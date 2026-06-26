@@ -1,0 +1,321 @@
+/* ============================================================
+   e-Gov Law Search UX Optimization Styles
+   (e-Gov画面上で適用されるCSS)
+   ============================================================ */
+
+/* ----- 1. ScrollSpy (目次ハイライト) ----- */
+/* The parent wrapper of the active link */
+.tocitem.active-spy-parent > .tocitemlabel,
+.tocitem.active-spy-parent > summary > .tocitemlabel {
+  background-color: #e7eefa !important;
+}
+
+/* The actual link text */
+.tocitem a.active-spy {
+  color: #1042a4 !important;
+  font-weight: bold !important;
+}
+
+/* ----- 2. Reference Popup (参照条文ポップアップ) ----- */
+.egov-ext-tooltip {
+  position: absolute;
+  background: white;
+  border: 1px solid #999;
+  box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+  padding: 15px;
+  border-radius: 6px;
+  z-index: 9999;
+  max-width: 400px;
+  max-height: 300px;
+  overflow-y: auto;
+  font-size: 14px;
+  line-height: 1.6;
+  opacity: 0;
+  transition: opacity 0.2s ease-in-out;
+  pointer-events: none;
+}
+.egov-ext-tooltip.visible {
+  opacity: 1;
+}
+
+/* Tooltip Layout Normalization */
+.egov-ext-tooltip * {
+  margin-top: 0 !important;
+  margin-bottom: 0 !important;
+}
+.egov-ext-tooltip ._div_ParagraphSentence,
+.egov-ext-tooltip .ParagraphSentence,
+.egov-ext-tooltip ._div_ItemSentence,
+.egov-ext-tooltip .ItemSentence {
+  padding-bottom: 6px !important;
+}
+.egov-ext-tooltip ._div_ArticleCaption,
+.egov-ext-tooltip .ArticleCaption {
+  font-weight: bold;
+  padding-bottom: 4px !important;
+}
+
+/* Forces titles and first paragraphs to render as inline text rather than blocks */
+.egov-ext-tooltip .egov-ext-inline {
+  display: inline !important;
+}
+
+/* ----- 3. 括弧書きの薄字化 (Dim Parentheses) ----- */
+body.egov-ext-dim-active .egov-ext-dimmed-text {
+  color: #838A97 !important; /* 変更前後の中間の明るさのグレー */
+}
+
+/* リンク内の薄字化テキストが青色に引っ張られないようにする */
+body.egov-ext-dim-active a .egov-ext-dimmed-text,
+body.egov-ext-dim-active a.egov-ext-dimmed-text {
+  color: inherit !important;
+}
+
+/* 
+  カッコ記号（（ や ））自体のスタイル。
+  虹色カッコ機能（Rainbow Brackets）により、入れ子の深さ（レベル）に応じて背景と文字色を変えます。
+*/
+.egov-ext-bracket {
+  font-weight: bold !important;
+  border-radius: 2px !important;
+}
+
+/* レベル1: ディープクリムゾン（赤、一番外側のカッコ - 非常に高いコントラストで視認性抜群） */
+.egov-ext-bracket-level-1 {
+  color: #b91c1c !important; 
+  background-color: rgba(185, 28, 28, 0.08) !important;
+}
+
+/* レベル2: フォレストグリーン（緑、二重カッコ） */
+.egov-ext-bracket-level-2 {
+  color: #15803d !important; 
+  background-color: rgba(21, 128, 61, 0.08) !important;
+}
+
+/* レベル3: ダークアンバー（琥珀色/茶、三重カッコ - 1段目の赤・2段目の緑と明確に区別可能） */
+.egov-ext-bracket-level-3 {
+  color: #b45309 !important; 
+  background-color: rgba(180, 83, 9, 0.08) !important;
+}
+
+/* レベル4: ロイヤルブルー（青、四重カッコ - 深い階層のみで出現するため画面全体の青さを損ないません） */
+.egov-ext-bracket-level-4 {
+  color: #1d4ed8 !important; 
+  background-color: rgba(29, 78, 216, 0.08) !important;
+}
+
+/* レベル5: ディープパープル（紫、五重カッコ） */
+.egov-ext-bracket-level-5 {
+  color: #6d28d9 !important; 
+  background-color: rgba(109, 40, 217, 0.08) !important;
+}
+
+/* ----- 4. ヘッダーコンテナ (Header Container for Status Badge and Jump Search Box) ----- */
+.egov-ext-header-container {
+  position: fixed !important;
+  top: 16px !important; /* ヘルプと高さをきっちり揃えるために少し下へ調整 */
+  right: 110px !important; /* ヘルプのすぐ左隣に配置 */
+  z-index: 2147483647 !important; /* 最前面へ */
+  display: flex !important;
+  align-items: center !important;
+  gap: 8px !important;
+  pointer-events: none !important;
+}
+
+/* ----- 4b. ステータスバッジ (Status Badge) ----- */
+.egov-ext-status-badge {
+  background: rgba(16, 66, 164, 0.9) !important;
+  color: white !important;
+  padding: 4px 12px !important;
+  border-radius: 16px !important;
+  font-size: 12px !important;
+  font-weight: bold !important;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif !important;
+  pointer-events: auto !important;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.2) !important;
+  backdrop-filter: blur(4px) !important;
+  -webkit-backdrop-filter: blur(4px) !important;
+  display: flex !important;
+  align-items: center !important;
+  gap: 6px !important;
+  height: 28px !important; /* 条文ジャンプ検索ボックスと同じ高さに揃える */
+  box-sizing: border-box !important;
+}
+
+/* ----- 5. 条文ジャンプ検索ボックス (Jump Search Box) ----- */
+.egov-ext-jump-container {
+  display: flex !important;
+  align-items: center !important;
+  background: rgba(255, 255, 255, 0.9) !important;
+  backdrop-filter: blur(10px) !important;
+  -webkit-backdrop-filter: blur(10px) !important;
+  border: 1px solid #1042a4 !important; /* 細くスタイリッシュな青枠 */
+  border-radius: 16px !important; /* 角丸を少し小さく */
+  padding: 2px 8px !important; /* 上下の余白を減らして高さを抑える */
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1) !important;
+  transition: all 0.3s ease !important;
+  width: 210px !important; /* プレースホルダーの例が見えるようにさらに幅を広く */
+  height: 28px !important; /* 高さを固定してスリムに */
+  pointer-events: auto !important; /* クリック可能にする */
+  box-sizing: border-box !important;
+}
+
+.egov-ext-jump-container:focus-within {
+  width: 210px !important; /* フォーカス時も幅を広げない */
+  background: rgba(255, 255, 255, 1) !important;
+  box-shadow: 0 6px 12px rgba(0, 0, 0, 0.15) !important;
+  border-color: #0a2d73 !important;
+}
+
+.egov-ext-jump-icon {
+  margin-right: 6px !important;
+  font-size: 14px !important; /* アイコンを小さく */
+  color: #1042a4 !important;
+  opacity: 1 !important;
+}
+
+.egov-ext-jump-container:focus-within .egov-ext-jump-icon {
+  color: #0a2d73 !important;
+}
+
+.egov-ext-jump-input {
+  border: none !important;
+  background: transparent !important;
+  outline: none !important;
+  font-size: 13px !important; /* フォントを小さく */
+  width: 100% !important;
+  color: #333 !important;
+  height: 100% !important;
+  line-height: 28px !important; /* 縦方向の中央揃え */
+}
+
+.egov-ext-jump-input::placeholder {
+  color: #888 !important; /* プレースホルダーを少し薄く */
+  font-size: 12px !important;
+}
+
+.egov-ext-jump-clear {
+  margin-left: 6px !important;
+  font-size: 16px !important;
+  color: #aaa !important;
+  cursor: pointer !important;
+  display: none !important;
+  line-height: 1 !important;
+  padding: 2px !important;
+  border-radius: 50% !important;
+  transition: color 0.2s, background-color 0.2s !important;
+}
+
+.egov-ext-jump-clear.visible {
+  display: inline-block !important;
+}
+
+.egov-ext-jump-clear:hover {
+  color: #333 !important;
+  background-color: #f0f0f0 !important;
+}
+
+/* ジャンプした先の条文をハイライトするアニメーション */
+@keyframes egov-ext-highlight-fade {
+  0% { background-color: rgba(255, 235, 59, 0.8); }
+  50% { background-color: rgba(255, 235, 59, 0.4); }
+  100% { background-color: transparent; }
+}
+
+.egov-ext-jump-target {
+  animation: egov-ext-highlight-fade 2.5s ease-out forwards !important;
+}
+
+/* ----- 6. 定義語ホバー辞書＆ハイライト (Defined Terms Highlight & Tooltip) ----- */
+
+/* 定義語のハイライト表示（優先度を最大限に強化して他スタイルの競合を回避） */
+body .egov-definition-word,
+body div .egov-definition-word,
+body span.egov-definition-word,
+.LawBody .egov-definition-word,
+.main-content .egov-definition-word {
+  color: #00695c !important; /* 控えめで上品な深緑/深青緑系（ティール） */
+  border-bottom: 1.5px dotted #00695c !important; /* 点線のアンダーライン */
+  background-color: rgba(0, 105, 92, 0.04) !important; /* ごく薄いティールの背景 */
+  transition: background-color 0.2s ease !important;
+  display: inline !important; /* テキストの流れを崩さないインライン表示 */
+}
+
+body .egov-definition-word:hover,
+body div .egov-definition-word:hover,
+.LawBody .egov-definition-word:hover {
+  background-color: rgba(0, 105, 92, 0.1) !important; /* ホバー時に少し背景を強調 */
+}
+
+/* リンク内の定義語は下線や色をリンクに合わせる */
+body a .egov-definition-word,
+.LawBody a .egov-definition-word {
+  color: inherit !important;
+  border-bottom-color: inherit !important;
+}
+
+/* 定義語のホバーポップアップ（辞書ツールチップ） */
+.egov-ext-definition-tooltip {
+  position: absolute;
+  background: white;
+  border: 1px solid #ccc;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  padding: 12px;
+  border-radius: 8px;
+  z-index: 10000; /* 参照ポップアップより前面に表示 */
+  max-width: 450px;
+  max-height: 350px;
+  overflow-y: auto;
+  font-size: 13px;
+  line-height: 1.6;
+  opacity: 0;
+  transition: opacity 0.15s ease-in-out;
+  pointer-events: none;
+  color: #333;
+}
+
+.egov-ext-definition-tooltip.visible {
+  opacity: 1;
+}
+
+/* ポップアップのヘッダー（条項の出典番号） */
+.egov-ext-definition-tooltip-header {
+  font-weight: bold;
+  font-size: 12px;
+  color: #00695c;
+  border-bottom: 1px solid #eee;
+  padding-bottom: 4px;
+  margin-bottom: 8px !important;
+}
+
+/* ポップアップの本文 */
+.egov-ext-definition-tooltip-body {
+  margin-top: 0 !important;
+}
+
+/* ポップアップ内部の余白・レイアウト調整 */
+.egov-ext-definition-tooltip-body * {
+  margin-top: 0 !important;
+  margin-bottom: 0 !important;
+}
+
+.egov-ext-definition-tooltip-body ._div_ParagraphSentence,
+.egov-ext-definition-tooltip-body .ParagraphSentence,
+.egov-ext-definition-tooltip-body ._div_ItemSentence,
+.egov-ext-definition-tooltip-body .ItemSentence {
+  padding-bottom: 4px !important;
+}
+
+/* ----- 7. レンダリングの高速化 (Fast Rendering for Massive DOMs) ----- */
+body.egov-fastrender-enabled ._div_Article, 
+body.egov-fastrender-enabled .Article,
+body.egov-fastrender-enabled ._div_Paragraph, 
+body.egov-fastrender-enabled .Paragraph,
+body.egov-fastrender-enabled article.law, 
+body.egov-fastrender-enabled article.article {
+  /* 画面外にある要素のレイアウト計算と描画をスキップする */
+  content-visibility: auto !important;
+  /* 描画前の仮の高さ（500px）を指定し、一度描画された後は実際の高さを記憶(auto)させる */
+  contain-intrinsic-size: auto 500px !important;
+}
+

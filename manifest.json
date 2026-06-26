@@ -1,0 +1,46 @@
+{
+  "manifest_version": 3,
+  "name": "e-Gov 法令検索 実務サポート",
+  "version": "1.0.0",
+  "description": "e-Gov法令検索のレイアウトを改善し、横書きの算用数字変換、括弧書きの薄字化、参照条文・定義語のホバー表示などの機能を提供します。",
+  "permissions": ["storage"],
+  "host_permissions": ["*://laws.e-gov.go.jp/*", "*://elaws.e-gov.go.jp/*"],
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "e-Gov 法令検索 実務サポート",
+    "default_icon": {
+      "16": "icons/icon16.png",
+      "48": "icons/icon48.png",
+      "128": "icons/icon128.png"
+    }
+  },
+  "icons": {
+    "16": "icons/icon16.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  },
+  "content_scripts": [
+    {
+      "matches": ["*://laws.e-gov.go.jp/*", "*://elaws.e-gov.go.jp/*"],
+      "css": ["css/style.css"],
+      "js": [
+        "js/utils.js",
+        "js/horizontal.js",
+        "js/dim.js",
+        "js/scrollspy.js",
+        "js/refer_popup.js",
+        "js/jump.js",
+        "js/definition.js",
+        "js/content.js"
+      ],
+      "run_at": "document_end"
+    }
+  ],
+  "background": {
+    "service_worker": "js/background.js"
+  },
+  "options_ui": {
+    "page": "options.html",
+    "open_in_tab": true
+  }
+}

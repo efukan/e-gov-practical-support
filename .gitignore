@@ -1,0 +1,7 @@
+.agents/
+CHROMEWEBSTORE.md
+node_modules/
+assets/
+scripts/
+tests/
+*.zip

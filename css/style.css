@@ -323,20 +323,20 @@ body.egov-fastrender-enabled article.article {
 .egov-ext-citation-btn {
   display: inline-flex !important;
   align-items: center !important;
-  gap: 4px !important;
-  margin-left: 10px !important;
-  padding: 2px 8px !important;
+  gap: 2px !important;                 /* アイコンとテキストの間隔を狭く */
+  margin-left: 8px !important;
+  padding: 2px 4px !important;         /* 左右の余白を極限まで削り、スリムに */
   background-color: #e7eefa !important; /* 淡いブランド青 */
-  color: #1042a4 !important; /* ブランドネイビー */
+  color: #1042a4 !important;           /* ブランドネイビー */
   border: 1px solid #c2daf8 !important;
-  border-radius: 12px !important;
+  border-radius: 4px !important;       /* 角丸を小さくしてデッドスペース（物理的な無駄幅）をカット */
   font-size: 11px !important;
   font-weight: bold !important;
   cursor: pointer !important;
   transition: all 0.2s ease !important;
   vertical-align: middle !important;
   line-height: 1 !important;
-  height: 20px !important;
+  height: 18px !important;             /* 高さもスリム化して文字とのバランスを維持 */
   box-sizing: border-box !important;
 }
 

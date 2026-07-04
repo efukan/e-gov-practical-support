@@ -248,7 +248,7 @@ window.egovExt = window.egovExt || {};
       btn.className = 'egov-ext-citation-btn';
       btn.type = 'button';
       btn.title = 'この条文の被引用法令一覧を表示';
-      btn.innerHTML = `<svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor"><path d="M20 2H4c-1.1 0-1.99.9-1.99 2L2 22l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zM6 9h12v2H6V9zm8 5H6v-2h8v2zm4-6H6V6h12v2z"/></svg>引用`;
+      btn.innerHTML = `<svg viewBox="0 0 24 24" width="12" height="12" fill="currentColor"><path d="M20 2H4c-1.1 0-1.99.9-1.99 2L2 22l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zM6 9h12v2H6V9zm8 5H6v-2h8v2zm4-6H6V6h12v2z"/></svg>引用`;
 
       // タイトルの直後に挿入 (インライン)
       titleEl.appendChild(btn);

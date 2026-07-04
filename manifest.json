@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "e-Gov 法令検索 実務サポート",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "e-Gov法令検索のレイアウトを改善し、横書きの算用数字変換、括弧書きの薄字化、参照条文・定義語のホバー表示などの機能を提供します。",
   "permissions": ["storage"],
   "host_permissions": ["*://laws.e-gov.go.jp/*", "*://elaws.e-gov.go.jp/*"],

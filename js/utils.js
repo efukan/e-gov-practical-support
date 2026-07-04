@@ -21,7 +21,8 @@ window.egovExt = window.egovExt || {};
     dim: true,
     jump: true,
     horizontal: true,
-    fastrender: true
+    fastrender: true,
+    citation: true
   };
 
   /**

@@ -104,6 +104,7 @@ window.egovExt = window.egovExt || {};
       if (ext.removeHorizontalConversion) ext.removeHorizontalConversion();
       if (ext.processNormalizeQueue) ext.processNormalizeQueue();
       if (ext.removeJumpSearch) ext.removeJumpSearch();
+      if (ext.disableCitations) ext.disableCitations();
       if (ext.scrollSpyObserver) {
         ext.scrollSpyObserver.disconnect();
         ext.scrollSpyObserver = null;
@@ -498,6 +499,12 @@ window.egovExt = window.egovExt || {};
       }
 
       try {
+        if (ext.disableCitations) ext.disableCitations();
+      } catch (e) {
+        console.error("egov-ext: Error disabling citations:", e);
+      }
+
+      try {
         if (ext.processNormalizeQueue) ext.processNormalizeQueue();
       } catch (e) {
         console.error("egov-ext: Error processing normalize queue:", e);
@@ -569,6 +576,17 @@ window.egovExt = window.egovExt || {};
       } catch (e) {
         console.error("egov-ext: Error enabling popup:", e);
       }
+    }
+
+    // 被引用（引用元）表示機能
+    if (ext.settings.citation && isLawPage && ext.enableCitations) {
+      try {
+        ext.enableCitations();
+      } catch (e) {
+        console.error("egov-ext: Error enabling citations:", e);
+      }
+    } else {
+      if (ext.disableCitations) ext.disableCitations();
     }
 
     // 条文ジャンプ検索

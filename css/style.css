@@ -319,3 +319,113 @@ body.egov-fastrender-enabled article.article {
   contain-intrinsic-size: auto 500px !important;
 }
 
+/* ----- 8. 被引用（引用元）表示機能 (Cited By / Citations) ----- */
+.egov-ext-citation-btn {
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 4px !important;
+  margin-left: 10px !important;
+  padding: 2px 8px !important;
+  background-color: #e7eefa !important; /* 淡いブランド青 */
+  color: #1042a4 !important; /* ブランドネイビー */
+  border: 1px solid #c2daf8 !important;
+  border-radius: 12px !important;
+  font-size: 11px !important;
+  font-weight: bold !important;
+  cursor: pointer !important;
+  transition: all 0.2s ease !important;
+  vertical-align: middle !important;
+  line-height: 1 !important;
+  height: 20px !important;
+  box-sizing: border-box !important;
+}
+
+.egov-ext-citation-btn:hover {
+  background-color: #d2e4f9 !important;
+  border-color: #a4ccf6 !important;
+  color: #0a2d73 !important;
+}
+
+.egov-ext-citation-btn svg {
+  flex-shrink: 0 !important;
+}
+
+/* 被引用ポップアップ（ツールチップ） */
+.egov-ext-citation-tooltip {
+  position: absolute;
+  background: white;
+  border: 1px solid #ccc;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
+  padding: 12px 14px;
+  border-radius: 8px;
+  z-index: 10000;
+  max-width: 450px;
+  max-height: 350px;
+  overflow-y: auto;
+  font-size: 13px;
+  line-height: 1.6;
+  opacity: 0;
+  transition: opacity 0.15s ease-in-out;
+  pointer-events: auto; /* リンクをクリックできるようにする */
+  color: #333;
+}
+
+.egov-ext-citation-tooltip.visible {
+  opacity: 1;
+}
+
+.egov-ext-citation-tooltip-header {
+  font-weight: bold;
+  font-size: 12px;
+  color: #1042a4;
+  border-bottom: 1px solid #eee;
+  padding-bottom: 6px;
+  margin-bottom: 8px !important;
+}
+
+.egov-ext-citation-tooltip-list {
+  list-style: none !important;
+  padding: 0 !important;
+  margin: 0 !important;
+}
+
+.egov-ext-citation-tooltip-list li {
+  margin-bottom: 6px !important;
+  padding: 0 !important;
+  list-style: none !important;
+}
+
+.egov-ext-citation-tooltip-list li:last-child {
+  margin-bottom: 0 !important;
+}
+
+.egov-ext-citation-link {
+  display: flex !important;
+  flex-direction: column !important;
+  text-decoration: none !important;
+  padding: 6px 8px !important;
+  border-radius: 4px !important;
+  background-color: #f7f9fc !important;
+  transition: background-color 0.2s ease !important;
+  color: #333 !important;
+  border: 1px solid #eef2f6 !important;
+}
+
+.egov-ext-citation-link:hover {
+  background-color: #edf2f9 !important;
+  border-color: #cbdcf2 !important;
+}
+
+.egov-ext-citation-lawname {
+  font-weight: bold !important;
+  color: #1a1a1a !important;
+  font-size: 12px !important;
+  line-height: 1.4 !important;
+}
+
+.egov-ext-citation-path {
+  color: #666 !important;
+  font-size: 11px !important;
+  margin-top: 2px !important;
+}
+

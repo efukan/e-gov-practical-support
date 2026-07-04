@@ -17,7 +17,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     dim: document.getElementById('feature-dim'),
     jump: document.getElementById('feature-jump'),
     horizontal: document.getElementById('feature-horizontal'),
-    fastrender: document.getElementById('feature-fastrender')
+    fastrender: document.getElementById('feature-fastrender'),
+    citation: document.getElementById('feature-citation')
   };
 
   // 初期設定のデフォルト値
@@ -30,7 +31,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     dim: true,
     jump: true,
     horizontal: true,
-    fastrender: true
+    fastrender: true,
+    citation: true
   };
   
   let settings = defaultSettings;

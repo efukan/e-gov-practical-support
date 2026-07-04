@@ -324,7 +324,7 @@ body.egov-fastrender-enabled article.article {
   display: inline-flex !important;
   align-items: center !important;
   gap: 2px !important;                 /* アイコンとテキストの間隔を狭く */
-  margin-left: 8px !important;
+  margin-left: 3px !important;
   padding: 2px 4px !important;         /* 左右の余白を極限まで削り、スリムに */
   background-color: #e7eefa !important; /* 淡いブランド青 */
   color: #1042a4 !important;           /* ブランドネイビー */

@@ -37,6 +37,7 @@ window.egovExt = window.egovExt || {};
    * 共通の初期化・適用関数
    */
   ext.enableCitations = async function() {
+    console.log("egov-ext: enableCitations started. Settings citation:", ext.settings.citation, "global:", ext.settings.global);
     if (!ext.settings.global || !ext.settings.citation) {
       ext.disableCitations();
       return;
@@ -90,7 +91,7 @@ window.egovExt = window.egovExt || {};
    */
   ext.disableCitations = function() {
     // 挿入したボタンを削除
-    const buttons = document.querySelectorAll('.egov-ext-citation-btn');
+    const buttons = ext.deepQuerySelectorAll(document.body, '.egov-ext-citation-btn');
     buttons.forEach(btn => btn.remove());
 
     // ツールチップを削除
@@ -134,9 +135,8 @@ window.egovExt = window.egovExt || {};
                       document.querySelector('article.law') || 
                       document.body;
 
-    // 本則の条文要素 (主にクラス名が「Article」または「_div_Article」のもの)
-    // 憲法の前文や特殊な法令の条文も考慮して、IDを持つ要素を探索
-    const articles = container.querySelectorAll('.Article, ._div_Article');
+    // 本則の条文要素 (大文字・小文字、タグ名やアンダースコア表記のブレを網羅して広く探索)
+    const articles = ext.deepQuerySelectorAll(container, '.Article, ._div_Article, .article, ._div_article, article');
     articles.forEach(el => {
       if (el.id) {
         objectIds.push(el.id);
@@ -166,14 +166,15 @@ window.egovExt = window.egovExt || {};
       if (!revRes.ok) throw new Error(`SelectLawRevisionData failed with status ${revRes.status}`);
       const revData = await revRes.json();
       
-      if (!revData || !revData.result || !revData.result.revision_list || revData.result.revision_list.length === 0) {
+      const revisionList = revData.result.revision_list || revData.result.Amendment_History;
+      if (!revData || !revData.result || !revisionList || revisionList.length === 0) {
         return null;
       }
 
-      // 最新の施行情報を取得 (通常配列の最初の要素)
-      const currentRevision = revData.result.revision_list[0];
-      const lawDataId = currentRevision.law_data_id;
-      const subRevision = currentRevision.subRevision;
+      // 現在施行されているリビジョンを取得 (無ければ最初の要素を使用)
+      const currentRevision = revisionList.find(r => r.IsCurrentEnforcement || r.isCurrentEnforcement) || revisionList[0];
+      const lawDataId = currentRevision.law_data_id || currentRevision.LawDataId;
+      const subRevision = currentRevision.subRevision || currentRevision.SubRevision;
 
       // 日付の取得 (YYYY/MM/DD形式)
       const date = new Date();
@@ -215,7 +216,7 @@ window.egovExt = window.egovExt || {};
                       document.querySelector('article.law') || 
                       document.body;
 
-    const articles = container.querySelectorAll('.Article, ._div_Article');
+    const articles = ext.deepQuerySelectorAll(container, '.Article, ._div_Article, .article, ._div_article, article');
     articles.forEach(articleEl => {
       const objectId = articleEl.id;
       if (!objectId || !ext.citationMap.has(objectId)) return;
@@ -223,8 +224,8 @@ window.egovExt = window.egovExt || {};
       // すでにボタンが挿入されているかチェック
       if (articleEl.querySelector('.egov-ext-citation-btn')) return;
 
-      // 条文のタイトル要素 (例: 「第１条」など) を探す
-      const titleEl = articleEl.querySelector('.ArticleTitle, ._div_ArticleTitle');
+      // 条文のタイトル要素 (例: 「第１条」など) を探す (大文字・小文字・ハイフン表記等のバリエーションを網羅)
+      const titleEl = articleEl.querySelector('.ArticleTitle, ._div_ArticleTitle, .articletitle, ._div_articletitle, .article-title, .paragraph-title, .paragraphtitle');
       if (!titleEl) return;
 
       // ボタン要素の作成

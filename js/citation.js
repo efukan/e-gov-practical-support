@@ -305,6 +305,7 @@ window.egovExt = window.egovExt || {};
     html += '</ul>';
     
     ext.citationTooltipEl.innerHTML = html;
+    ext.citationTooltipEl.scrollTop = 0; // スクロール位置をリセット
     ext.citationTooltipEl.classList.add('visible');
 
     // 位置の計算
@@ -342,6 +343,7 @@ window.egovExt = window.egovExt || {};
     tooltipHideTimer = setTimeout(() => {
       if (ext.citationTooltipEl) {
         ext.citationTooltipEl.classList.remove('visible');
+        ext.citationTooltipEl.scrollTop = 0; // 非表示時にスクロール位置をリセット
       }
     }, 300); // 300msの遅延後に非表示にする
   }

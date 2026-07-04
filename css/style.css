@@ -365,13 +365,16 @@ body.egov-fastrender-enabled article.article {
   font-size: 13px;
   line-height: 1.6;
   opacity: 0;
-  transition: opacity 0.15s ease-in-out;
-  pointer-events: auto; /* リンクをクリックできるようにする */
+  visibility: hidden; /* 非表示の時は完全に隠す */
+  pointer-events: none; /* 非表示の時はマウスイベントを透過させる */
+  transition: opacity 0.15s ease-in-out, visibility 0.15s ease-in-out;
   color: #333;
 }
 
 .egov-ext-citation-tooltip.visible {
   opacity: 1;
+  visibility: visible; /* 表示時に可視化 */
+  pointer-events: auto; /* 表示時はリンク等をクリックできるようにする */
 }
 
 .egov-ext-citation-tooltip-header {

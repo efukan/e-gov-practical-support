@@ -48,6 +48,29 @@ window.egovExt = window.egovExt || {};
   let lastObservedUrl = '';
 
   /**
+   * 前回処理時の法令ID（同一法令内でのタブ切り替え時に定義語抽出をスキップするため）
+   * @type {string}
+   */
+  let lastObservedLawId = '';
+
+  /**
+   * URLから法令IDを抽出するヘルパー関数
+   */
+  function getLawIdFromUrl(urlString) {
+    if (!urlString) return null;
+    try {
+      const url = new URL(urlString, window.location.origin);
+      const pathMatch = url.pathname.match(/\/law\/([0-9A-Z]+)/i);
+      if (pathMatch) return pathMatch[1].toUpperCase();
+      const lawIdParam = url.searchParams.get('lawid') || url.searchParams.get('lawId');
+      if (lawIdParam) return lawIdParam.toUpperCase();
+      const generalMatch = url.pathname.match(/\/([0-9]{3}[A-Z]{2}[0-9]+)/i);
+      if (generalMatch) return generalMatch[1].toUpperCase();
+    } catch (e) {}
+    return null;
+  }
+
+  /**
    * 別タブで開く機能のクリックリスナーが登録されたかどうかのフラグ
    * @type {boolean}
    */
@@ -476,6 +499,12 @@ window.egovExt = window.egovExt || {};
       lastObservedUrl = currentUrl;
     }
 
+    const currentLawId = getLawIdFromUrl(currentUrl);
+    const lawIdChanged = currentLawId !== lastObservedLawId;
+    if (lawIdChanged) {
+      lastObservedLawId = currentLawId;
+    }
+
     console.log("egov-ext: handleDynamicContent called. forceReset:", forceReset, "urlChanged:", urlChanged, "isLawPage:", isLawPage);
 
     // 設定変更などで強制リセットが必要な場合のみ、元の状態に一度戻す
@@ -532,7 +561,7 @@ window.egovExt = window.egovExt || {};
     // 定義語ホバー辞書＆ハイライト
     if (ext.settings.definition && isLawPage && ext.extractDefinitionsAsync && ext.enableDefinitionHighlighting) {
       try {
-        const shouldExtract = forceReset || urlChanged || ext.definitionMap.size === 0;
+        const shouldExtract = forceReset || lawIdChanged || ext.definitionMap.size === 0;
         if (shouldExtract) {
           await ext.extractDefinitionsAsync();
           

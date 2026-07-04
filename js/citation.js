@@ -365,6 +365,10 @@ window.egovExt = window.egovExt || {};
     ext.citationTooltipEl.scrollTop = 0; // スクロール位置をリセット
     ext.citationTooltipEl.classList.add('visible');
 
+    if (ext.settings.horizontal && ext.applyHorizontalConversion) {
+      ext.applyHorizontalConversion(ext.citationTooltipEl);
+    }
+
     // 位置の計算
     const rect = btn.getBoundingClientRect();
     const tooltipRect = ext.citationTooltipEl.getBoundingClientRect();

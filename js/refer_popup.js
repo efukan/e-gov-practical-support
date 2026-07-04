@@ -161,6 +161,10 @@ window.egovExt = window.egovExt || {};
             ext.tooltipEl.style.left = '0px';
             ext.tooltipEl.style.top = `${rect.bottom + window.scrollY + 5}px`;
             ext.tooltipEl.classList.add('visible');
+
+            if (ext.settings.horizontal && ext.applyHorizontalConversion) {
+              ext.applyHorizontalConversion(ext.tooltipEl);
+            }
             
             const tooltipWidth = ext.tooltipEl.offsetWidth;
             

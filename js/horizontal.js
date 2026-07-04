@@ -227,8 +227,14 @@ window.egovExt = window.egovExt || {};
 
       nodes.forEach(node => {
         if (node.parentNode && node.parentNode.closest) {
-          const parentTooltip = node.parentNode.closest('.egov-ext-definition-tooltip, .egov-ext-tooltip');
-          if (parentTooltip) return;
+          const parentTooltip = node.parentNode.closest('.egov-ext-definition-tooltip, .egov-ext-tooltip, .egov-ext-citation-tooltip');
+          if (parentTooltip) {
+            if (targetContainer && (targetContainer === parentTooltip || targetContainer.contains(parentTooltip))) {
+              // Allow conversion if explicitly targeted
+            } else {
+              return;
+            }
+          }
 
           const closestTitle = node.parentNode.closest('.ItemTitle, ._div_ItemTitle, .itemtitle, .ParagraphNum, ._div_ParagraphNum, .paragraphtitle');
           if (closestTitle) {

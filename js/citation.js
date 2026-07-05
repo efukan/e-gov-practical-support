@@ -406,7 +406,7 @@ window.egovExt = window.egovExt || {};
         ext.citationTooltipEl.classList.remove('visible');
         ext.citationTooltipEl.scrollTop = 0; // 非表示時にスクロール位置をリセット
       }
-    }, 300); // 300msの遅延後に非表示にする
+    }, 200); // 200msの遅延後に非表示にする
   }
 
 })(window.egovExt);

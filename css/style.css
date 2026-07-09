@@ -432,3 +432,15 @@ body.egov-fastrender-enabled article.article {
   margin-top: 2px !important;
 }
 
+/* ----- 9. 印刷時の非表示設定 (Hide elements during print) ----- */
+@media print {
+  .egov-ext-header-container,
+  .egov-ext-status-badge,
+  .egov-ext-jump-container,
+  .egov-ext-tooltip,
+  .egov-ext-definition-tooltip,
+  .egov-ext-citation-tooltip {
+    display: none !important;
+  }
+}
+

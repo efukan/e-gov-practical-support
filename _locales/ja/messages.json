@@ -1,0 +1,10 @@
+{
+  "extName": {
+    "message": "e-Gov 法令検索 実務サポート",
+    "description": "Extension name in Japanese"
+  },
+  "extDesc": {
+    "message": "e-Gov法令検索のレイアウトを改善し、横書きの算用数字変換、括弧書きの薄字化、参照条文・定義語のホバー表示などの機能を提供します。",
+    "description": "Extension description in Japanese"
+  }
+}

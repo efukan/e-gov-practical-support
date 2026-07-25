@@ -1,0 +1,10 @@
+{
+  "extName": {
+    "message": "e-Gov Law Search Practical Support",
+    "description": "Extension name in English"
+  },
+  "extDesc": {
+    "message": "Optimizes e-Gov Law Search layout with horizontal digit conversion, dimmed parentheses, definition tooltips, and citation links.",
+    "description": "Extension description in English"
+  }
+}

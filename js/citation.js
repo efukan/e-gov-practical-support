@@ -251,7 +251,14 @@ window.egovExt = window.egovExt || {};
       btn.innerHTML = `<svg viewBox="0 0 24 24" width="12" height="12" fill="currentColor"><path d="M20 2H4c-1.1 0-1.99.9-1.99 2L2 22l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zM6 9h12v2H6V9zm8 5H6v-2h8v2zm4-6H6V6h12v2z"/></svg>引用`;
 
       // タイトルの直後に挿入 (インライン)
-      titleEl.appendChild(btn);
+      // 公職選挙法などのように、_div_ArticleTitle の中に本文が同居しているケースに対応するため、
+      // 内部の最初の span (「第一条」等の条数ラベル) の直後に挿入を試みる。
+      const labelSpan = titleEl.querySelector('span');
+      if (labelSpan && labelSpan.parentNode === titleEl) {
+        labelSpan.parentNode.insertBefore(btn, labelSpan.nextSibling);
+      } else {
+        titleEl.appendChild(btn);
+      }
     });
   }
 
@@ -351,11 +358,14 @@ window.egovExt = window.egovExt || {};
     html += '<ul class="egov-ext-citation-tooltip-list">';
     
     inyoList.forEach(item => {
-      const url = `https://laws.e-gov.go.jp${item.url}`;
+      const escape = ext.escapeHTML || (s => String(s).replace(/[&<>"']/g, ''));
+      const safeUrl = `https://laws.e-gov.go.jp${escape(item.url)}`;
+      const safeLawName = escape(item.law_name);
+      const safePath = escape(item.path);
       html += `<li>
-        <a href="${url}" target="_blank" rel="noopener noreferrer" class="egov-ext-citation-link">
-          <span class="egov-ext-citation-lawname">${item.law_name}</span>
-          <span class="egov-ext-citation-path">${item.path}</span>
+        <a href="${safeUrl}" target="_blank" rel="noopener noreferrer" class="egov-ext-citation-link">
+          <span class="egov-ext-citation-lawname">${safeLawName}</span>
+          <span class="egov-ext-citation-path">${safePath}</span>
         </a>
       </li>`;
     });

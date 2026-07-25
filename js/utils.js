@@ -234,6 +234,21 @@ window.egovExt = window.egovExt || {};
   };
 
   /**
+   * HTML特殊文字をエスケープしてXSSを予防する汎用関数
+   * @param {string} str - エスケープ対象の文字列
+   * @returns {string} エスケープ済みの文字列
+   */
+  ext.escapeHTML = function(str) {
+    if (str === null || str === undefined) return '';
+    return String(str)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#039;');
+  };
+
+  /**
    * イベントの伝播経路（Shadow DOM を含む）を走査して、指定のセレクタにマッチする要素を見つける
    * @param {Event} event - ブラウザのイベントオブジェクト
    * @param {string} selector - 検索対象のCSSセレクタ

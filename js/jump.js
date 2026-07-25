@@ -38,22 +38,28 @@ window.egovExt = window.egovExt || {};
     container = document.createElement('div');
     container.id = 'egov-ext-jump-container';
     container.className = 'egov-ext-jump-container';
+    container.setAttribute('role', 'search');
 
     // アイコン
     const icon = document.createElement('span');
     icon.className = 'egov-ext-jump-icon';
     icon.textContent = '🔍';
+    icon.setAttribute('aria-hidden', 'true');
 
     // 入力欄
     const input = document.createElement('input');
     input.type = 'text';
     input.className = 'egov-ext-jump-input';
     input.placeholder = '条文へジャンプ (例: 5, 12-2)';
+    input.setAttribute('aria-label', '条文番号検索');
 
     // クリアボタン
     const clearBtn = document.createElement('span');
     clearBtn.className = 'egov-ext-jump-clear';
     clearBtn.innerHTML = '&times;';
+    clearBtn.setAttribute('role', 'button');
+    clearBtn.setAttribute('tabindex', '0');
+    clearBtn.setAttribute('aria-label', '検索テキストをクリア');
 
     container.appendChild(icon);
     container.appendChild(input);
@@ -71,11 +77,19 @@ window.egovExt = window.egovExt || {};
       }
     });
 
-    // クリアボタンがクリックされたら入力を空にする
-    clearBtn.addEventListener('click', () => {
+    const handleClear = () => {
       input.value = '';
       clearBtn.classList.remove('visible');
       input.focus();
+    };
+
+    // クリアボタンがクリックされたら入力を空にする
+    clearBtn.addEventListener('click', handleClear);
+    clearBtn.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault();
+        handleClear();
+      }
     });
 
     // Enterキーで検索を実行

@@ -21,7 +21,8 @@ function updateIcon(isGlobalEnabled) {
 // ブラウザ起動時の初期化処理
 chrome.runtime.onStartup.addListener(() => {
   chrome.storage.sync.get('egovSettings', (result) => {
-    const settings = result.egovSettings || { global: true };
+    if (chrome.runtime.lastError) return;
+    const settings = (result && result.egovSettings) || { global: true };
     updateIcon(settings.global);
   });
 });
@@ -30,10 +31,18 @@ chrome.runtime.onStartup.addListener(() => {
 // 拡張機能がインストール・更新された時の初期化処理
 chrome.runtime.onInstalled.addListener(() => {
   chrome.storage.sync.get('egovSettings', (result) => {
-    const settings = result.egovSettings || { global: true };
+    if (chrome.runtime.lastError) return;
+    const settings = (result && result.egovSettings) || { global: true };
     updateIcon(settings.global);
   });
   console.log("e-Gov Law Search UX Optimization extension installed.");
+});
+
+// Service Worker 起動時（スリープ復帰時含む）のアイコン状態同調
+chrome.storage.sync.get('egovSettings', (result) => {
+  if (chrome.runtime.lastError) return;
+  const settings = (result && result.egovSettings) || { global: true };
+  updateIcon(settings.global);
 });
 
 // Listen for settings changes to update the icon dynamically

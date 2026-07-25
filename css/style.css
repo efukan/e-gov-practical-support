@@ -432,7 +432,15 @@ body.egov-fastrender-enabled article.article {
   margin-top: 2px !important;
 }
 
-/* ----- 9. 印刷時の非表示設定 (Hide elements during print) ----- */
+/* ----- 9. アクセシビリティ・フォーカス視認性 (Accessibility Focus Styles) ----- */
+.egov-ext-jump-input:focus-visible,
+.egov-ext-citation-btn:focus-visible,
+.egov-ext-jump-clear:focus-visible {
+  outline: 2px solid #1042a4 !important;
+  outline-offset: 2px !important;
+}
+
+/* ----- 10. 印刷時の非表示設定 (Hide elements during print) ----- */
 @media print {
   .egov-ext-header-container,
   .egov-ext-status-badge,

@@ -1,4 +1,5 @@
 .agents/
+.archive/
 CHROMEWEBSTORE.md
 node_modules/
 assets/
@@ -6,8 +7,8 @@ scripts/
 *.zip
 .DS_Store
 
-# tests/ 配下はアドホックな検証スクリプト置き場だが、
-# npm test で実行するスモークテストだけは追跡対象にする
+# tests/ 配下は npm test で実行する2本のみを追跡する。
+# 一時的な検証用のダンプデータやスクラッチを置いても追跡されない。
 tests/*
 !tests/smoke_content_scripts.js
 !tests/test_tooltip_position.js

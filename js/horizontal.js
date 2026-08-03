@@ -131,6 +131,9 @@ window.egovExt = window.egovExt || {};
    * @param {HTMLElement|null} [targetContainer=null] - 適用対象のDOMコンテナ
    */
   ext.applyHorizontalConversion = function(targetContainer = null) {
+    // 呼び出し側でも設定を確認しているが、ここでも一度だけ判定して以降の分岐をなくす
+    if (!ext.settings.global || !ext.settings.horizontal) return;
+
     if (!targetContainer) {
       ext.cancelTask('horizontal_leaf');
       ext.cancelTask('horizontal_item');
@@ -141,15 +144,11 @@ window.egovExt = window.egovExt || {};
     if (targetContainer) {
       containers.push(targetContainer);
     } else {
-      const mainContainer = ext.deepQuerySelectorAll(document.body, '.LawBody')[0] || 
-                            ext.deepQuerySelectorAll(document.body, '.main-content')[0] || 
-                            ext.deepQuerySelectorAll(document.body, '.provisiontext')[0] || 
-                            ext.deepQuerySelectorAll(document.body, 'article.law')[0];
+      const mainContainer = ext.getLawContainer();
       if (mainContainer) {
         containers.push(mainContainer);
       }
-      const sidebar = document.querySelector('.sidebar, #sidebar, .toc') || 
-                      ext.deepQuerySelectorAll(document.body, '.sidebar, #sidebar, .toc')[0];
+      const sidebar = ext.deepQuerySelectorAll(document.body, ext.SIDEBAR_SELECTOR)[0];
       if (sidebar) {
         containers.push(sidebar);
       }
@@ -207,11 +206,13 @@ window.egovExt = window.egovExt || {};
           return false;
         }
       }
-      return ext.deepQuerySelectorAll(el, 'div, p, h1, h2, h3, h4, h5, h6, li, td, th').length === 0;
+      // querySelector は最初の1件で打ち切られるため querySelectorAll(...).length === 0 より速い
+      return !el.querySelector(ext.BLOCK_SELECTOR);
     });
 
     const processLeaf = (block) => {
-      if (ext.settings.global && ext.settings.horizontal && !HAS_NUM_REGEX.test(block.textContent)) {
+      // 数字を含まないブロックは変換対象が無いのでテキストノード走査ごとスキップする
+      if (!HAS_NUM_REGEX.test(block.textContent)) {
         return;
       }
 
@@ -227,7 +228,7 @@ window.egovExt = window.egovExt || {};
 
       nodes.forEach(node => {
         if (node.parentNode && node.parentNode.closest) {
-          const parentTooltip = node.parentNode.closest('.egov-ext-definition-tooltip, .egov-ext-tooltip, .egov-ext-citation-tooltip');
+          const parentTooltip = node.parentNode.closest('.egov-ext-tip');
           if (parentTooltip) {
             if (targetContainer && (targetContainer === parentTooltip || targetContainer.contains(parentTooltip))) {
               // Allow conversion if explicitly targeted
@@ -247,18 +248,14 @@ window.egovExt = window.egovExt || {};
         }
 
         // 目次（サイドバー）のテキストノードは、イベントリスナ破壊防止のためinnerHTMLではなくテキストのインプレース書き戻しで復元する
-        const isInsideSidebar = node.parentNode && node.parentNode.closest && node.parentNode.closest('.sidebar, #sidebar, .toc');
-        if (isInsideSidebar) {
-          if (node._originalText === undefined) {
-            node._originalText = node.textContent;
-          }
+        const isInsideSidebar = node.parentNode && node.parentNode.closest && node.parentNode.closest(ext.SIDEBAR_SELECTOR);
+        if (isInsideSidebar && node._originalText === undefined) {
+          node._originalText = node.textContent;
         }
 
-        if (ext.settings.global && ext.settings.horizontal) {
-          const newVal = convertLawTextToHorizontal(node.textContent);
-          if (node.textContent !== newVal) {
-            node.textContent = newVal;
-          }
+        const newVal = convertLawTextToHorizontal(node.textContent);
+        if (node.textContent !== newVal) {
+          node.textContent = newVal;
         }
       });
     };
@@ -284,19 +281,17 @@ window.egovExt = window.egovExt || {};
         ext.saveOriginalHTML(el);
       }
 
-      if (ext.settings.global && ext.settings.horizontal) {
-        const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT, null, false);
-        const nodes = [];
-        while (walker.nextNode()) {
-          nodes.push(walker.currentNode);
-        }
-        nodes.forEach(node => {
-          const newVal = convertItemTitleToHorizontal(node.textContent);
-          if (node.textContent !== newVal) {
-            node.textContent = newVal;
-          }
-        });
+      const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT, null, false);
+      const nodes = [];
+      while (walker.nextNode()) {
+        nodes.push(walker.currentNode);
       }
+      nodes.forEach(node => {
+        const newVal = convertItemTitleToHorizontal(node.textContent);
+        if (node.textContent !== newVal) {
+          node.textContent = newVal;
+        }
+      });
     };
 
     if (targetContainer) {
@@ -323,19 +318,17 @@ window.egovExt = window.egovExt || {};
         ext.saveOriginalHTML(el);
       }
 
-      if (ext.settings.global && ext.settings.horizontal) {
-        const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT, null, false);
-        const nodes = [];
-        while (walker.nextNode()) {
-          nodes.push(walker.currentNode);
-        }
-        nodes.forEach(node => {
-          const newVal = convertParagraphNumToHorizontal(node.textContent);
-          if (node.textContent !== newVal) {
-            node.textContent = newVal;
-          }
-        });
+      const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT, null, false);
+      const nodes = [];
+      while (walker.nextNode()) {
+        nodes.push(walker.currentNode);
       }
+      nodes.forEach(node => {
+        const newVal = convertParagraphNumToHorizontal(node.textContent);
+        if (node.textContent !== newVal) {
+          node.textContent = newVal;
+        }
+      });
     };
 
     if (targetContainer) {
@@ -346,19 +339,17 @@ window.egovExt = window.egovExt || {};
   };
 
   /**
-   * 横書き表記変換を解除して元の状態に戻す関数
+   * 横書き表記変換を解除する関数。
+   * 進行中タスクの停止と、サイドバーのテキストのインプレース復元のみを行う。
+   * 本文側の DOM の巻き戻しは content.js が3機能ぶんをまとめて1回だけ実行する。
    */
   ext.removeHorizontalConversion = function() {
     ext.cancelTask('horizontal_leaf');
     ext.cancelTask('horizontal_item');
     ext.cancelTask('horizontal_para');
-    if (ext.restoreAllOriginalHTML) {
-      ext.restoreAllOriginalHTML();
-    }
 
     // 目次（サイドバー）のテキストノードをインプレースで元の表記に戻す（イベントリスナや目のアイコンの状態破壊を防ぐ）
-    const sidebar = document.querySelector('.sidebar, #sidebar, .toc') || 
-                    ext.deepQuerySelectorAll(document.body, '.sidebar, #sidebar, .toc')[0];
+    const sidebar = ext.deepQuerySelectorAll(document.body, ext.SIDEBAR_SELECTOR)[0];
     if (sidebar) {
       const walker = document.createTreeWalker(sidebar, NodeFilter.SHOW_TEXT, null, false);
       const nodes = [];

@@ -3,5 +3,11 @@ CHROMEWEBSTORE.md
 node_modules/
 assets/
 scripts/
-tests/
 *.zip
+.DS_Store
+
+# tests/ 配下はアドホックな検証スクリプト置き場だが、
+# npm test で実行するスモークテストだけは追跡対象にする
+tests/*
+!tests/smoke_content_scripts.js
+!tests/test_tooltip_position.js

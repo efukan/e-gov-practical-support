@@ -98,10 +98,8 @@ window.egovExt = window.egovExt || {};
         const val = input.value.trim();
         if (!val) return;
         
-        let normalized = val.replace(/[０-９]/g, function(s) {
-          return String.fromCharCode(s.charCodeAt(0) - 0xFEE0);
-        });
-        
+        let normalized = ext.toHalfWidthArabic(val);
+
         normalized = normalized.replace(/[第条]/g, '');
         normalized = normalized.replace(/(-|の|ー|−|—|_)/g, '_');
 

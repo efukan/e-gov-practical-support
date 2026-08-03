@@ -58,18 +58,64 @@ e-gov-layout-changes/
 ├── options.html        # 詳細設定画面UI
 ├── PRIVACY.md          # プライバシーポリシー (日本語・英語併記)
 ├── README.md           # 本ファイル (説明書)
+├── CHANGELOG.md        # バージョンごとの変更履歴
 ├── css/
 │   ├── style.css       # 法令表示ページ用カスタムCSS
 │   ├── popup.css       # 設定ポップアップ用CSS
 │   └── options.css     # 詳細設定画面用CSS
 ├── js/
-│   ├── content.js      # メインの挙動を制御するコンテンツスクリプト
-│   ├── background.js   # サービスワーカー (バックグラウンド処理)
+│   ├── settings.js     # 設定のデフォルト値・保存/読込・設定UIの共通ロジック
+│   ├── utils.js        # 共有状態、DOMユーティリティ、漢数字変換などの共通ヘルパー
+│   ├── tooltip.js      # ホバーポップアップの共通基盤 (生成・配置・表示制御)
+│   ├── horizontal.js   # 横書き表記変換 (漢数字 → 全角算用数字)
+│   ├── dim.js          # 括弧書きの薄字化・虹色カッコ
+│   ├── scrollspy.js    # 目次の現在位置ハイライト
+│   ├── refer_popup.js  # 参照条文プレビュー
+│   ├── jump.js         # 条文ジャンプ検索ボックス
+│   ├── definition.js   # 定義語の抽出・ハイライト・ホバー辞書
+│   ├── citation.js     # 被引用 (引用元) 法令の表示
+│   ├── content.js      # 各機能の呼び出しを統括するオーケストレーター
+│   ├── background.js   # サービスワーカー (アイコン状態の同期)
 │   ├── popup.js        # ポップアップUIのインタラクション制御
-│   ├── options.js      # 詳細設定画面の制御
-│   └── (各種機能モジュール) # horizontal.js, refer_popup.js, definition.js 等
-└── icons/              # 拡張機能アイコン画像一式 (マスターSVG含む)
+│   └── options.js      # 詳細設定画面の制御
+├── _locales/           # 拡張機能名・説明の多言語リソース (ja / en)
+├── icons/              # 拡張機能アイコン画像一式 (マスターSVG含む)
+└── tests/              # 自動テスト (npm test で実行)
 ```
+
+---
+
+## 🧪 開発とテスト (Development)
+
+本拡張機能はビルド不要です。ソースをそのまま `chrome://extensions/` から読み込めます。
+テストと開発用ツールのみ Node.js に依存しています。
+
+```bash
+npm install
+```
+
+### テストの実行
+
+```bash
+npm test
+```
+
+以下の2つが実行されます（いずれも jsdom 上で動作し、ブラウザは不要です）。
+
+* `tests/smoke_content_scripts.js` — `manifest.json` に記載された順序で content script 一式を読み込み、定義語の抽出からハイライト、ホバー表示、元の状態への復元までを一通り検証します。
+* `tests/test_tooltip_position.js` — ホバーポップアップの配置ロジック（画面端での上下反転・左右の収まり・矢印の位置）を検証します。
+
+### アイコンの再生成
+
+`icons/icon.svg` を更新した場合は、以下で各解像度の PNG を生成します。
+
+```bash
+npm run generate-icons
+```
+
+### 変更履歴
+
+各バージョンの変更点は [CHANGELOG.md](CHANGELOG.md) を参照してください。
 
 ---
 

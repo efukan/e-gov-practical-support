@@ -35,7 +35,7 @@ chrome.runtime.onInstalled.addListener(() => {
     const settings = (result && result.egovSettings) || { global: true };
     updateIcon(settings.global);
   });
-  console.log("e-Gov Law Search UX Optimization extension installed.");
+  // インストール/更新時の初期処理はアイコン状態の同期のみ（下の updateIcon が担当）
 });
 
 // Service Worker 起動時（スリープ復帰時含む）のアイコン状態同調

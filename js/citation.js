@@ -16,16 +16,16 @@ window.egovExt = window.egovExt || {};
   ext.citationMap = new Map();
 
   /**
-   * 被引用表示ポップアップ（ツールチップ）のDOM要素
-   * @type {HTMLElement|null}
+   * 条文要素を指すセレクタ（大文字・小文字やアンダースコア表記のブレを網羅）
+   * @type {string}
    */
-  ext.citationTooltipEl = null;
+  const ARTICLE_SELECTOR = '.Article, ._div_Article, .article, ._div_article, article';
 
   /**
-   * ポップアップ非表示用の遅延タイマーID
-   * @type {number|null}
+   * 被引用表示ポップアップのツールチップインスタンス（js/tooltip.js の createTooltip の戻り値）
+   * @type {Object|null}
    */
-  let tooltipHideTimer = null;
+  ext.citationTooltip = null;
 
   /**
    * 現在表示中の法令ID (URLから取得)
@@ -46,19 +46,10 @@ window.egovExt = window.egovExt || {};
     if (!isLawPage) return;
 
     // URLからLawIDを抽出する
-    const lawId = extractLawIdFromUrl();
+    const lawId = ext.getLawIdFromUrl(window.location.href);
     if (!lawId) return;
 
-    // ツールチップの作成
-    createCitationTooltip();
-
-    // グローバルイベントリスナーの登録（多重登録防止）
-    if (!document.body.dataset.citationListenersAdded) {
-      document.body.addEventListener('mouseover', handleGlobalMouseOver);
-      document.body.addEventListener('mouseout', handleGlobalMouseOut);
-      document.body.addEventListener('click', handleGlobalClick);
-      document.body.dataset.citationListenersAdded = 'true';
-    }
+    setupCitationTooltip();
 
     // すでに同じLawIDでロード済みの場合は、DOMへのボタン挿入のみ行う
     if (currentLawId === lawId && ext.citationMap.size > 0) {
@@ -101,18 +92,9 @@ window.egovExt = window.egovExt || {};
     const buttons = ext.deepQuerySelectorAll(document.body, '.egov-ext-citation-btn');
     buttons.forEach(btn => btn.remove());
 
-    // ツールチップを削除
-    if (ext.citationTooltipEl) {
-      ext.citationTooltipEl.remove();
-      ext.citationTooltipEl = null;
-    }
-
-    // グローバルイベントリスナーの解除
-    if (document.body.dataset.citationListenersAdded) {
-      document.body.removeEventListener('mouseover', handleGlobalMouseOver);
-      document.body.removeEventListener('mouseout', handleGlobalMouseOut);
-      document.body.removeEventListener('click', handleGlobalClick);
-      delete document.body.dataset.citationListenersAdded;
+    // ポップアップを閉じる（インスタンス自体は再利用するため破棄しない）
+    if (ext.citationTooltip) {
+      ext.citationTooltip.hide(true);
     }
 
     ext.citationMap.clear();
@@ -120,38 +102,15 @@ window.egovExt = window.egovExt || {};
   };
 
   /**
-   * 現在のURLから法令ID（law_id）を抽出する関数
-   * @returns {string|null} 法令ID、見つからない場合は null
-   */
-  function extractLawIdFromUrl() {
-    const url = window.location;
-    // パラメータ形式: document?lawid=321CONSTITUTION
-    const params = new URLSearchParams(url.search);
-    const queryLawId = params.get('lawid');
-    if (queryLawId) return queryLawId;
-
-    // パス形式: /law/321CONSTITUTION
-    const match = url.pathname.match(/\/law\/([^/]+)/);
-    if (match && match[1]) {
-      return match[1];
-    }
-    return null;
-  }
-
-  /**
    * 法令本文のDOMから、本則の各条文のObjectId（ID属性値）を収集する関数
    * @returns {Array<string>} ObjectIdの配列
    */
   function collectArticleObjectIds() {
     const objectIds = [];
-    const container = document.querySelector('.LawBody') || 
-                      document.querySelector('.main-content') || 
-                      document.querySelector('.provisiontext') || 
-                      document.querySelector('article.law') || 
-                      document.body;
+    const container = ext.getLawContainer();
 
     // 本則の条文要素 (大文字・小文字、タグ名やアンダースコア表記のブレを網羅して広く探索)
-    const articles = ext.deepQuerySelectorAll(container, '.Article, ._div_Article, .article, ._div_article, article');
+    const articles = ext.deepQuerySelectorAll(container, ARTICLE_SELECTOR);
     articles.forEach(el => {
       if (el.id) {
         objectIds.push(el.id);
@@ -225,13 +184,9 @@ window.egovExt = window.egovExt || {};
    * 被引用データが存在する条文タイトル（見出し）の直後に「被引用」ボタンを挿入する関数
    */
   function insertCitationButtons() {
-    const container = document.querySelector('.LawBody') || 
-                      document.querySelector('.main-content') || 
-                      document.querySelector('.provisiontext') || 
-                      document.querySelector('article.law') || 
-                      document.body;
+    const container = ext.getLawContainer();
 
-    const articles = ext.deepQuerySelectorAll(container, '.Article, ._div_Article, .article, ._div_article, article');
+    const articles = ext.deepQuerySelectorAll(container, ARTICLE_SELECTOR);
     articles.forEach(articleEl => {
       const objectId = articleEl.id;
       if (!objectId || !ext.citationMap.has(objectId)) return;
@@ -263,160 +218,72 @@ window.egovExt = window.egovExt || {};
   }
 
   /**
-   * 被引用表示用のポップアップ（ツールチップ）要素を初期化する関数
+   * 被引用ポップアップを共通ツールチップ基盤に登録する（初回のみ）。
+   * 表示位置・ディレイ・Escape・外側クリックによる非表示はすべて基盤側が担当する。
    */
-  function createCitationTooltip() {
-    if (document.getElementById('egov-ext-citation-tooltip')) {
-      ext.citationTooltipEl = document.getElementById('egov-ext-citation-tooltip');
-      return;
-    }
+  function setupCitationTooltip() {
+    if (ext.citationTooltip) return;
 
-    const tooltip = document.createElement('div');
-    tooltip.id = 'egov-ext-citation-tooltip';
-    tooltip.className = 'egov-ext-citation-tooltip';
+    ext.citationTooltip = ext.createTooltip({ variant: 'citation' });
 
-    document.body.appendChild(tooltip);
-    ext.citationTooltipEl = tooltip;
-  }
+    ext.bindHoverTooltip({
+      selector: '.egov-ext-citation-btn',
+      tooltip: ext.citationTooltip,
+      isEnabled: () => !!(ext.settings.global && ext.settings.citation),
+      resolveContent: (btn) => {
+        const articleEl = btn.closest(ARTICLE_SELECTOR);
+        if (!articleEl || !articleEl.id) return null;
 
-  /**
-   * グローバルな mouseover ハンドラ
-   */
-  function handleGlobalMouseOver(e) {
-    if (!ext.settings.global || !ext.settings.citation) return;
+        const inyoList = ext.citationMap.get(articleEl.id);
+        if (!inyoList || inyoList.length === 0) return null;
 
-    const btn = ext.getComposedTarget(e, '.egov-ext-citation-btn');
-    const tooltip = ext.getComposedTarget(e, '.egov-ext-citation-tooltip');
-
-    if (btn) {
-      if (tooltipHideTimer) {
-        clearTimeout(tooltipHideTimer);
-        tooltipHideTimer = null;
+        return buildCitationList(inyoList);
       }
-      const articleEl = btn.closest('.Article, ._div_Article, .article, ._div_article, article');
-      if (articleEl && articleEl.id) {
-        showTooltipAt(btn, articleEl.id);
-      }
-    } else if (tooltip) {
-      if (tooltipHideTimer) {
-        clearTimeout(tooltipHideTimer);
-        tooltipHideTimer = null;
-      }
-    }
-  }
-
-  /**
-   * グローバルな mouseout ハンドラ
-   */
-  function handleGlobalMouseOut(e) {
-    if (!ext.citationTooltipEl) return;
-
-    const related = e.relatedTarget;
-    if (!related) {
-      hideTooltipDeferred();
-      return;
-    }
-
-    const toBtn = related.closest && related.closest('.egov-ext-citation-btn');
-    const toTooltip = (related === ext.citationTooltipEl) || (ext.citationTooltipEl.contains && ext.citationTooltipEl.contains(related));
-
-    if (!toBtn && !toTooltip) {
-      hideTooltipDeferred();
-    }
-  }
-
-  /**
-   * グローバルな click ハンドラ（ポップアップ外クリックによる閉じる挙動用）
-   */
-  function handleGlobalClick(e) {
-    if (!ext.citationTooltipEl) return;
-
-    const btn = ext.getComposedTarget(e, '.egov-ext-citation-btn');
-    const tooltip = ext.getComposedTarget(e, '.egov-ext-citation-tooltip');
-
-    if (!btn && !tooltip) {
-      if (ext.citationTooltipEl.classList.contains('visible')) {
-        ext.citationTooltipEl.classList.remove('visible');
-        ext.citationTooltipEl.scrollTop = 0;
-      }
-    }
-  }
-
-  /**
-   * ポップアップを表示する関数
-   */
-  function showTooltipAt(btn, objectId) {
-    const inyoList = ext.citationMap.get(objectId);
-    if (!inyoList || inyoList.length === 0) return;
-
-    if (!ext.citationTooltipEl) {
-      createCitationTooltip();
-    }
-
-    // ポップアップ内のコンテンツを構築
-    let html = '<div class="egov-ext-citation-tooltip-header">被引用法令一覧</div>';
-    html += '<ul class="egov-ext-citation-tooltip-list">';
-    
-    inyoList.forEach(item => {
-      const escape = ext.escapeHTML || (s => String(s).replace(/[&<>"']/g, ''));
-      const safeUrl = `https://laws.e-gov.go.jp${escape(item.url)}`;
-      const safeLawName = escape(item.law_name);
-      const safePath = escape(item.path);
-      html += `<li>
-        <a href="${safeUrl}" target="_blank" rel="noopener noreferrer" class="egov-ext-citation-link">
-          <span class="egov-ext-citation-lawname">${safeLawName}</span>
-          <span class="egov-ext-citation-path">${safePath}</span>
-        </a>
-      </li>`;
     });
-    html += '</ul>';
-    
-    ext.citationTooltipEl.innerHTML = html;
-    ext.citationTooltipEl.scrollTop = 0; // スクロール位置をリセット
-    ext.citationTooltipEl.classList.add('visible');
-
-    if (ext.settings.horizontal && ext.applyHorizontalConversion) {
-      ext.applyHorizontalConversion(ext.citationTooltipEl);
-    }
-
-    // 位置の計算
-    const rect = btn.getBoundingClientRect();
-    const tooltipRect = ext.citationTooltipEl.getBoundingClientRect();
-
-    // 画面スクロール分を考慮した絶対配置の座標
-    const scrollY = window.pageYOffset || document.documentElement.scrollTop;
-    const scrollX = window.pageXOffset || document.documentElement.scrollLeft;
-
-    let top = rect.top + scrollY - tooltipRect.height - 8; // ボタンの直上
-    let left = rect.left + scrollX + (rect.width / 2) - (tooltipRect.width / 2);
-
-    // 画面の上端からはみ出る場合は、ボタンの下側に表示する
-    if (rect.top - tooltipRect.height - 8 < 0) {
-      top = rect.bottom + scrollY + 8;
-    }
-
-    // 左右のはみ出しを防ぐ調整
-    if (left < 10) {
-      left = 10;
-    } else if (left + tooltipRect.width > window.innerWidth - 10) {
-      left = window.innerWidth - tooltipRect.width - 10;
-    }
-
-    ext.citationTooltipEl.style.top = `${top}px`;
-    ext.citationTooltipEl.style.left = `${left}px`;
   }
 
   /**
-   * ポップアップを少し遅れて非表示にする関数
+   * 被引用法令の一覧DOMを組み立てる。
+   * 外部から取得したデータを扱うため、innerHTML は使わず DOM API で構築する。
+   * @param {Array<Object>} inyoList - 被引用データの配列
+   * @returns {DocumentFragment}
    */
-  function hideTooltipDeferred() {
-    if (tooltipHideTimer) clearTimeout(tooltipHideTimer);
-    tooltipHideTimer = setTimeout(() => {
-      if (ext.citationTooltipEl) {
-        ext.citationTooltipEl.classList.remove('visible');
-        ext.citationTooltipEl.scrollTop = 0; // 非表示時にスクロール位置をリセット
-      }
-    }, 200); // 200msの遅延後に非表示にする
+  function buildCitationList(inyoList) {
+    const frag = document.createDocumentFragment();
+
+    const header = document.createElement('div');
+    header.className = 'egov-ext-tip-header';
+    header.textContent = '被引用法令一覧';
+    frag.appendChild(header);
+
+    const list = document.createElement('ul');
+    list.className = 'egov-ext-citation-list';
+
+    inyoList.forEach(item => {
+      const li = document.createElement('li');
+
+      const link = document.createElement('a');
+      link.className = 'egov-ext-citation-link';
+      link.href = `https://laws.e-gov.go.jp${item.url || ''}`;
+      link.target = '_blank';
+      link.rel = 'noopener noreferrer';
+
+      const lawName = document.createElement('span');
+      lawName.className = 'egov-ext-citation-lawname';
+      lawName.textContent = item.law_name || '';
+      link.appendChild(lawName);
+
+      const path = document.createElement('span');
+      path.className = 'egov-ext-citation-path';
+      path.textContent = item.path || '';
+      link.appendChild(path);
+
+      li.appendChild(link);
+      list.appendChild(li);
+    });
+
+    frag.appendChild(list);
+    return frag;
   }
 
 })(window.egovExt);

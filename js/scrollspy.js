@@ -25,7 +25,7 @@ window.egovExt = window.egovExt || {};
 
     // 条文の本文エリアと目次エリアを取得
     const mainContent = document.querySelector('.main-content, .provisiontext') || ext.deepQuerySelectorAll(document.body, '.main-content, .provisiontext')[0];
-    const sidebar = document.querySelector('.sidebar, #sidebar, .toc') || ext.deepQuerySelectorAll(document.body, '.sidebar, #sidebar, .toc')[0];
+    const sidebar = ext.deepQuerySelectorAll(document.body, ext.SIDEBAR_SELECTOR)[0];
     if (!mainContent || !sidebar) return;
 
     // 目次の中にあるリンクを全て取得して、目印（id）ごとに整理する

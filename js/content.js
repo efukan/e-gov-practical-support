@@ -1,5 +1,3 @@
-console.log("egov-ext: content.js load start");
-
 /**
  * content.js
  * 
@@ -36,6 +34,13 @@ window.egovExt = window.egovExt || {};
   const MAX_DELAY = 1000;
 
   /**
+   * MutationObserver で追加を検知したノードを「同期的に」変換する子孫要素数の上限。
+   * これを超える大がかりなDOM入れ替えは、UIを固めないよう非同期の全体適用に委ねる。
+   * @type {number}
+   */
+  const SYNC_PROCESS_LIMIT = 250;
+
+  /**
    * 重複監視およびメモリリークを防ぐための、MutationObserver監視対象Shadow Root/要素のセット
    * @type {Set<Node>}
    */
@@ -54,23 +59,6 @@ window.egovExt = window.egovExt || {};
   let lastObservedLawId = '';
 
   /**
-   * URLから法令IDを抽出するヘルパー関数
-   */
-  function getLawIdFromUrl(urlString) {
-    if (!urlString) return null;
-    try {
-      const url = new URL(urlString, window.location.origin);
-      const pathMatch = url.pathname.match(/\/law\/([0-9A-Z]+)/i);
-      if (pathMatch) return pathMatch[1].toUpperCase();
-      const lawIdParam = url.searchParams.get('lawid') || url.searchParams.get('lawId');
-      if (lawIdParam) return lawIdParam.toUpperCase();
-      const generalMatch = url.pathname.match(/\/([0-9]{3}[A-Z]{2}[0-9]+)/i);
-      if (generalMatch) return generalMatch[1].toUpperCase();
-    } catch (e) {}
-    return null;
-  }
-
-  /**
    * 別タブで開く機能のクリックリスナーが登録されたかどうかのフラグ
    * @type {boolean}
    */
@@ -81,26 +69,19 @@ window.egovExt = window.egovExt || {};
    * @returns {Promise<void>}
    */
   async function init() {
-    console.log("egov-ext: init started");
-    try {
-      // 保存されているユーザー設定を読み込む
-      const result = await chrome.storage.sync.get('egovSettings');
-      if (result && result.egovSettings) {
-        // デフォルト設定をベースに安全にマージ（新機能追加時などのundefinedを防ぐ）
-        ext.settings = Object.assign({}, ext.settings, result.egovSettings);
-      }
-      console.log("egov-ext: settings loaded:", ext.settings);
-    } catch (e) {
-      console.error("egov-ext: Error reading storage, using default settings:", e);
-    }
-    
+    ext.log('init started');
+
+    // 保存されているユーザー設定を読み込む（失敗時はデフォルト値が返る）
+    ext.settings = await ext.loadSettings();
+    ext.log('settings loaded:', ext.settings);
+
     try {
       // 読み込んだ設定を反映して各機能を初期適用する
       applySettings();
-      
+
       // 画面の動的変化を常に見張るため、MutationObserverを開始する
       observeDOMChanges();
-      console.log("egov-ext: initialization complete");
+      ext.log('initialization complete');
     } catch (e) {
       console.error("egov-ext: Error during initialization execution:", e);
     }
@@ -125,19 +106,17 @@ window.egovExt = window.egovExt || {};
       if (ext.disableDefinitionHighlighting) ext.disableDefinitionHighlighting();
       if (ext.disableDimParentheses) ext.disableDimParentheses();
       if (ext.removeHorizontalConversion) ext.removeHorizontalConversion();
-      if (ext.processNormalizeQueue) ext.processNormalizeQueue();
+      // 3機能の書き換えをまとめて1回だけ巻き戻す
+      ext.restoreAllOriginalHTML();
       if (ext.removeJumpSearch) ext.removeJumpSearch();
       if (ext.disableCitations) ext.disableCitations();
       if (ext.scrollSpyObserver) {
         ext.scrollSpyObserver.disconnect();
         ext.scrollSpyObserver = null;
       }
-      if (ext.tooltipEl) {
-        ext.tooltipEl.classList.remove('visible');
-      }
-      if (ext.definitionTooltipEl) {
-        ext.definitionTooltipEl.classList.remove('visible');
-      }
+      if (ext.referenceTooltip) ext.referenceTooltip.hide(true);
+      if (ext.definitionTooltip) ext.definitionTooltip.hide(true);
+      if (ext.citationTooltip) ext.citationTooltip.hide(true);
       return;
     }
     
@@ -150,11 +129,7 @@ window.egovExt = window.egovExt || {};
       let originalTop = 0;
       
       // 法令本文コンテナを取得
-      const container = document.querySelector('.LawBody') || 
-                        document.querySelector('.main-content') || 
-                        document.querySelector('.provisiontext') || 
-                        document.querySelector('article.law') || 
-                        document.body;
+      const container = ext.getLawContainer();
 
       // 憲法の前文や章タイトルなど、あらゆる法令構造のアンカーに対応するためスキャン対象のセレクタを拡充
       const selectors = [
@@ -251,7 +226,7 @@ window.egovExt = window.egovExt || {};
   function findAndObserveShadows(root) {
     if (!root) return;
 
-    const isShadowRoot = (typeof ShadowRoot !== 'undefined' && root instanceof ShadowRoot) || 
+    const isShadowRoot = (typeof ShadowRoot !== 'undefined' && root instanceof ShadowRoot) ||
                          (root.nodeType === Node.DOCUMENT_FRAGMENT_NODE && root.host);
     if (root === document.body || isShadowRoot) {
       if (!observedRootsSet.has(root)) {
@@ -270,20 +245,35 @@ window.egovExt = window.egovExt || {};
       findAndObserveShadows(root.shadowRoot);
     }
 
-    if (root.querySelectorAll) {
+    // 配下の全要素から Shadow Root を持つものを探す。
+    // querySelectorAll('*') は巨大な配列を確保してしまうため、TreeWalker で逐次走査する。
+    if (root.nodeType === Node.ELEMENT_NODE || root.nodeType === Node.DOCUMENT_FRAGMENT_NODE) {
       try {
-        const allElements = root.querySelectorAll('*');
-        for (let i = 0; i < allElements.length; i++) {
-          const el = allElements[i];
+        const walker = document.createTreeWalker(root, NodeFilter.SHOW_ELEMENT);
+        while (walker.nextNode()) {
+          const el = walker.currentNode;
           if (el.shadowRoot) {
             ext.hasShadowRoots = true;
             findAndObserveShadows(el.shadowRoot);
           }
         }
       } catch (e) {
-        console.error("egov-ext: QuerySelectorAll failed in findAndObserveShadows:", e);
+        console.error("egov-ext: TreeWalker failed in findAndObserveShadows:", e);
       }
     }
+  }
+
+  /**
+   * 追加ノードに対する Shadow Root 探索。
+   * ページ全体を初回に走査した結果 Shadow Root が1つも無かった場合、
+   * e-Gov は途中から Shadow DOM を生やさないため以降の再走査を丸ごと省略する。
+   * （この分岐が無いと、拡張自身のDOM書き換えが発火させるミューテーションのたびに
+   *   全要素走査が走り、巨大な法令ページで著しく重くなる）
+   * @param {Node} node - 追加されたノード
+   */
+  function scanAddedNodeForShadows(node) {
+    if (ext.shadowScanCompleted && !ext.hasShadowRoots) return;
+    findAndObserveShadows(node);
   }
 
   /**
@@ -298,14 +288,30 @@ window.egovExt = window.egovExt || {};
 
     ext.globalDOMObserver = new MutationObserver((mutations) => {
       const now = Date.now();
-      
+
+      // 1バッチ内で同じノードの子孫数を二度数えないためのメモ
+      const descendantCountCache = new Map();
+      /**
+       * ノードの子孫要素数を SYNC_PROCESS_LIMIT を上限に数える（結果はバッチ内でキャッシュ）
+       * @param {HTMLElement} node
+       * @returns {number}
+       */
+      const countDescendants = (node) => {
+        let cached = descendantCountCache.get(node);
+        if (cached === undefined) {
+          cached = ext.countDescendantsUpTo(node, SYNC_PROCESS_LIMIT);
+          descendantCountCache.set(node, cached);
+        }
+        return cached;
+      };
+
       // 新たに追加された DOM 要素のみを走査して Shadow Root 監視登録を拡張
       for (let i = 0; i < mutations.length; i++) {
         const addedNodes = mutations[i].addedNodes;
         for (let j = 0; j < addedNodes.length; j++) {
           const node = addedNodes[j];
           if (node.nodeType === Node.ELEMENT_NODE) {
-            findAndObserveShadows(node);
+            scanAddedNodeForShadows(node);
           }
         }
       }
@@ -318,31 +324,15 @@ window.egovExt = window.egovExt || {};
           const addedNodes = mutation.addedNodes;
           for (let j = 0; j < addedNodes.length; j++) {
             const node = addedNodes[j];
-            if (node.nodeType === Node.ELEMENT_NODE) {
-              const isInsideMain = node.closest && (
-                node.closest('.LawBody') || 
-                node.closest('.main-content') || 
-                node.closest('.provisiontext') || 
-                node.closest('article.law')
-              );
-              if (isInsideMain) {
-                addedElementsToProcess.push(node);
-              }
+            if (node.nodeType === Node.ELEMENT_NODE && node.closest &&
+                node.closest(ext.LAW_CONTAINER_SELECTOR)) {
+              addedElementsToProcess.push(node);
             }
           }
         } else if (mutation.type === 'characterData') {
-          const node = mutation.target; // テキストノード
-          const parent = node.parentNode;
-          if (parent) {
-            const isInsideMain = parent.closest && (
-              parent.closest('.LawBody') || 
-              parent.closest('.main-content') || 
-              parent.closest('.provisiontext') || 
-              parent.closest('article.law')
-            );
-            if (isInsideMain) {
-              addedElementsToProcess.push(parent);
-            }
+          const parent = mutation.target.parentNode; // テキストノードの親要素
+          if (parent && parent.closest && parent.closest(ext.LAW_CONTAINER_SELECTOR)) {
+            addedElementsToProcess.push(parent);
           }
         }
       }
@@ -355,8 +345,7 @@ window.egovExt = window.egovExt || {};
 
         addedElementsToProcess.forEach(node => {
           // ノード配下の要素数が多すぎないかチェック（大がかりなDOM入れ替えの場合は非同期に任せる）
-          const childCount = node.querySelectorAll ? node.querySelectorAll('*').length : 0;
-          if (childCount < 250) {
+          if (countDescendants(node) < SYNC_PROCESS_LIMIT) {
             // 横書き表記変換 (同期的)
             if (ext.settings.global && ext.settings.horizontal && ext.applyHorizontalConversion) {
               try {
@@ -395,34 +384,20 @@ window.egovExt = window.egovExt || {};
 
         // サイドバーや目次の開閉などの変更は無視する (チラつき防止)
         const target = mutation.target;
-        const isInsideSidebar = target.closest && (
-          target.closest('.sidebar') || 
-          target.closest('#sidebar') || 
-          target.closest('.toc')
-        );
-        if (isInsideSidebar) {
+        if (target.closest && target.closest(ext.SIDEBAR_SELECTOR)) {
           continue;
         }
-        
-        // もし追加されたノードがある場合、要素数が250未満のものは上で同期処理済みなので、非同期の全体適用は不要
+
+        // 追加ノードのうち、SYNC_PROCESS_LIMIT 未満のものは上で同期処理済みなので、非同期の全体適用は不要
         const addedNodes = mutation.addedNodes;
         let hasUnprocessedAddition = false;
         for (let j = 0; j < addedNodes.length; j++) {
           const node = addedNodes[j];
-          if (node.nodeType === Node.ELEMENT_NODE) {
-            const isInsideMain = node.closest && (
-              node.closest('.LawBody') || 
-              node.closest('.main-content') || 
-              node.closest('.provisiontext') || 
-              node.closest('article.law')
-            );
-            if (isInsideMain) {
-              const childCount = node.querySelectorAll ? node.querySelectorAll('*').length : 0;
-              if (childCount >= 250) {
-                hasUnprocessedAddition = true;
-                break;
-              }
-            }
+          if (node.nodeType === Node.ELEMENT_NODE && node.closest &&
+              node.closest(ext.LAW_CONTAINER_SELECTOR) &&
+              countDescendants(node) >= SYNC_PROCESS_LIMIT) {
+            hasUnprocessedAddition = true;
+            break;
           }
         }
 
@@ -431,28 +406,16 @@ window.egovExt = window.egovExt || {};
           break;
         }
 
-        // ノードの削除がある場合も、全体を再スキャンして辻褄を合わせる
-        if (mutation.removedNodes && mutation.removedNodes.length > 0) {
-          let hasMainRemoval = false;
+        // 本文コンテナ内でノードの削除があった場合も、全体を再スキャンして辻褄を合わせる
+        if (mutation.removedNodes && mutation.removedNodes.length > 0 &&
+            target.closest && target.closest(ext.LAW_CONTAINER_SELECTOR)) {
           for (let j = 0; j < mutation.removedNodes.length; j++) {
-            const node = mutation.removedNodes[j];
-            if (node.nodeType === Node.ELEMENT_NODE) {
-              const targetInMain = target.closest && (
-                target.closest('.LawBody') || 
-                target.closest('.main-content') || 
-                target.closest('.provisiontext') || 
-                target.closest('article.law')
-              );
-              if (targetInMain) {
-                hasMainRemoval = true;
-                break;
-              }
+            if (mutation.removedNodes[j].nodeType === Node.ELEMENT_NODE) {
+              shouldUpdate = true;
+              break;
             }
           }
-          if (hasMainRemoval) {
-            shouldUpdate = true;
-            break;
-          }
+          if (shouldUpdate) break;
         }
       }
 
@@ -472,8 +435,11 @@ window.egovExt = window.egovExt || {};
       }
     });
 
-    // 初期状態で document.body 配下の Shadow DOM をすべて監視対象にする
+    // 初期状態で document.body 配下の Shadow DOM をすべて監視対象にする。
+    // ここで Shadow Root が1つも見つからなければ、以降の再走査はスキップできる。
     findAndObserveShadows(document.body);
+    ext.shadowScanCompleted = true;
+    ext.log('shadow scan completed. hasShadowRoots:', ext.hasShadowRoots);
   }
 
   /**
@@ -499,13 +465,13 @@ window.egovExt = window.egovExt || {};
       lastObservedUrl = currentUrl;
     }
 
-    const currentLawId = getLawIdFromUrl(currentUrl);
+    const currentLawId = ext.getLawIdFromUrl(currentUrl);
     const lawIdChanged = currentLawId !== lastObservedLawId;
     if (lawIdChanged) {
       lastObservedLawId = currentLawId;
     }
 
-    console.log("egov-ext: handleDynamicContent called. forceReset:", forceReset, "urlChanged:", urlChanged, "isLawPage:", isLawPage);
+    ext.log("handleDynamicContent called. forceReset:", forceReset, "urlChanged:", urlChanged, "isLawPage:", isLawPage);
 
     // 設定変更などで強制リセットが必要な場合のみ、元の状態に一度戻す
     if (forceReset) {
@@ -533,10 +499,12 @@ window.egovExt = window.egovExt || {};
         console.error("egov-ext: Error disabling citations:", e);
       }
 
+      // 各 disable は状態リセットのみを行う。DOM の巻き戻しはここで一度だけ実施する
+      // （以前は3つの disable がそれぞれ全体復元を呼んでおり、同じ処理が3回走っていた）
       try {
-        if (ext.processNormalizeQueue) ext.processNormalizeQueue();
+        ext.restoreAllOriginalHTML();
       } catch (e) {
-        console.error("egov-ext: Error processing normalize queue:", e);
+        console.error("egov-ext: Error restoring original HTML:", e);
       }
     }
 

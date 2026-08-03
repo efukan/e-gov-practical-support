@@ -20,59 +20,12 @@ window.egovExt = window.egovExt || {};
     }
     document.body.classList.add('egov-ext-dim-active');
     
-    const container = targetContainer || 
-                      ext.deepQuerySelectorAll(document.body, '.main-content')[0] || 
-                      ext.deepQuerySelectorAll(document.body, '.provisiontext')[0] || 
-                      document.body;
-    // 目次などのサイドバー、およびページ上部のタイトルバー部分は対象から外すための要素を取得
-    const sidebar = document.querySelector('.sidebar, #sidebar, .toc') || ext.deepQuerySelectorAll(document.body, '.sidebar, #sidebar, .toc')[0];
-    const titlebar = document.getElementById('titlebar');
-    
-    const allBlocks = [];
-    if (targetContainer && targetContainer.matches && targetContainer.matches('div, p, h1, h2, h3, h4, h5, h6, li, td, th')) {
-      allBlocks.push(targetContainer);
-    }
-    const queryBlocks = ext.deepQuerySelectorAll(container, 'div, p, h1, h2, h3, h4, h5, h6, li, td, th');
-    allBlocks.push(...Array.from(queryBlocks));
-    
-    // 一番末端（それ以上内側にdiv等のブロック要素を持たない）ブロックだけを抽出
-    const leafBlocks = Array.from(allBlocks).filter(el => {
-      // もしその要素がサイドバーかタイトルバーの中にあったら無視する
-      if (!targetContainer && ext.deepClosest(el, '.sidebar, #sidebar, .toc')) return false;
-      if (titlebar && (titlebar === el || titlebar.contains(el))) return false;
-      return ext.deepQuerySelectorAll(el, 'div, p, h1, h2, h3, h4, h5, h6, li, td, th').length === 0;
-    });
-    
-    // 見出し部分の括弧や目次、タイムバーなどは対象外にする
-    const excludedSelectors = [
-      '[class*="ArticleCaption"]',
-      '[class*="PartTitle"]',
-      '[class*="ChapterTitle"]',
-      '[class*="SectionTitle"]',
-      '[class*="SubsectionTitle"]',
-      '[class*="DivisionTitle"]',
-      '[class*="SupplProvisionLabel"]',
-      '[class*="revisionamendinglawtitle"]',
-      '[class*="timebar"]',
-      '[class*="openingtocitems"]',
-      '[class*="lawdetaillawtitle"]',
-      '[class*="title-law"]',
-      '[class*="lawtitle"]',
-      '[class*="LawTitle"]',
-      '[class*="law-title"]',
-      '[class*="Law-Title"]',
-      '[class*="appid"]',
-      '[class*="ItemTitle"]',
-      '[class*="itemtitle"]',
-      '[class*="ParagraphNum"]',
-      '[class*="paragraphtitle"]'
-    ].join(', ');
+    const container = targetContainer || ext.getLawContainer();
 
-    const blocks = leafBlocks.filter(block => {
-      // block自体、または親要素のいずれかが上記のクラスを持っていれば除外する
-      return !ext.deepClosest(block, excludedSelectors);
-    });
-    
+    // 変換対象の末端ブロックを収集する。
+    // サイドバー・タイトルバー・見出し等の除外も collectLeafBlocks が行う。
+    const blocks = ext.collectLeafBlocks(container, targetContainer);
+
     // 残ったブロック内の「テキストそのもの」を解析していく
     const processDim = (block) => {
       // 高速化パス: 括弧が含まれないブロックは走査をスキップする
@@ -101,7 +54,7 @@ window.egovExt = window.egovExt || {};
         }
         
         // テキストノードの親要素が対象外クラス（ItemTitleなど）に含まれている場合はスキップ
-        if (node.parentNode && node.parentNode.closest && node.parentNode.closest(excludedSelectors)) {
+        if (node.parentNode && node.parentNode.closest && node.parentNode.closest(ext.EXCLUDED_SELECTORS)) {
           return;
         }
         
@@ -171,12 +124,15 @@ window.egovExt = window.egovExt || {};
     }
   };
 
+  /**
+   * 薄字化・虹色カッコを無効化する。
+   * 進行中タスクの停止とクラス除去のみを行い、DOM の巻き戻しは行わない。
+   * 巻き戻しは content.js が3機能ぶんをまとめて1回だけ実行する
+   * （ext.restoreAllOriginalHTML は機能別ではなく全体を復元するため）。
+   */
   ext.disableDimParentheses = function() {
     ext.cancelTask('dim');
     document.body.classList.remove('egov-ext-dim-active');
-    if (ext.restoreAllOriginalHTML) {
-      ext.restoreAllOriginalHTML();
-    }
   };
 
 })(window.egovExt);

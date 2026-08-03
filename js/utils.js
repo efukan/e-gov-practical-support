@@ -9,28 +9,49 @@ window.egovExt = window.egovExt || {};
 
 (function(ext) {
   /**
-   * グローバルな設定状態を保持するオブジェクト。デフォルト値はすべて true（オン）。
+   * デバッグログを出力するかどうか。
+   * 開発時は DevTools のコンソールで `window.egovExt.DEBUG = true` を実行すると有効になる。
+   * @type {boolean}
+   */
+  ext.DEBUG = false;
+
+  /**
+   * ext.DEBUG が有効なときだけコンソールに出力するログ関数。
+   * エラーは常に出したいので console.error をそのまま使うこと。
+   * @param {...*} args
+   */
+  ext.log = function(...args) {
+    if (ext.DEBUG) console.log('egov-ext:', ...args);
+  };
+
+  /**
+   * グローバルな設定状態を保持するオブジェクト。
+   * デフォルト値の定義は js/settings.js（ext.DEFAULT_SETTINGS）に一本化されている。
    * @type {Object<string, boolean>}
    */
-  ext.settings = {
-    global: true,
-    scrollspy: true,
-    popup: true,
-    definition: true,
-    newtab: true,
-    dim: true,
-    jump: true,
-    horizontal: true,
-    fastrender: true,
-    citation: true
-  };
+  ext.settings = Object.assign({}, ext.DEFAULT_SETTINGS);
+
+  /**
+   * 法令本文のメインコンテナを指すセレクタ。
+   * closest() などに渡す際は、カンマ区切りの1回の呼び出しで祖先を1度だけ遡れる。
+   * @type {string}
+   */
+  ext.LAW_CONTAINER_SELECTOR = '.LawBody, .main-content, .provisiontext, article.law';
+
+  /**
+   * 目次・サイドバーを指すセレクタ（変換対象から除外する領域）
+   * @type {string}
+   */
+  ext.SIDEBAR_SELECTOR = '.sidebar, #sidebar, .toc';
 
   /**
    * 非同期実行タスクの追跡管理オブジェクト（多重起動防止およびキャンセル排他制御用）
    * @type {Object<string, Object|null>}
    */
   ext.activeTasks = {
-    horizontal: null,
+    horizontal_leaf: null,
+    horizontal_item: null,
+    horizontal_para: null,
     dim: null,
     definitionExtract: null,
     definitionHighlight: null
@@ -68,7 +89,7 @@ window.egovExt = window.egovExt || {};
     if (!element) return;
 
     // 目次（サイドバー）の要素はイベントリスナ破壊防止のため、innerHTMLによる保存・復元の対象外とする
-    if (element.closest && element.closest('.sidebar, #sidebar, .toc')) {
+    if (element.closest && element.closest(ext.SIDEBAR_SELECTOR)) {
       return;
     }
 
@@ -111,16 +132,18 @@ window.egovExt = window.egovExt || {};
   };
 
   /**
-   * 復元処理後に正規化（テキストノードの結合）を行う対象要素のセット
-   * @type {Set<HTMLElement>}
-   */
-  ext.normalizeQueue = new Set();
-
-  /**
-   * ページ内に Shadow Root が存在するかどうかのフラグ
+   * ページ内に Shadow Root が存在するかどうかのフラグ。
+   * false の場合は Shadow DOM を考慮した重い探索をすべて省略できる（高速化の要）。
    * @type {boolean}
    */
   ext.hasShadowRoots = false;
+
+  /**
+   * Shadow Root の初回全走査が完了したかどうかのフラグ。
+   * 完了後は、Shadow Root が1つも無かった場合に再走査をスキップする。
+   * @type {boolean}
+   */
+  ext.shadowScanCompleted = false;
 
   /**
    * グローバルなDOM監視用Observer（content.jsで実体化）
@@ -143,21 +166,155 @@ window.egovExt = window.egovExt || {};
    * すべての非同期タスクを中断する関数
    */
   ext.cancelAllTasks = function() {
-    ext.cancelTask('horizontal');
-    ext.cancelTask('dim');
-    ext.cancelTask('definitionExtract');
-    ext.cancelTask('definitionHighlight');
-    ext.cancelTask('horizontal_leaf');
-    ext.cancelTask('horizontal_item');
-    ext.cancelTask('horizontal_para');
+    for (const name in ext.activeTasks) {
+      ext.cancelTask(name);
+    }
   };
 
   /**
-   * 登録された要素のテキストノードを結合（正規化）してキャッシュをクリアする関数
+   * 指定ノードの子孫要素数を数える。ただし limit に達した時点で打ち切る。
+   * querySelectorAll('*').length と違い、巨大なサブツリーでも全要素を列挙しない。
+   * @param {Node} node - 起点ノード
+   * @param {number} limit - 数え上げの上限
+   * @returns {number} 子孫要素数（limit で打ち切られた場合は limit）
    */
-  ext.processNormalizeQueue = function() {
-    if (!ext.normalizeQueue) return;
-    ext.normalizeQueue.clear();
+  ext.countDescendantsUpTo = function(node, limit) {
+    if (!node || node.nodeType !== Node.ELEMENT_NODE) return 0;
+
+    let count = 0;
+    const walker = document.createTreeWalker(node, NodeFilter.SHOW_ELEMENT);
+    while (walker.nextNode()) {
+      count++;
+      if (count >= limit) return limit;
+    }
+    return count;
+  };
+
+  /**
+   * 法令本文のメインコンテナ要素を取得する。
+   * `.LawBody` → `.main-content` → `.provisiontext` → `article.law` の優先順で探し、
+   * 見つからない場合は document.body を返す（Shadow DOM 対応）。
+   * @param {HTMLElement} [root=document.body] - 探索の起点
+   * @returns {HTMLElement} メインコンテナ、または document.body
+   */
+  ext.getLawContainer = function(root) {
+    const scope = root || document.body;
+    // 内側のコンテナを優先したいので、まとめて1回のクエリにはせず優先順に探す
+    const PRIORITY = ['.LawBody', '.main-content', '.provisiontext', 'article.law'];
+    for (let i = 0; i < PRIORITY.length; i++) {
+      const found = ext.deepQuerySelectorAll(scope, PRIORITY[i])[0];
+      if (found) return found;
+    }
+    return document.body;
+  };
+
+  /**
+   * URLから法令ID（例: 322AC0000000067）を抽出する。
+   * @param {string} urlString - 解析対象のURL
+   * @returns {string|null} 抽出された法令ID（大文字）、見つからない場合は null
+   */
+  ext.getLawIdFromUrl = function(urlString) {
+    if (!urlString) return null;
+    try {
+      const url = new URL(urlString, window.location.origin);
+
+      // 1. /law/[法令ID] パスから抽出
+      const pathMatch = url.pathname.match(/\/law\/([0-9A-Z]+)/i);
+      if (pathMatch) return pathMatch[1].toUpperCase();
+
+      // 2. ?lawId= / ?lawid= クエリから抽出（e-Gov 側で表記が揺れるため両方を見る）
+      const lawIdParam = url.searchParams.get('lawId') || url.searchParams.get('lawid');
+      if (lawIdParam) return lawIdParam.toUpperCase();
+
+      // 3. パス中に含まれる一般的な法令IDパターン (例: /document/322AC0000000067)
+      const generalMatch = url.pathname.match(/\/([0-9]{3}[A-Z]{2}[0-9]+)/i);
+      if (generalMatch) return generalMatch[1].toUpperCase();
+    } catch (e) {
+      // 相対パスなど URL として解釈できない場合のフォールバック
+      const pathMatch = urlString.match(/\/law\/([0-9A-Z]+)/i);
+      if (pathMatch) return pathMatch[1].toUpperCase();
+    }
+    return null;
+  };
+
+  /**
+   * テキスト変換の対象となるブロック要素のセレクタ
+   * @type {string}
+   */
+  ext.BLOCK_SELECTOR = 'div, p, h1, h2, h3, h4, h5, h6, li, td, th';
+
+  /**
+   * テキスト変換（薄字化・定義語ハイライト等）の対象から除外する要素のセレクタ。
+   * 見出し・法令名・条番号・目次など、書き換えても意味がない or 壊れる領域を列挙する。
+   * @type {string}
+   */
+  ext.EXCLUDED_SELECTORS = [
+    '[class*="ArticleCaption"]',
+    '[class*="PartTitle"]',
+    '[class*="ChapterTitle"]',
+    '[class*="SectionTitle"]',
+    '[class*="SubsectionTitle"]',
+    '[class*="DivisionTitle"]',
+    '[class*="SupplProvisionLabel"]',
+    '[class*="revisionamendinglawtitle"]',
+    '[class*="timebar"]',
+    '[class*="openingtocitems"]',
+    '[class*="lawdetaillawtitle"]',
+    '[class*="title-law"]',
+    '[class*="lawtitle"]',
+    '[class*="LawTitle"]',
+    '[class*="law-title"]',
+    '[class*="Law-Title"]',
+    '[class*="appid"]',
+    '[class*="ItemTitle"]',
+    '[class*="itemtitle"]',
+    '[class*="ParagraphNum"]',
+    '[class*="paragraphtitle"]'
+  ].join(', ');
+
+  /**
+   * テキスト変換の対象とする「末端ブロック要素」を収集する。
+   * ブロック要素のうち、自身がさらにブロック要素を内包していないものだけを返す
+   * （親子で二重に変換して壊すのを防ぐため）。サイドバー・タイトルバー・
+   * EXCLUDED_SELECTORS に該当する領域はここで除外される。
+   *
+   * @param {HTMLElement} container - 探索の起点
+   * @param {HTMLElement|null} [selfCandidate=null] - container 自身も候補に含める場合に渡す
+   *   （MutationObserver で追加された単一ノードを処理するケース）
+   * @returns {HTMLElement[]} 変換対象の末端ブロック要素の配列
+   */
+  const SKIP_SELECTOR = ext.SIDEBAR_SELECTOR + ', ' + ext.EXCLUDED_SELECTORS;
+
+  ext.collectLeafBlocks = function(container, selfCandidate = null) {
+    if (!container) return [];
+
+    const candidates = [];
+    if (selfCandidate && selfCandidate.matches && selfCandidate.matches(ext.BLOCK_SELECTOR)) {
+      candidates.push(selfCandidate);
+    }
+    const found = ext.deepQuerySelectorAll(container, ext.BLOCK_SELECTOR);
+    for (let i = 0; i < found.length; i++) {
+      candidates.push(found[i]);
+    }
+
+    const titlebar = document.getElementById('titlebar');
+    const results = [];
+
+    for (let i = 0; i < candidates.length; i++) {
+      const el = candidates[i];
+
+      // 末端判定。querySelector は最初の1件で打ち切られるため
+      // querySelectorAll(...).length === 0 より大幅に速い。
+      if (el.querySelector(ext.BLOCK_SELECTOR)) continue;
+
+      if (titlebar && (titlebar === el || titlebar.contains(el))) continue;
+      // サイドバーと除外セレクタは1回の祖先走査でまとめて判定する
+      if (ext.deepClosest(el, SKIP_SELECTOR)) continue;
+
+      results.push(el);
+    }
+
+    return results;
   };
 
   /**
@@ -255,6 +412,12 @@ window.egovExt = window.egovExt || {};
    * @returns {HTMLElement|null} マッチした最も近い要素、見つからない場合は null
    */
   ext.getComposedTarget = function(event, selector) {
+    // 高速化パス: ページに Shadow Root が無いなら composedPath() の走査は不要。
+    // mouseover のたびに呼ばれるホットパスなので、この分岐の効果は大きい。
+    if (!ext.hasShadowRoots) {
+      return event.target && event.target.closest ? event.target.closest(selector) : null;
+    }
+
     if (typeof event.composedPath === 'function') {
       const path = event.composedPath();
       for (let i = 0; i < path.length; i++) {
@@ -301,26 +464,23 @@ window.egovExt = window.egovExt || {};
     const results = [];
     if (!root) return results;
 
-    // 高速化パス: ページ内に Shadow Root が見つかっていない場合、
-    // または検索元ノードが法令本文やサイドバー配下であることが明確な場合は、通常の querySelectorAll を使用する
-    const isMainOrSidebar = root.closest && (
-      root.closest('.LawBody') || 
-      root.closest('.main-content') || 
-      root.closest('.provisiontext') || 
-      root.closest('article.law') || 
-      root.closest('.sidebar') || 
-      root.closest('#sidebar') || 
-      root.closest('.toc')
-    );
-
-    if (!ext.hasShadowRoots || isMainOrSidebar) {
+    /** 通常の querySelectorAll だけで済ませる高速パス */
+    const shallowQuery = () => {
       if (root.querySelectorAll) {
         try {
-          const matches = root.querySelectorAll(selector);
-          return Array.from(matches);
+          return Array.from(root.querySelectorAll(selector));
         } catch (e) {}
       }
       return results;
+    };
+
+    // 高速化パス1: ページ内に Shadow Root が見つかっていない場合は再帰探索が不要。
+    // isMainOrSidebar の判定（祖先を何度も遡る）より先に評価することで無駄な走査を避ける。
+    if (!ext.hasShadowRoots) return shallowQuery();
+
+    // 高速化パス2: 検索元が法令本文やサイドバー配下であることが明確なら、その内部に Shadow Root は無い
+    if (root.closest && root.closest(ext.LAW_CONTAINER_SELECTOR + ', ' + ext.SIDEBAR_SELECTOR)) {
+      return shallowQuery();
     }
 
     // 従来の再帰的探索フォールバック（Shadow DOM が存在する可能性のあるエリア用）
@@ -467,6 +627,19 @@ window.egovExt = window.egovExt || {};
     if (!numStr) return '';
     return numStr.toString().replace(/[0-9]/g, function(s) {
       return String.fromCharCode(s.charCodeAt(0) + 0xFEE0);
+    });
+  };
+
+  /**
+   * 全角アラビア数字を半角アラビア数字に変換する関数
+   * 例: "１２３" -> "123"
+   * @param {string|number} numStr - 置換前の全角文字列
+   * @returns {string} 半角数値文字列
+   */
+  ext.toHalfWidthArabic = function(numStr) {
+    if (!numStr) return '';
+    return numStr.toString().replace(/[０-９]/g, function(s) {
+      return String.fromCharCode(s.charCodeAt(0) - 0xFEE0);
     });
   };
 

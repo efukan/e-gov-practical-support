@@ -1,20 +1,20 @@
 {
   "name": "e-gov-layout-changes",
-  "version": "1.2.1",
+  "version": "2.0.0",
   "description": "e-Gov法令検索のレイアウトを改善し、横書きの算用数字変換、括弧書きの薄字化、参照条文・定義語のホバー表示などの機能を提供します。",
-  "main": "index.js",
   "directories": {
     "test": "tests"
   },
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1",
+    "test": "node tests/smoke_content_scripts.js && node tests/test_tooltip_position.js",
     "generate-icons": "node scripts/generate_icons.js"
   },
   "keywords": [],
   "author": "",
-  "license": "ISC",
+  "license": "MIT",
   "type": "commonjs",
   "devDependencies": {
-    "sharp": "^0.35.2"
+    "sharp": "^0.35.2",
+    "jsdom": "^26.0.0"
   }
 }

@@ -59,14 +59,14 @@ window.egovExt = window.egovExt || {};
    * @param {Object} [options]
    * @param {string} [options.variant='default'] - 'definition' | 'reference' | 'citation'
    * @param {number} [options.showDelay=300] - 表示までの遅延（ms）。条文読書中のマウス通過による誤表示を防ぐ
-   * @param {number} [options.hideDelay=240] - 非表示までの遅延（ms）。ツールチップ本体へ移動する猶予
+   * @param {number} [options.hideDelay=380] - 非表示までの遅延（ms）。ツールチップ本体へ移動する猶予（人間工学に配慮）
    * @returns {{el: HTMLElement, show: Function, hide: Function, cancelHide: Function, destroy: Function}}
    */
   ext.createTooltip = function(options) {
     const {
       variant = 'default',
       showDelay = 300,
-      hideDelay = 240,
+      hideDelay = 380,
       placement = 'auto',
       parent = null
     } = options || {};
@@ -293,6 +293,7 @@ window.egovExt = window.egovExt || {};
       cancelHide() {
         if (hideTimer !== null) { clearTimeout(hideTimer); hideTimer = null; }
         if (parent) parent.cancelHide();
+        children.forEach(c => c.cancelHide());
       },
 
       /** 現在このツールチップを開いているアンカー要素 */
@@ -320,6 +321,7 @@ window.egovExt = window.egovExt || {};
 
     // ツールチップ本体にマウスが乗っている間は閉じない（中をスクロール・クリックできるようにする）
     el.addEventListener('mouseenter', () => instance.cancelHide());
+    el.addEventListener('mousemove', () => instance.cancelHide());
     el.addEventListener('mouseleave', (e) => {
       const related = e.relatedTarget;
       if (related) {
@@ -391,6 +393,11 @@ window.egovExt = window.egovExt || {};
     function resolveBinding(e) {
       if (!combinedSelector) return null;
 
+      // ツールチップ自体の内部にある要素は、いかなる場合もホバーアンカーとして扱わない
+      // （条文プレビュー内の別条文リンクや定義語へのホバーによる自壊・誤爆を完全防止）
+      const tipContainer = ext.getComposedTarget(e, '.egov-ext-tip');
+      if (tipContainer) return null;
+
       // 全セレクタをまとめた1回の closest() で判定する
       const anchor = ext.getComposedTarget(e, combinedSelector);
       if (!anchor) return null;
@@ -450,7 +457,11 @@ window.egovExt = window.egovExt || {};
       // ガード2: ツールチップ本体へ移動した場合は閉じない（hideDelay 中に mouseenter が拾う）
       if (related && (related === tip || tip.contains(related))) return;
 
-      // ガード3: 子ツールチップ（フライアウトプレビュー）へ移動した場合も閉じない
+      // ガード3: 親ツールチップへ移動した場合も閉じない
+      const parentTip = resolved.binding.tooltip.parent;
+      if (parentTip && related && (related === parentTip.el || parentTip.el.contains(related))) return;
+
+      // ガード4: 子ツールチップ（フライアウトプレビュー）へ移動した場合も閉じない
       const children = resolved.binding.tooltip.children;
       if (children && related) {
         for (const child of children) {

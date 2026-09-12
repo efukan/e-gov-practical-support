@@ -719,6 +719,78 @@ async function check(name, fn) {
     return '長距離先行展開（instant）→ 滑らか着地（smooth）→ 到着補正（scrollend吸着）の完全動作確認';
   });
 
+  await check('ポップアップ上マウス移動: プレビュー内リンク・定義語通過時の自壊防止およびKeep-Alive安定化', async () => {
+    const { dom, ext } = await createTestEnv(SAMPLE_LAW_HTML);
+
+    // 本文内に参照リンクを追加（サイドバー外）
+    const article2 = dom.window.document.querySelector('#Mp-At_2-Pr_1');
+    const testLink = dom.window.document.createElement('a');
+    testLink.href = '#Mp-At_1';
+    testLink.textContent = '第一条';
+    article2.appendChild(testLink);
+
+    // 参照条文プレビューを有効化
+    ext.enablePopup();
+
+    // 1. アンカーホバーでポップアップを表示
+    testLink.dispatchEvent(new dom.window.Event('mouseover', { bubbles: true }));
+    await new Promise(r => setTimeout(r, 320));
+
+    const tip = ext.referenceTooltip;
+    if (!tip || !tip.el.classList.contains('visible')) {
+      throw new Error('参照条文プレビューが表示されていない');
+    }
+
+    // プレビュー本文内にリンクと定義語が存在することを確認
+    const previewBody = tip.el.querySelector('.egov-ext-tip-body');
+    if (!previewBody) throw new Error('プレビュー本文が見つかりません');
+
+    // プレビュー本文に子要素リンクおよび定義語スパンを模擬挿入
+    const innerLink = dom.window.document.createElement('a');
+    innerLink.href = '#Mp-At_3';
+    innerLink.textContent = '第三条';
+    previewBody.appendChild(innerLink);
+
+    const innerDef = dom.window.document.createElement('span');
+    innerDef.className = 'egov-definition-word';
+    innerDef.dataset.word = '権利';
+    innerDef.textContent = '権利';
+    previewBody.appendChild(innerDef);
+
+    // 2. ボタンを押しに行くマウスが、プレビュー内のリンクや定義語の上を通過した状況をシミュレート
+    innerLink.dispatchEvent(new dom.window.Event('mouseover', { bubbles: true }));
+    await new Promise(r => setTimeout(r, 50));
+
+    // ポップアップが消えずに表示を維持していること（自壊していないこと）
+    if (!tip.el.classList.contains('visible')) {
+      throw new Error('プレビュー内の条文リンク通過によってポップアップが消えた');
+    }
+
+    innerDef.dispatchEvent(new dom.window.Event('mouseover', { bubbles: true }));
+    await new Promise(r => setTimeout(r, 50));
+
+    if (!tip.el.classList.contains('visible')) {
+      throw new Error('プレビュー内の定義語通過によってポップアップが消滅した');
+    }
+
+    // 3. プレビュー内部でマウスが動いている間（mousemove）、Keep-Alive が維持されること
+    tip.el.dispatchEvent(new dom.window.Event('mousemove', { bubbles: true }));
+    // hideTimer がセットされていない（または即座にクリアされている）こと
+    await new Promise(r => setTimeout(r, 100));
+    if (!tip.el.classList.contains('visible')) {
+      throw new Error('プレビュー内の mousemove 中にポップアップが非表示になった');
+    }
+
+    // 4. 右上のジャンプボタンが正常に存在しクリック可能なこと
+    const jumpBtn = tip.el.querySelector('.egov-ext-tip-action-btn');
+    if (!jumpBtn) {
+      throw new Error('ポップアップ右上のアクションボタンが見つかりません');
+    }
+
+    tip.hide(true);
+    return 'プレビュー内の他条文リンク・定義語通過時の誤爆自壊防止およびmousemove Keep-Aliveの完全動作確認';
+  });
+
 
 
   // ==========================================

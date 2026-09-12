@@ -113,15 +113,19 @@ window.egovExt = window.egovExt || {};
         const targetEl = document.querySelector(selector);
 
         if (targetEl) {
-          ext.fastSmoothScroll(targetEl, 250);
+          const scrollTarget = (targetEl.tagName && targetEl.tagName.toLowerCase() === 'a' && targetEl.hasAttribute('name'))
+            ? (targetEl.closest('._div_Article, Article') || targetEl.nextElementSibling || targetEl)
+            : (targetEl.closest('._div_Article, Article') || targetEl);
+
+          ext.fastSmoothScroll(scrollTarget);
           
-          targetEl.classList.remove('egov-ext-jump-target');
+          scrollTarget.classList.remove('egov-ext-jump-target');
           
           setTimeout(() => {
-            targetEl.classList.add('egov-ext-jump-target');
+            scrollTarget.classList.add('egov-ext-jump-target');
             
             setTimeout(() => {
-              targetEl.classList.remove('egov-ext-jump-target');
+              scrollTarget.classList.remove('egov-ext-jump-target');
             }, 3000);
           }, 10);
         } else {

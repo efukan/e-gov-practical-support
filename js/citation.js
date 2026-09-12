@@ -1137,6 +1137,7 @@ window.egovExt = window.egovExt || {};
         icon: 'open',
         label: '開く',
         title: '別タブでこの条文を開く',
+        url: targetUrl,
         onClick: () => {
           window.open(targetUrl, '_blank', 'noopener,noreferrer');
         }
@@ -1288,6 +1289,7 @@ window.egovExt = window.egovExt || {};
         icon: 'open',
         label: '開く',
         title: '別タブでこの条文を開く',
+        url: targetUrl,
         onClick: () => {
           window.open(targetUrl, '_blank', 'noopener,noreferrer');
         }

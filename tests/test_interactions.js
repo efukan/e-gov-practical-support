@@ -542,7 +542,7 @@ async function check(name, fn) {
       throw new Error('ジャンプボタン押下時にターゲット条文に egov-ext-jump-target ハイライトが付与されていない');
     }
 
-    // 2. 他法令プレビューの「別タブで開く」ボタン検証
+    // 2. 他法令プレビューの「別タブで開く」ボタン検証（cloneNode(true) 後でもデリゲーションで動作すること）
     let openedUrl = null;
     dom.window.open = (url) => { openedUrl = url; };
 
@@ -553,17 +553,47 @@ async function check(name, fn) {
     const testUrl = 'https://laws.e-gov.go.jp/law/129AC0000000089#Mp-At_709';
     const externalDOM = ext.renderArticlePreview(dummyContent, [], '民法', '第七百九条', testUrl);
 
-    const openBtn = externalDOM.querySelector('.egov-ext-btn-open');
+    // 実機同様に cloneNode(true) してツールチップDOMに模した要素に挿入
+    const clonedExternalDOM = externalDOM.cloneNode(true);
+    dom.window.document.body.appendChild(clonedExternalDOM);
+
+    const openBtn = clonedExternalDOM.querySelector('.egov-ext-btn-open');
     if (!openBtn) throw new Error('他法令プレビュー内に「開く」ボタン (.egov-ext-btn-open) が存在しない');
     if (!openBtn.textContent.includes('開く')) throw new Error('開くボタンのテキストが不正');
+    if (openBtn.dataset.url !== testUrl) throw new Error('開くボタンの data-url 属性が設定されていない');
 
-    // 開くボタンのクリックをシミュレート
+    // cloneNode 後のボタンクリック（イベントリスナーが剥がれていてもデリゲーションで拾われる）
     openBtn.click();
     if (openedUrl !== testUrl) {
-      throw new Error(`window.open で開かれたURLが一致しない (期待値: ${testUrl}, 実際: ${openedUrl})`);
+      throw new Error(`cloneNode後の開くボタン押下時に window.open が発火しなかった (期待値: ${testUrl}, 実際: ${openedUrl})`);
     }
 
-    return '本法令ジャンプおよび他法令別タブリンクの正常動作確認';
+    clonedExternalDOM.remove();
+
+    // 3. 空のアンカー <a name="..."> に対する自然なスクロール＆ハイライト対象の解決検証
+    const emptyAnchor = dom.window.document.createElement('a');
+    emptyAnchor.setAttribute('name', 'Mp-At_99');
+    const articleTitleDiv = dom.window.document.createElement('div');
+    articleTitleDiv.className = '_div_ArticleTitle';
+    articleTitleDiv.textContent = '第九十九条';
+    const articleContainer = dom.window.document.createElement('div');
+    articleContainer.className = '_div_Article';
+    articleContainer.appendChild(emptyAnchor);
+    articleContainer.appendChild(articleTitleDiv);
+    dom.window.document.body.appendChild(articleContainer);
+
+    const previewWithAnchor = ext._testReferPopup.buildPreviewContent(emptyAnchor);
+    const jumpBtn2 = previewWithAnchor.querySelector('.egov-ext-btn-jump');
+    if (!jumpBtn2) throw new Error('空アンカープレビュー内にジャンプボタンが存在しない');
+    jumpBtn2.click();
+    await new Promise(r => setTimeout(r, 30));
+
+    if (!articleContainer.classList.contains('egov-ext-jump-target') && !articleTitleDiv.classList.contains('egov-ext-jump-target')) {
+      throw new Error('空アンカー参照時に可視の条文要素へハイライトが付与されていない');
+    }
+    articleContainer.remove();
+
+    return '本法令ジャンプ（可視要素特定・自然な着地）および他法令別タブリンク（cloneNode耐性）の正常動作確認';
   });
 
 

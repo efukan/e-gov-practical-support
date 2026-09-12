@@ -141,25 +141,33 @@ window.egovExt = window.egovExt || {};
 
     // ジャンプボタン
     if (ext.createTipActionButton) {
+      // 空のアンカー <a> ではなく、可視の条文見出しやArticle要素を特定して自然に着地させる
+      const scrollTarget = (targetEl.tagName && targetEl.tagName.toLowerCase() === 'a' && targetEl.hasAttribute('name'))
+        ? (targetEl.closest('._div_Article, Article') || targetEl.nextElementSibling || targetEl)
+        : (targetEl.closest('._div_Article, Article') || targetEl);
+
+      const targetId = targetEl.id || targetEl.getAttribute('name') || '';
+
       const jumpBtn = ext.createTipActionButton({
         icon: 'jump',
         label: 'ジャンプ',
         title: 'この条文の場所へ移動',
+        targetId: targetId,
         onClick: () => {
           if (ext.referenceTooltip) {
             ext.referenceTooltip.hide(0);
           }
           if (ext.fastSmoothScroll) {
-            ext.fastSmoothScroll(targetEl, 250);
-          } else if (targetEl.scrollIntoView) {
-            targetEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            ext.fastSmoothScroll(scrollTarget);
+          } else if (scrollTarget.scrollIntoView) {
+            scrollTarget.scrollIntoView({ behavior: 'smooth', block: 'start' });
           }
 
-          targetEl.classList.remove('egov-ext-jump-target');
+          scrollTarget.classList.remove('egov-ext-jump-target');
           setTimeout(() => {
-            targetEl.classList.add('egov-ext-jump-target');
+            scrollTarget.classList.add('egov-ext-jump-target');
             setTimeout(() => {
-              targetEl.classList.remove('egov-ext-jump-target');
+              scrollTarget.classList.remove('egov-ext-jump-target');
             }, 2500);
           }, 10);
         }

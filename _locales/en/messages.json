@@ -4,7 +4,7 @@
     "description": "Extension name in English"
   },
   "extDesc": {
-    "message": "Optimizes e-Gov Law Search layout with horizontal digit conversion, dimmed parentheses, definition tooltips, and citation links.",
+    "message": "Optimizes e-Gov Law Search layout with horizontal digits, dimmed parentheses, definition tooltips, and article citation previews.",
     "description": "Extension description in English"
   }
 }

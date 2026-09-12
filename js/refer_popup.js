@@ -134,6 +134,119 @@ window.egovExt = window.egovExt || {};
   }
 
   /**
+   * 現在非同期ロード中の他法令リンク要素
+   * @type {HTMLAnchorElement|null}
+   */
+  let activeExternalLink = null;
+
+  /**
+   * リンク要素および前後のテキストから法令名と条番号パスを抽出する
+   * @param {HTMLAnchorElement} a
+   * @param {string} targetLawId
+   * @returns {{lawName: string, path: string}}
+   */
+  function parseLawLinkText(a, targetLawId) {
+    const rawText = (a.textContent || '').trim();
+
+    // 1. "民法第七百九条", "地方自治法第十条第一項" のように法令名と条番号が結合している場合
+    const fullMatch = rawText.match(/^(.+?(?:法|令|規則|府令|省令|憲法|条約|条例|布告|規程))(?:\s*)(第[0-9一二三四五六七八九十百千万]+条.*)?$/);
+    if (fullMatch) {
+      return {
+        lawName: fullMatch[1],
+        path: fullMatch[2] || ''
+      };
+    }
+
+    // 2. "第七百九条" のように条番号のみの場合、直前のテキストから法令名を探す
+    if (/^第[0-9一二三四五六七八九十百千万]+条/.test(rawText)) {
+      const precedingName = findPrecedingLawName(a);
+      return {
+        lawName: precedingName,
+        path: rawText
+      };
+    }
+
+    // 3. その他（法令名のみの場合や特殊表記）
+    return {
+      lawName: rawText,
+      path: ''
+    };
+  }
+
+  /**
+   * リンクの直前のテキストから法令名を探索する
+   * 例: "内閣府設置法（平成十一年法律第八十九号）<a href="...">第四十九条</a>" -> "内閣府設置法"
+   * @param {HTMLAnchorElement} a
+   * @returns {string}
+   */
+  function findPrecedingLawName(a) {
+    let prev = a.previousSibling;
+    while (prev) {
+      const txt = prev.textContent || '';
+      const m = txt.match(/([^\s（(「]+?(?:法|令|規則|府令|省令|憲法|条約|条例|布告|規程))(?:（[^）]*）|\([^)]*\))?\s*$/);
+      if (m) return m[1];
+      prev = prev.previousSibling;
+    }
+    if (a.parentElement) {
+      const parentText = a.parentElement.textContent || '';
+      const linkIdx = parentText.indexOf(a.textContent);
+      if (linkIdx > 0) {
+        const beforeText = parentText.slice(0, linkIdx);
+        const m = beforeText.match(/([^\s（(「]+?(?:法|令|規則|府令|省令|憲法|条約|条例|布告|規程))(?:（[^）]*）|\([^)]*\))?\s*$/);
+        if (m) return m[1];
+      }
+    }
+    return '';
+  }
+
+  /**
+   * 他法令リンクのプレビューを非同期取得し、ツールチップを更新する
+   * @param {HTMLAnchorElement} link
+   * @param {string} lawId
+   * @param {string} objectId
+   * @param {string} lawName
+   * @param {string} path
+   */
+  async function fetchAndPopulateExternalPreview(link, lawId, objectId, lawName, path) {
+    activeExternalLink = link;
+
+    try {
+      if (!ext.getOrFetchArticlePreview) {
+        throw new Error('プレビュー取得機能が初期化されていません');
+      }
+      const previewDOM = await ext.getOrFetchArticlePreview(lawId, objectId, '', lawName, path, '');
+      if (!previewDOM) throw new Error('条文データを取得できませんでした');
+
+      // 横書き設定が有効ならプレビュー内も横書き変換を適用
+      if (ext.settings.horizontal && ext.applyHorizontalConversion) {
+        ext.applyHorizontalConversion(previewDOM);
+      }
+
+      // まだこのリンクにユーザーが注目している場合（ホバー中またはツールチップ表示中）
+      const isTargetActive = (activeExternalLink === link) ||
+        (ext.referenceTooltip && ext.referenceTooltip.anchor === link && ext.referenceTooltip.el.classList.contains('visible'));
+
+      if (isTargetActive) {
+        if (ext.referenceTooltip && ext.referenceTooltip.el.classList.contains('visible')) {
+          ext.referenceTooltip.update(previewDOM.cloneNode(true));
+        }
+      }
+    } catch (err) {
+      const isTargetActive = (activeExternalLink === link) ||
+        (ext.referenceTooltip && ext.referenceTooltip.anchor === link && ext.referenceTooltip.el.classList.contains('visible'));
+
+      if (isTargetActive) {
+        if (ext.referenceTooltip && ext.referenceTooltip.el.classList.contains('visible')) {
+          const errorFrag = ext.createErrorView
+            ? ext.createErrorView(lawName, path, err.message)
+            : document.createTextNode(err.message);
+          ext.referenceTooltip.update(errorFrag);
+        }
+      }
+    }
+  }
+
+  /**
    * 参照条文プレビューを有効化する。
    */
   ext.enablePopup = function() {
@@ -143,28 +256,62 @@ window.egovExt = window.egovExt || {};
     ext.referenceTooltip = ext.createTooltip({ variant: 'reference' });
 
     ext.bindHoverTooltip({
-      selector: 'a[href*="#"]',
+      selector: 'a[href*="#"], a[href*="/law/"], a[href*="lawId="]',
       tooltip: ext.referenceTooltip,
       isEnabled: () => !!(ext.settings.global && ext.settings.popup),
       resolveContent: (a) => {
-        // 左カラム（サイドバー、目次）内のリンクはプレビューしない
-        if (ext.deepClosest(a, ext.SIDEBAR_SELECTOR)) return null;
+        // 左カラム（サイドバー、目次）や被引用一覧ツールチップ内のリンクはプレビューしない
+        if (ext.deepClosest(a, ext.SIDEBAR_SELECTOR) || ext.deepClosest(a, '.egov-ext-tip--citation')) return null;
 
+        const currentLawId = ext.getLawIdFromUrl(window.location.href);
+        const targetLawId = ext.getLawIdFromUrl(a.href);
         const targetId = a.href.includes('#') ? a.href.split('#')[1] : null;
-        const targetEl = resolveTargetElement(targetId);
-        if (!targetEl) return null;
-        if (!isInternalLink(a, targetEl)) return null;
+        const targetEl = targetId ? resolveTargetElement(targetId) : null;
 
-        const content = buildPreviewContent(targetEl);
-
-        // プレビュー内の漢数字も本文と同じ表記に揃える
-        if (ext.settings.horizontal && ext.applyHorizontalConversion) {
-          ext.applyHorizontalConversion(content);
+        // 1. 同一法令内のリンク（内部リンク）: 現在のページのDOMから即時生成
+        if (isInternalLink(a, targetEl)) {
+          if (!targetEl) return null;
+          const content = buildPreviewContent(targetEl);
+          if (ext.settings.horizontal && ext.applyHorizontalConversion) {
+            ext.applyHorizontalConversion(content);
+          }
+          return content;
         }
 
-        return content;
+        // 2. 他法令へのリンク（外部リンク）: API / XML から非同期取得
+        if (!targetLawId) return null;
+
+        const objectId = targetId || 'Mp';
+        const { lawName, path } = parseLawLinkText(a, targetLawId);
+        const cacheKey = `${targetLawId}:${objectId}`;
+
+        // すでにキャッシュが存在する場合は即座に表示
+        if (ext.citationPreviewCache && ext.citationPreviewCache.has(cacheKey)) {
+          const cachedDOM = ext.citationPreviewCache.get(cacheKey).cloneNode(true);
+          if (ext.settings.horizontal && ext.applyHorizontalConversion) {
+            ext.applyHorizontalConversion(cachedDOM);
+          }
+          return cachedDOM;
+        }
+
+        // キャッシュが無い場合はローディング画面を即座に返し、非同期取得を開始
+        const loadingDOM = ext.createLoadingView
+          ? ext.createLoadingView(lawName, path)
+          : document.createTextNode('読み込み中...');
+        fetchAndPopulateExternalPreview(a, targetLawId, objectId, lawName, path);
+        return loadingDOM;
       }
     });
   };
+
+  // テスト用に内部関数をエクスポート
+  if (typeof process !== 'undefined' && process.env && process.env.NODE_ENV === 'test') {
+    ext._testReferPopup = {
+      isInternalLink,
+      parseLawLinkText,
+      findPrecedingLawName,
+      fetchAndPopulateExternalPreview
+    };
+  }
 
 })(window.egovExt);

@@ -505,6 +505,117 @@ check('定義語の抽出とハイライト', async () => true);
     }
   });
 
+  console.log('\n--- 条文中の他法令リンクプレビュー ---');
+
+  check('parseLawLinkText が結合型・分離型・単体型の法令リンクテキストを解析', () => {
+    const { parseLawLinkText } = ext._testReferPopup;
+
+    // 1. 結合型
+    const a1 = document.createElement('a');
+    a1.textContent = '民法第七百九条';
+    const r1 = parseLawLinkText(a1, '129AC0000000089');
+    if (r1.lawName !== '民法' || r1.path !== '第七百九条') {
+      throw new Error(`結合型失敗: ${JSON.stringify(r1)}`);
+    }
+
+    // 2. 分離型（直前テキストに法令名）
+    const container = document.createElement('div');
+    container.innerHTML = '地方自治法（昭和二十二年法律第六十七号）<a href="/law/322AC0000000067#Mp-At_10">第十条</a>';
+    const a2 = container.querySelector('a');
+    const r2 = parseLawLinkText(a2, '322AC0000000067');
+    if (r2.lawName !== '地方自治法' || r2.path !== '第十条') {
+      throw new Error(`分離型失敗: ${JSON.stringify(r2)}`);
+    }
+
+    // 3. 法令名単体
+    const a3 = document.createElement('a');
+    a3.textContent = '日本国憲法';
+    const r3 = parseLawLinkText(a3, '321CONSTITUTION');
+    if (r3.lawName !== '日本国憲法' || r3.path !== '') {
+      throw new Error(`法令名単体失敗: ${JSON.stringify(r3)}`);
+    }
+
+    return 'parseLawLinkText 正常';
+  });
+
+  await check('他法令リンクへのホバー時に非同期取得とキャッシュ即時表示が行われる', async () => {
+    const originalGlobalFetch = global.fetch;
+    const originalWindowFetch = window.fetch;
+    let fetchCount = 0;
+
+    const mockFetch = async (url) => {
+      fetchCount++;
+      return {
+        ok: true,
+        text: async () => '',
+        json: async () => ({
+          result: {
+            success: true,
+            revision_list: [{ law_data_id: 'dummy', subRevision: 'dummy' }],
+            inyo_text_data: {
+              isHTML: false,
+              LawTitle: '民法',
+              InyoResult_array: [
+                {
+                  ObjectId: '#Mp-At_709',
+                  Type: 'Article',
+                  Content: {
+                    ArticleTitle: '第七百九条',
+                    Paragraph: [
+                      {
+                        ParagraphNum: '',
+                        ParagraphSentence: '故意又は過失によって他人の権利又は法律上保護される利益を侵害した者は、これによって生じた損害を賠償する責任を負う。'
+                      }
+                    ]
+                  }
+                }
+              ]
+            }
+          }
+        })
+      };
+    };
+
+    global.fetch = mockFetch;
+    window.fetch = mockFetch;
+
+    try {
+      // プレビューを有効化
+      ext.settings.global = true;
+      ext.settings.popup = true;
+      ext.enablePopup();
+
+      const testA = document.createElement('a');
+      testA.href = 'https://laws.e-gov.go.jp/law/129AC0000000089#Mp-At_709';
+      testA.textContent = '民法第七百九条';
+      document.body.appendChild(testA);
+
+      // 1回目のホバーシミュレーション: resolveContent の呼び出し
+      const { fetchAndPopulateExternalPreview } = ext._testReferPopup;
+      await fetchAndPopulateExternalPreview(testA, '129AC0000000089', 'Mp-At_709', '民法', '第七百九条');
+
+      const cacheKey = '129AC0000000089:Mp-At_709';
+      if (!ext.citationPreviewCache.has(cacheKey)) {
+        throw new Error('キャッシュに条文プレビューが保存されていない');
+      }
+      if (fetchCount !== 1) {
+        throw new Error(`予期せぬ通信回数: ${fetchCount}`);
+      }
+
+      // キャッシュからの取得検証
+      const cachedDOM = ext.citationPreviewCache.get(cacheKey);
+      const title = cachedDOM.querySelector('.egov-ext-preview-title');
+      if (!title || (title.textContent !== '第七百九条' && title.textContent !== '第７０９条')) {
+        throw new Error(`キャッシュのタイトル不一致: ${title?.textContent}`);
+      }
+
+      return '他法令リンクの非同期フェッチ・キャッシュ成功';
+    } finally {
+      global.fetch = originalGlobalFetch;
+      window.fetch = originalWindowFetch;
+    }
+  });
+
   if (errors.length) {
     console.error('\nwindow error:', errors);
     failures += errors.length;

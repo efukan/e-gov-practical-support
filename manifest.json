@@ -41,10 +41,10 @@
         "js/horizontal.js",
         "js/dim.js",
         "js/scrollspy.js",
+        "js/citation.js",
         "js/refer_popup.js",
         "js/jump.js",
         "js/definition.js",
-        "js/citation.js",
         "js/content.js"
       ],
       "run_at": "document_end"

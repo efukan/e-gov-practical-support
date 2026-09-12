@@ -59,14 +59,14 @@ window.egovExt = window.egovExt || {};
    * @param {Object} [options]
    * @param {string} [options.variant='default'] - 'definition' | 'reference' | 'citation'
    * @param {number} [options.showDelay=300] - 表示までの遅延（ms）。条文読書中のマウス通過による誤表示を防ぐ
-   * @param {number} [options.hideDelay=380] - 非表示までの遅延（ms）。ツールチップ本体へ移動する猶予（人間工学に配慮）
+   * @param {number} [options.hideDelay=300] - 非表示までの遅延（ms）。ツールチップ本体へ移動する猶予（人間工学に配慮）
    * @returns {{el: HTMLElement, show: Function, hide: Function, cancelHide: Function, destroy: Function}}
    */
   ext.createTooltip = function(options) {
     const {
       variant = 'default',
       showDelay = 300,
-      hideDelay = 380,
+      hideDelay = 300,
       placement = 'auto',
       parent = null
     } = options || {};
@@ -336,7 +336,31 @@ window.egovExt = window.egovExt || {};
         // アンカーへ戻った場合も閉じない
         if (currentAnchor && (related === currentAnchor || currentAnchor.contains(related))) return;
       }
+
       instance.hide();
+
+      // 1. 祖先ツールチップへの連動非表示:
+      // 移動先がその祖先自身またはその祖先のアンカーでなければ、
+      // ツールチップツリーの外に出たと判定して祖先ツールチップも連動して非表示予約する
+      let ancestor = parent;
+      while (ancestor) {
+        const intoAncestor = related && (related === ancestor.el || ancestor.el.contains(related));
+        const intoAncestorAnchor = related && ancestor.anchor && (related === ancestor.anchor || ancestor.anchor.contains(related));
+        if (!intoAncestor && !intoAncestorAnchor) {
+          ancestor.hide();
+        }
+        ancestor = ancestor.parent;
+      }
+
+      // 2. 子ツールチップへの連動非表示:
+      // 移動先が子ツールチップ自身またはそのアンカーでなければ、子ツールチップも連動して非表示予約する
+      for (const child of children) {
+        const intoChild = related && (related === child.el || child.el.contains(related));
+        const intoChildAnchor = related && child.anchor && (related === child.anchor || child.anchor.contains(related));
+        if (!intoChild && !intoChildAnchor) {
+          child.hide();
+        }
+      }
     });
 
     instances.add(instance);
@@ -492,6 +516,37 @@ window.egovExt = window.egovExt || {};
       if (e.key !== 'Escape') return;
       instances.forEach(instance => instance.hide(true));
     });
+
+    // ページスクロール検知: ページ全体がスクロールされた際、開いているツールチップを即座に閉じる
+    // （ただしツールチップ内部のスクロール要素 .egov-ext-tip-scroll は除外して保護する）
+    window.addEventListener('scroll', (e) => {
+      const target = e.target;
+      if (target && target.nodeType === Node.ELEMENT_NODE) {
+        if (target.closest('.egov-ext-tip') || target.classList.contains('egov-ext-tip-scroll')) {
+          return;
+        }
+      }
+      instances.forEach(instance => {
+        if (instance.el.classList.contains('visible')) {
+          instance.hide(true);
+        }
+      });
+    }, { passive: true, capture: true });
+
+    // 画面余白クリック（PointerDown）: ツールチップ外部をクリックした際、開いているツールチップを即座に閉じる
+    document.addEventListener('pointerdown', (e) => {
+      const target = e.target;
+      if (!target || target.nodeType !== Node.ELEMENT_NODE) return;
+      // ツールチップ自体の内部、またはアンカー内のクリックであれば閉じない（ボタンやリンクの操作を保護）
+      if (target.closest('.egov-ext-tip') || (combinedSelector && target.closest(combinedSelector))) {
+        return;
+      }
+      instances.forEach(instance => {
+        if (instance.el.classList.contains('visible')) {
+          instance.hide(true);
+        }
+      });
+    }, { passive: true });
   }
 
 })(window.egovExt);

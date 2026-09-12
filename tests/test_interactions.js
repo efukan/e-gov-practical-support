@@ -858,6 +858,142 @@ async function check(name, fn) {
     return '引用ボタンおよび被引用法令リンクホバー時のポップアップ＆フライアウト正常表示確認';
   });
 
+  await check('被引用法令一覧＆条文プレビュー: 子から外への移動による連動非表示・スクロール時閉鎖・内部スクロール保護', async () => {
+    const { dom, ext } = await createTestEnv(SAMPLE_LAW_HTML);
+    ext.settings = { global: true, citation: true, popup: true };
+
+    const mockInyoData = [
+      {
+        selText: 'Mp-At_1',
+        inyo_list: [
+          {
+            law_id: '129AC0000000089',
+            law_title: '民法',
+            article_id: 'Mp-At_709',
+            article_title: '第七百九条',
+            url: 'https://laws.e-gov.go.jp/law/129AC0000000089#Mp-At_709'
+          }
+        ]
+      }
+    ];
+
+    dom.window.fetch = async (url, opts) => {
+      const urlStr = String(url);
+      if (urlStr.includes('SelectInyoLawData.json')) {
+        return {
+          ok: true,
+          status: 200,
+          json: async () => ({ result: { inyo_law_data: mockInyoData } })
+        };
+      }
+      if (urlStr.includes('SelectInyoLawTextData.json')) {
+        return {
+          ok: true,
+          status: 200,
+          json: async () => ({
+            result: {
+              inyo_law_text: {
+                LawTitle: '民法',
+                ArticleTitle: '第七百九条',
+                ParagraphSentence: '故意又は過失によって他人の権利又は法律上保護される利益を侵害した者は、これによって生じた損害を賠償する責任を負う。'
+              }
+            }
+          })
+        };
+      }
+      return { ok: false, status: 404 };
+    };
+
+    await ext.enableCitations();
+
+    const citationBtn = dom.window.document.querySelector('.egov-ext-citation-btn');
+    if (!citationBtn) throw new Error('被引用ボタンが挿入されていません');
+
+    // 1. 引用ボタンにホバーして被引用一覧（親）を開く
+    citationBtn.dispatchEvent(new dom.window.Event('mouseover', { bubbles: true }));
+    await new Promise(r => setTimeout(r, 320));
+    const citeTip = ext.citationTooltip;
+    if (!citeTip || !citeTip.el.classList.contains('visible')) {
+      throw new Error('被引用一覧が開かなかった');
+    }
+
+    // 2. 一覧内のリンクにホバーして条文プレビュー（子）を開く
+    const citeLink = citeTip.el.querySelector('.egov-ext-citation-link');
+    citeLink.dispatchEvent(new dom.window.Event('mouseover', { bubbles: true }));
+    await new Promise(r => setTimeout(r, 320));
+    const prevTip = ext.citationPreviewTooltip;
+    if (!prevTip || !prevTip.el.classList.contains('visible')) {
+      throw new Error('条文プレビューが開かなかった');
+    }
+
+    // 3. 子ツールチップ（条文プレビュー）から画面外（余白）へマウスアウト
+    const dummyOutside = dom.window.document.createElement('div');
+    dom.window.document.body.appendChild(dummyOutside);
+
+    prevTip.el.dispatchEvent(new dom.window.MouseEvent('mouseleave', {
+      bubbles: true,
+      relatedTarget: dummyOutside
+    }));
+
+    // hideDelay (300ms) 経過待ち
+    await new Promise(r => setTimeout(r, 350));
+
+    // 子だけでなく、親（被引用一覧）も確実に非表示になっていること！
+    if (citeTip.el.classList.contains('visible')) {
+      throw new Error('子ツールチップから外に出た後も親ツールチップ（被引用一覧）が消えずに残っている');
+    }
+    if (prevTip.el.classList.contains('visible')) {
+      throw new Error('子ツールチップ（条文プレビュー）が消えずに残っている');
+    }
+
+    // 4. 再度開いて、内部スクロール保護とページスクロール閉鎖の検証
+    citationBtn.dispatchEvent(new dom.window.Event('mouseover', { bubbles: true }));
+    await new Promise(r => setTimeout(r, 320));
+    if (!citeTip.el.classList.contains('visible')) {
+      throw new Error('被引用一覧の再表示に失敗');
+    }
+
+    // 内部スクロール要素（.egov-ext-tip-scroll）でスクロールイベント発生 → 閉じないこと！
+    const tipScroller = citeTip.el.querySelector('.egov-ext-tip-scroll');
+    if (!tipScroller) throw new Error('ツールチップ内部のスクローラー要素が見つかりません');
+    tipScroller.dispatchEvent(new dom.window.Event('scroll', { bubbles: true }));
+    await new Promise(r => setTimeout(r, 50));
+    if (!citeTip.el.classList.contains('visible')) {
+      throw new Error('ツールチップ内部スクロールでツールチップが誤って閉じてしまった');
+    }
+
+    // ページ（window）でスクロールイベント発生 → 即座に閉じること！
+    dom.window.dispatchEvent(new dom.window.Event('scroll', { bubbles: true }));
+    await new Promise(r => setTimeout(r, 50));
+    if (citeTip.el.classList.contains('visible')) {
+      throw new Error('ページスクロール発生時にツールチップが即座に閉じなかった');
+    }
+
+    // 5. 画面余白クリック（pointerdown）での即時閉鎖検証
+    citationBtn.dispatchEvent(new dom.window.Event('mouseover', { bubbles: true }));
+    await new Promise(r => setTimeout(r, 320));
+    if (!citeTip.el.classList.contains('visible')) {
+      throw new Error('被引用一覧の再表示に失敗');
+    }
+
+    // ツールチップ内部クリック → 閉じない
+    tipScroller.dispatchEvent(new dom.window.Event('pointerdown', { bubbles: true }));
+    await new Promise(r => setTimeout(r, 50));
+    if (!citeTip.el.classList.contains('visible')) {
+      throw new Error('ツールチップ内部クリックで誤って閉じてしまった');
+    }
+
+    // 画面外クリック → 即時閉鎖
+    dummyOutside.dispatchEvent(new dom.window.Event('pointerdown', { bubbles: true }));
+    await new Promise(r => setTimeout(r, 50));
+    if (citeTip.el.classList.contains('visible')) {
+      throw new Error('画面余白クリック時にツールチップが即座に閉じなかった');
+    }
+
+    dummyOutside.remove();
+    return '子から外への移動連動非表示・スクロール即時閉鎖・内部スクロール保護・画面外クリック閉鎖の完全動作確認';
+  });
+
 
 
   // ==========================================

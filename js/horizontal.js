@@ -195,7 +195,7 @@ window.egovExt = window.egovExt || {};
     
     const leafBlocks = Array.from(allBlocks).filter(el => {
       if (titlebar && (titlebar === el || titlebar.contains(el))) return false;
-      if (el.closest && (el.closest('.egov-ext-header-container') || el.closest('#egov-ext-status-badge') || el.closest('#egov-ext-jump-container'))) return false;
+      if (el.closest && el.closest(ext.SELF_UI_SELECTOR)) return false;
       
       // Prevent processLeaf from conflicting with processItem and processPara
       const closestTitle = el.closest ? el.closest('.ItemTitle, ._div_ItemTitle, .itemtitle, .ParagraphNum, ._div_ParagraphNum, .paragraphtitle') : null;
@@ -228,10 +228,11 @@ window.egovExt = window.egovExt || {};
 
       nodes.forEach(node => {
         if (node.parentNode && node.parentNode.closest) {
-          const parentTooltip = node.parentNode.closest('.egov-ext-tip');
-          if (parentTooltip) {
-            if (targetContainer && (targetContainer === parentTooltip || targetContainer.contains(parentTooltip))) {
-              // Allow conversion if explicitly targeted
+          const selfUI = node.parentNode.closest(ext.SELF_UI_SELECTOR);
+          if (selfUI) {
+            // ツールチップ内の個別変換が明示的に指定された場合のみ例外として許可
+            if (targetContainer && (targetContainer === selfUI || targetContainer.contains(selfUI))) {
+              // 許可
             } else {
               return;
             }

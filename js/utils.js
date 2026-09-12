@@ -45,6 +45,12 @@ window.egovExt = window.egovExt || {};
   ext.SIDEBAR_SELECTOR = '.sidebar, #sidebar, .toc';
 
   /**
+   * 拡張機能自身が挿入した自作UI要素を指すセレクタ
+   * @type {string}
+   */
+  ext.SELF_UI_SELECTOR = '.egov-ext-tip, .egov-ext-header-container, #egov-ext-jump-container, #egov-ext-status-badge, .egov-ext-citation-btn';
+
+  /**
    * 非同期実行タスクの追跡管理オブジェクト（多重起動防止およびキャンセル排他制御用）
    * @type {Object<string, Object|null>}
    */
@@ -88,28 +94,38 @@ window.egovExt = window.egovExt || {};
   ext.saveOriginalHTML = function(element) {
     if (!element) return;
 
-    // 目次（サイドバー）の要素はイベントリスナ破壊防止のため、innerHTMLによる保存・復元の対象外とする
-    if (element.closest && element.closest(ext.SIDEBAR_SELECTOR)) {
+    // 自作UIおよび目次（サイドバー）の要素は対象外とする
+    if (element.closest && (element.closest(ext.SIDEBAR_SELECTOR) || element.closest(ext.SELF_UI_SELECTOR))) {
       return;
     }
 
-    // 親子要素の二重管理・復元競合を防ぐため、標準的な行・段落コンテナ（最外ブロック）を特定して退避する
+    // 親子要素の二重管理・復元競合（親による子の復元上書き）を防ぐため、
+    // 互いに包含関係を持たない末端の行・文ブロックコンテナを特定して退避する
     const targetSelector = [
-      '._div_Paragraph', '.Paragraph',
-      '._div_Item', '.Item',
-      '._div_Subitem', '.Subitem',
-      '._div_ArticleTitle', '.ArticleTitle',
-      '._div_ArticleCaption', '.ArticleCaption',
       '._div_ParagraphSentence', '.ParagraphSentence',
       '._div_ItemSentence', '.ItemSentence',
-      '._div_SubitemSentence', '.SubitemSentence'
+      '._div_SubitemSentence', '.SubitemSentence',
+      '._div_ParagraphNum', '.ParagraphNum',
+      '._div_ItemTitle', '.ItemTitle',
+      '._div_ArticleTitle', '.ArticleTitle',
+      '._div_ArticleCaption', '.ArticleCaption'
     ].join(', ');
 
     const target = element.closest ? element.closest(targetSelector) : null;
     const actualElement = target || element;
 
     if (actualElement._egov_originalHTML === undefined) {
-      actualElement._egov_originalHTML = actualElement.innerHTML;
+      // 自作UI（被引用ボタン等）が既に挿入されている場合は、クローンから自作UIを除去して純粋な元HTMLを退避する
+      if (actualElement.querySelector && actualElement.querySelector(ext.SELF_UI_SELECTOR)) {
+        const clone = actualElement.cloneNode(true);
+        const selfUIs = clone.querySelectorAll(ext.SELF_UI_SELECTOR);
+        for (let i = 0; i < selfUIs.length; i++) {
+          selfUIs[i].remove();
+        }
+        actualElement._egov_originalHTML = clone.innerHTML;
+      } else {
+        actualElement._egov_originalHTML = actualElement.innerHTML;
+      }
       ext.modifiedElements.add(actualElement);
     }
   };
@@ -283,7 +299,7 @@ window.egovExt = window.egovExt || {};
    *   （MutationObserver で追加された単一ノードを処理するケース）
    * @returns {HTMLElement[]} 変換対象の末端ブロック要素の配列
    */
-  const SKIP_SELECTOR = ext.SIDEBAR_SELECTOR + ', ' + ext.EXCLUDED_SELECTORS;
+  const SKIP_SELECTOR = ext.SIDEBAR_SELECTOR + ', ' + ext.EXCLUDED_SELECTORS + ', ' + ext.SELF_UI_SELECTOR;
 
   ext.collectLeafBlocks = function(container, selfCandidate = null) {
     if (!container) return [];

@@ -380,6 +380,15 @@ body a .egov-definition-word,
   text-decoration-color: currentColor !important;
 }
 
+/* 括弧書きの薄字化（dimmed-text）と定義語が入れ子になった場合でも、定義語の視認性を最優先する */
+body.egov-ext-dim-active .egov-ext-dimmed-text .egov-definition-word,
+body.egov-ext-dim-active .egov-definition-word .egov-ext-dimmed-text,
+body.egov-ext-dim-active .egov-definition-word.egov-ext-dimmed-text {
+  color: #00695c !important;
+  text-decoration: underline dotted #00695c !important;
+  background-color: rgba(0, 105, 92, 0.04) !important;
+}
+
 /* キーボード操作でも定義語にフォーカスできるので、フォーカスリングを明示する */
 body .egov-definition-word:focus-visible {
   outline: 2px solid #00695c !important;

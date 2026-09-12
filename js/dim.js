@@ -33,6 +33,11 @@ window.egovExt = window.egovExt || {};
         return;
       }
 
+      // 冪等性ガード: 既にこのブロックが薄字化処理済みの場合は二重処理をスキップ（カウント狂いや重複スパンを防止）
+      if (block.querySelector && block.querySelector('.egov-ext-bracket')) {
+        return;
+      }
+
       if (ext.saveOriginalHTML) {
         ext.saveOriginalHTML(block);
       }
@@ -53,8 +58,9 @@ window.egovExt = window.egovExt || {};
           return;
         }
         
-        // テキストノードの親要素が対象外クラス（ItemTitleなど）に含まれている場合はスキップ
-        if (node.parentNode && node.parentNode.closest && node.parentNode.closest(ext.EXCLUDED_SELECTORS)) {
+        // テキストノードの親要素が対象外クラス（ItemTitleなど）または自作UIに含まれている場合はスキップ
+        if (node.parentNode && node.parentNode.closest && 
+           (node.parentNode.closest(ext.EXCLUDED_SELECTORS) || node.parentNode.closest(ext.SELF_UI_SELECTOR))) {
           return;
         }
         

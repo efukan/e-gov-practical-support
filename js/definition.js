@@ -408,7 +408,8 @@ window.egovExt = window.egovExt || {};
       nodes.forEach(node => {
         if (!node.parentNode) return;
         
-        if (node.parentNode.classList && node.parentNode.classList.contains('egov-definition-word')) {
+        // 既に定義語ハイライト済み、または祖先に定義語・自作UIがある場合は二重ラップ防止のためスキップ
+        if (node.parentNode.closest && (node.parentNode.closest('.egov-definition-word') || node.parentNode.closest(ext.SELF_UI_SELECTOR))) {
           return;
         }
         

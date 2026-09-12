@@ -309,6 +309,13 @@ async function main() {
     assert(styleCss.includes('.egov-definition-word:focus-visible'), 'definition-word の focus-visible が定義されている');
   });
 
+  runTest('css/style.css 内のツールチップ・プレビュー内引用ボタン非表示 (display: none) 定義', () => {
+    const styleCss = fs.readFileSync(path.join(ROOT_DIR, 'css', 'style.css'), 'utf8');
+    assert(styleCss.includes('.egov-ext-tip .egov-ext-citation-btn'), 'tip 内の citation-btn 非表示ルールが定義されている');
+    assert(styleCss.includes('.egov-ext-preview-container .egov-ext-citation-btn'), 'preview-container 内の citation-btn 非表示ルールが定義されている');
+  });
+
+
   // =============================================================================
   // 4. 印刷スタイル (@media print) 検証
   // =============================================================================

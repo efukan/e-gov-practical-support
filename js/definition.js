@@ -557,9 +557,12 @@ window.egovExt = window.egovExt || {};
         body.className = 'egov-ext-tip-body';
 
         const clone = def.element.cloneNode(true);
+        // クローンから引用ボタンなどの自作UI要素を除去
+        clone.querySelectorAll('.egov-ext-citation-btn, [class*="citation-btn"]').forEach(btn => btn.remove());
         // 共通成形関数で定義ポップアップDOMをインライン化・クリーンアップ
         ext.formatInlinePreview(clone);
         body.appendChild(clone);
+
 
         frag.appendChild(body);
         return frag;

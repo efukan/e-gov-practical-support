@@ -487,6 +487,43 @@ async function check(name, fn) {
     return '自作UIの完全保護確認';
   });
 
+  await check('ポップアップサニタイズ: 参照条文・定義語プレビュー内で「引用」ボタンが完全に除去される', async () => {
+    const { dom, ext } = await createTestEnv(SAMPLE_LAW_HTML);
+    ext.settings = { global: true, citation: true, horizontal: true, dim: true, definition: true };
+
+    // 1. 本文に引用ボタンを挿入
+    await ext.enableCitations();
+    const originalArticle = dom.window.document.querySelector('#Mp-At_1');
+
+    const originalBtn = originalArticle.querySelector('.egov-ext-citation-btn');
+    if (!originalBtn) throw new Error('本文側の条文見出しに引用ボタンが挿入されていない');
+
+    // 2. 参照条文プレビューDOMの構築 (buildPreviewContent)
+    const previewDOM = ext._testReferPopup.buildPreviewContent(originalArticle);
+
+    // 3. プレビューDOM内部に .egov-ext-citation-btn が存在しないこと（DOMから完全除去）
+    const previewBtns = previewDOM.querySelectorAll('.egov-ext-citation-btn, [class*="citation-btn"]');
+    if (previewBtns.length > 0) {
+      throw new Error(`プレビューDOM内に引用ボタンが残存しています (件数: ${previewBtns.length})`);
+    }
+
+    // 4. 本文側の引用ボタンは削除されずに健在であること
+    if (!originalArticle.querySelector('.egov-ext-citation-btn')) {
+      throw new Error('プレビューDOM構築によって本文側の引用ボタンまで誤って削除されている');
+    }
+
+    // 5. formatInlinePreview を直接通した場合でも除去されること
+    const dummyContainer = dom.window.document.createElement('div');
+    dummyContainer.innerHTML = '<div class="_div_ArticleTitle"><span>第十条</span><button class="egov-ext-citation-btn">引用</button></div>';
+    ext.formatInlinePreview(dummyContainer);
+    if (dummyContainer.querySelector('.egov-ext-citation-btn')) {
+      throw new Error('formatInlinePreview 実行後にも引用ボタンが残存している');
+    }
+
+    return 'プレビュー内引用ボタンの完全除去・本文保持確認';
+  });
+
+
   // ==========================================
   // 5. 動的DOM更新（MutationObserver）の相互作用テスト
   // ==========================================

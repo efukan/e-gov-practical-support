@@ -172,6 +172,17 @@
   display: inline !important;
 }
 
+/* ツールチップ・プレビュー内では条文見出し横の「引用」ボタンを非表示にする */
+.egov-ext-tip .egov-ext-citation-btn,
+.egov-ext-tip [class*="citation-btn"],
+.egov-ext-preview-container .egov-ext-citation-btn,
+.egov-ext-preview-container [class*="citation-btn"] {
+  display: none !important;
+  pointer-events: none !important;
+  visibility: hidden !important;
+}
+
+
 /* アニメーションを抑制する設定のユーザーには動きを出さない */
 @media (prefers-reduced-motion: reduce) {
   .egov-ext-tip {

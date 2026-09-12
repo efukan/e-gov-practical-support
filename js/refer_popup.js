@@ -123,6 +123,10 @@ window.egovExt = window.egovExt || {};
       clone = targetEl.cloneNode(true);
     }
 
+    // クローンした要素から「引用」ボタンを確実に除去（ポップアップ内での不要表示・誤操作を防止）
+    const citationBtns = clone.querySelectorAll('.egov-ext-citation-btn, [class*="citation-btn"]');
+    citationBtns.forEach(btn => btn.remove());
+
     const content = document.createElement('div');
     content.className = 'egov-ext-tip-body';
     content.appendChild(clone);
@@ -132,6 +136,7 @@ window.egovExt = window.egovExt || {};
 
     return content;
   }
+
 
   /**
    * 現在非同期ロード中の他法令リンク要素
@@ -332,10 +337,12 @@ window.egovExt = window.egovExt || {};
   if (typeof process !== 'undefined' && process.env && process.env.NODE_ENV === 'test') {
     ext._testReferPopup = {
       isInternalLink,
+      buildPreviewContent,
       parseLawLinkText,
       findPrecedingLawName,
       fetchAndPopulateExternalPreview
     };
+
   }
 
 })(window.egovExt);

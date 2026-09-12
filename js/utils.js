@@ -867,7 +867,12 @@ window.egovExt = window.egovExt || {};
    * @param {HTMLElement} container - 成形対象のコンテナ要素
    */
   ext.formatInlinePreview = function(container) {
+    // ポップアップ・プレビュー内に混入した引用ボタンなどの自作UI要素を確実に除去
+    const unwantedElements = container.querySelectorAll('.egov-ext-citation-btn, [class*="citation-btn"]');
+    unwantedElements.forEach(el => el.remove());
+
     const titles = container.querySelectorAll('._div_ArticleTitle, .ArticleTitle, .paragraphtitle');
+
     titles.forEach(t => {
       t.classList.add('egov-ext-inline');
       let hasInnerDiv = false;

@@ -290,10 +290,12 @@ window.egovExt = window.egovExt || {};
       },
 
       /** 非表示予約を取り消す（ツールチップ本体にマウスが乗ったとき等） */
-      cancelHide() {
+      cancelHide(fromRelative = false) {
         if (hideTimer !== null) { clearTimeout(hideTimer); hideTimer = null; }
-        if (parent) parent.cancelHide();
-        children.forEach(c => c.cancelHide());
+        if (!fromRelative) {
+          if (parent) parent.cancelHide(true);
+          children.forEach(c => c.cancelHide(true));
+        }
       },
 
       /** 現在このツールチップを開いているアンカー要素 */

@@ -55,9 +55,30 @@ async function createTestEnv(html) {
           result: {
             success: true,
             inyo_data: [
-              { selText: 'Mp-At_1', inyo_list: [{ InyoLawName: '刑法', InyoClause: '第十条' }] },
-              { selText: 'Mp-At_2', inyo_list: [{ InyoLawName: '民法', InyoClause: '第七百九条' }] }
+              { selText: 'Mp-At_1', inyo_list: [{ law_id: '140AC0000000045', law_name: '刑法', path: '第十条', url: '/law/140AC0000000045#Mp-At_10' }] },
+              { selText: 'Mp-At_2', inyo_list: [{ law_id: '129AC0000000089', law_name: '民法', path: '第七百九条', url: '/law/129AC0000000089#Mp-At_709' }] }
             ]
+          }
+        })
+      };
+    }
+    if (url.includes('SelectInyoLawTextData')) {
+      return {
+        ok: true,
+        json: async () => ({
+          result: {
+            success: true,
+            revision_list: [{ law_data_id: 'dummy', subRevision: 'dummy' }],
+            inyo_text_data: {
+              InyoResult_array: [{
+                ObjectId: '#Mp-At_10',
+                Type: 'Article',
+                Content: {
+                  ArticleTitle: '第十条',
+                  ParagraphSentence: '刑法第十条の規定による本文。'
+                }
+              }]
+            }
           }
         })
       };
@@ -789,6 +810,52 @@ async function check(name, fn) {
 
     tip.hide(true);
     return 'プレビュー内の他条文リンク・定義語通過時の誤爆自壊防止およびmousemove Keep-Aliveの完全動作確認';
+  });
+
+  await check('被引用ポップアップ＆フライアウトプレビュー: ホバー表示および親子相互cancelHideの健全性', async () => {
+    const { dom, ext } = await createTestEnv(SAMPLE_LAW_HTML);
+
+    // 被引用機能を有効化
+    ext.settings.citation = true;
+    await ext.enableCitations();
+
+    const citationBtn = dom.window.document.querySelector('.egov-ext-citation-btn');
+    if (!citationBtn) throw new Error('被引用ボタンが挿入されていません');
+
+    // 1. 引用ボタンにマウスオーバーして一覧ポップアップが開くこと（無限再帰なく開くこと）
+    citationBtn.dispatchEvent(new dom.window.Event('mouseover', { bubbles: true }));
+    await new Promise(r => setTimeout(r, 320));
+
+    const citeTip = ext.citationTooltip;
+    if (!citeTip || !citeTip.el.classList.contains('visible')) {
+      throw new Error('被引用法令一覧ポップアップが表示されなかった');
+    }
+
+    // 2. 一覧内の法令リンクにマウスオーバーしてフライアウトプレビューが開くこと
+    const citeLink = citeTip.el.querySelector('.egov-ext-citation-link');
+    if (!citeLink) throw new Error('被引用法令一覧内にリンクが見つかりません');
+
+    // リンクへのマウスオーバー（cancelHideの呼び出しを含む）
+    citeLink.dispatchEvent(new dom.window.Event('mouseover', { bubbles: true }));
+    await new Promise(r => setTimeout(r, 320));
+
+    const prevTip = ext.citationPreviewTooltip;
+    if (!prevTip || !prevTip.el.classList.contains('visible')) {
+      throw new Error('フライアウト条文プレビューが表示されなかった');
+    }
+
+    // 3. 親・子のどちらで mousemove / cancelHide が起きても無限再帰せず安定して表示維持されること
+    citeTip.el.dispatchEvent(new dom.window.Event('mousemove', { bubbles: true }));
+    prevTip.el.dispatchEvent(new dom.window.Event('mousemove', { bubbles: true }));
+    await new Promise(r => setTimeout(r, 50));
+
+    if (!citeTip.el.classList.contains('visible') || !prevTip.el.classList.contains('visible')) {
+      throw new Error('親子ツールチップの相互cancelHide中にツールチップが閉じてしまった');
+    }
+
+    citeTip.hide(true);
+    prevTip.hide(true);
+    return '引用ボタンおよび被引用法令リンクホバー時のポップアップ＆フライアウト正常表示確認';
   });
 
 

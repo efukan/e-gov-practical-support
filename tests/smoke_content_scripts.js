@@ -384,6 +384,127 @@ check('定義語の抽出とハイライト', async () => true);
     }
   });
 
+  check('findTargetArticleNodeInXml と xmlNodeToContent が条文XMLを正しく解析', () => {
+    const xmlText = `<?xml version="1.0" encoding="UTF-8"?>
+<Law Era="Showa" Year="21" Num="000" LawType="Constitution" Lang="ja">
+  <LawBody>
+    <LawTitle>日本国憲法</LawTitle>
+    <Article Num="9">
+      <ArticleCaption>（戦争の放棄）</ArticleCaption>
+      <ArticleTitle>第九条</ArticleTitle>
+      <Paragraph Num="1">
+        <ParagraphNum/>
+        <ParagraphSentence>
+          <Sentence>日本国民は、恒久の平和を念願し、戦争を放棄する。</Sentence>
+        </ParagraphSentence>
+      </Paragraph>
+      <Paragraph Num="2">
+        <ParagraphNum/>
+        <ParagraphSentence>
+          <Sentence>前項の目的を達するため、戦力は保持しない。</Sentence>
+        </ParagraphSentence>
+      </Paragraph>
+    </Article>
+  </LawBody>
+</Law>`;
+    const parser = new window.DOMParser();
+    const doc = parser.parseFromString(xmlText, 'text/xml');
+    const node = ext._testCitation.findTargetArticleNodeInXml(doc, 'Mp-At_9', '第九条');
+    if (!node) throw new Error('Article node not found in XML');
+    const content = ext._testCitation.xmlNodeToContent(node);
+    if (content.ArticleTitle !== '第九条') throw new Error(`Title mismatch: ${content.ArticleTitle}`);
+    if (content.ArticleCaption !== '（戦争の放棄）') throw new Error(`Caption mismatch: ${content.ArticleCaption}`);
+    if (!Array.isArray(content.Paragraph) || content.Paragraph.length !== 2) throw new Error('Paragraph count mismatch');
+    const dom = ext._testCitation.renderArticlePreview(content, ['第九条'], '日本国憲法', '第九条');
+    if (!dom.querySelector('.egov-ext-preview-caption')) throw new Error('Caption not rendered');
+    return 'XMLパース＆DOM生成 OK';
+  });
+
+  check('findTargetArticleNodeInXml が単文法令（Paragraph直接型）XMLを正しく解析', () => {
+    const xmlText = `<?xml version="1.0" encoding="UTF-8"?>
+<Law Era="Meiji" Year="32" Num="040" LawType="Act" Lang="ja">
+  <LawBody>
+    <LawTitle>失火ノ責任ニ関スル法律</LawTitle>
+    <MainProvision>
+      <Paragraph Num="1">
+        <ParagraphNum/>
+        <ParagraphSentence>
+          <Sentence>民法第七百九条ノ規定ハ失火ノ場合ニハ之ヲ適用セス但シ重大ナル過失アリタルトキハ此ノ限ニ在ラス</Sentence>
+        </ParagraphSentence>
+      </Paragraph>
+    </MainProvision>
+  </LawBody>
+</Law>`;
+    const parser = new window.DOMParser();
+    const doc = parser.parseFromString(xmlText, 'text/xml');
+    const node = ext._testCitation.findTargetArticleNodeInXml(doc, 'Mp', '');
+    if (!node) throw new Error('Single paragraph node not found in XML');
+    const content = ext._testCitation.xmlNodeToContent(node);
+    if (!Array.isArray(content.Paragraph) || content.Paragraph.length !== 1) throw new Error('Single paragraph mismatch');
+    const dom = ext._testCitation.renderArticlePreview(content, ['第七百九条'], '失火ノ責任ニ関スル法律', '');
+    const mark = dom.querySelector('mark.egov-ext-citation-highlight');
+    if (!mark || mark.textContent !== '第七百九条') throw new Error('Single paragraph highlight missing');
+    return '単文法令XMLパース OK';
+  });
+
+  await check('isHTML: true の場合に XML API へ自動フォールバックしてプレビュー生成', async () => {
+    const originalGlobalFetch = global.fetch;
+    const originalWindowFetch = window.fetch;
+    let xmlApiCalled = false;
+
+    const mockFetch = async (url, opts) => {
+      // 1. JSON API は isHTML: true を返す
+      if (url.includes('SelectInyoLawTextData')) {
+        return {
+          ok: true,
+          json: async () => ({
+            result: {
+              success: true,
+              inyo_text_data: { isHTML: true }
+            }
+          })
+        };
+      }
+      // 2. XML API は正常な XML を返す
+      if (url.includes('api/2/law_file/xml')) {
+        xmlApiCalled = true;
+        return {
+          ok: true,
+          text: async () => `<?xml version="1.0" encoding="UTF-8"?>
+<Law Era="Showa" Year="22" Num="067" LawType="Act" Lang="ja">
+  <LawBody>
+    <LawTitle>地方自治法</LawTitle>
+    <Article Num="10">
+      <ArticleTitle>第十条</ArticleTitle>
+      <Paragraph Num="1">
+        <ParagraphSentence>
+          <Sentence>市町村の区域内に住所を有する者は、当該市町村及びこれを包括する都道府県の住民とする。</Sentence>
+        </ParagraphSentence>
+      </Paragraph>
+    </Article>
+  </LawBody>
+</Law>`
+        };
+      }
+      return { ok: false, status: 404 };
+    };
+
+    global.fetch = mockFetch;
+    window.fetch = mockFetch;
+
+    try {
+      const dom = await ext._testCitation.getOrFetchArticlePreview('322AC0000000067', 'Mp-At_10', '', '地方自治法', '第十条', '');
+      if (!xmlApiCalled) throw new Error('XML API が呼ばれなかった');
+      if (!dom) throw new Error('プレビューDOMが生成されなかった');
+      const title = dom.querySelector('.egov-ext-preview-title');
+      if (!title || title.textContent !== '第十条') throw new Error(`タイトル不一致: ${title?.textContent}`);
+      return 'XMLフォールバック成功（isHTML救済）';
+    } finally {
+      global.fetch = originalGlobalFetch;
+      window.fetch = originalWindowFetch;
+    }
+  });
+
   if (errors.length) {
     console.error('\nwindow error:', errors);
     failures += errors.length;

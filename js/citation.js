@@ -46,6 +46,12 @@ window.egovExt = window.egovExt || {};
   ext.citationPreviewCache = new Map();
 
   /**
+   * 法令XMLドキュメントのキャッシュ用Map (キー: `${lawId}:${asof}`, 値: Document)
+   * @type {Map<string, Document>}
+   */
+  ext.citationXmlCache = new Map();
+
+  /**
    * 現在表示中の法令ID (URLから取得)
    * @type {string|null}
    */
@@ -133,6 +139,7 @@ window.egovExt = window.egovExt || {};
 
     ext.citationMap.clear();
     ext.citationPreviewCache.clear();
+    ext.citationXmlCache.clear();
     inFlightFetches.clear();
     activePreviewLink = null;
     currentLawId = null;
@@ -528,48 +535,298 @@ window.egovExt = window.egovExt || {};
   }
 
   /**
-   * e-Gov内部API（SelectInyoLawTextData）から条文テキストを取得し、プレビュー用DOMを生成する
+   * e-Gov 公式 API v2（law_file/xml）から法令XMLを取得し、パース済み Document を返す
+   * @param {string} lawId
+   * @param {string} enforcementDate - YYYY/MM/DD 形式
+   * @returns {Promise<Document|null>}
+   */
+  async function fetchLawXmlDocument(lawId, enforcementDate) {
+    if (!lawId) return null;
+    const asof = enforcementDate ? enforcementDate.replace(/\//g, '-') : '';
+    const cacheKey = `${lawId}:${asof}`;
+
+    if (ext.citationXmlCache.has(cacheKey)) {
+      return ext.citationXmlCache.get(cacheKey);
+    }
+
+    const url = asof
+      ? `https://laws.e-gov.go.jp/api/2/law_file/xml/${encodeURIComponent(lawId)}?asof=${encodeURIComponent(asof)}`
+      : `https://laws.e-gov.go.jp/api/2/law_file/xml/${encodeURIComponent(lawId)}`;
+
+    try {
+      const res = await fetch(url, {
+        headers: { 'Accept': 'application/xml, text/xml, */*' }
+      });
+      if (!res.ok) return null;
+      const xmlText = await res.text();
+      const parser = new (window.DOMParser || DOMParser)();
+      const doc = parser.parseFromString(xmlText, 'text/xml');
+      if (doc.querySelector('parsererror')) {
+        return null;
+      }
+      ext.citationXmlCache.set(cacheKey, doc);
+      return doc;
+    } catch (e) {
+      console.warn('egov-ext: Failed to fetch law XML:', e);
+      return null;
+    }
+  }
+
+  /**
+   * 法令XMLドキュメントから目的の条文ノード（<Article> または単文法令の <Paragraph>）を特定する
+   * @param {Document} xmlDoc
+   * @param {string} objectId
+   * @param {string} path
+   * @returns {Element|null}
+   */
+  function findTargetArticleNodeInXml(xmlDoc, objectId, path) {
+    if (!xmlDoc) return null;
+
+    // 1. objectId から条番号（Num属性）を抽出して照合
+    // 例: "Mp-At_4" -> "4", "Mp-At_1_2" -> "1_2", "Mp-Ch_3-At_20" -> "20"
+    const atMatch = (objectId || '').match(/At_([0-9_]+)/);
+    if (atMatch) {
+      const numAttr = atMatch[1];
+      const target = xmlDoc.querySelector(`Article[Num="${numAttr}"]`);
+      if (target) return target;
+    }
+
+    // 2. path（例: "第四条", "第一条の二" など）から ArticleTitle のテキスト照合
+    const cleanPath = (path || '').trim();
+    if (cleanPath) {
+      const articles = xmlDoc.querySelectorAll('Article');
+      for (let i = 0; i < articles.length; i++) {
+        const titleEl = articles[i].querySelector(':scope > ArticleTitle');
+        if (titleEl) {
+          const tText = titleEl.textContent.trim();
+          if (tText === cleanPath || cleanPath.includes(tText) || tText.includes(cleanPath)) {
+            return articles[i];
+          }
+        }
+      }
+    }
+
+    // 3. 条文番号のない単文法令（Paragraph直接型）の場合
+    const articlesCount = xmlDoc.querySelectorAll('Article').length;
+    if (articlesCount === 0) {
+      const singlePara = xmlDoc.querySelector('MainProvision > Paragraph') || xmlDoc.querySelector('Paragraph');
+      if (singlePara) return singlePara;
+    }
+
+    return null;
+  }
+
+  /**
+   * XMLの条文ノード（<Article> または <Paragraph>）を
+   * renderArticlePreview が受け取れる Content 構造化オブジェクトに変換する
+   * @param {Element} node
+   * @returns {Object|null}
+   */
+  function xmlNodeToContent(node) {
+    if (!node) return null;
+
+    // 単文法令（Paragraph直接型）の場合
+    if (node.tagName.toLowerCase() === 'paragraph') {
+      const pSentenceNode = node.querySelector(':scope > ParagraphSentence');
+      const sentences = pSentenceNode
+        ? Array.from(pSentenceNode.querySelectorAll(':scope > Sentence')).map(s => ({ '#text': s.textContent }))
+        : [];
+      return {
+        Paragraph: [
+          {
+            ParagraphNum: '',
+            ParagraphSentence: { Sentence: sentences }
+          }
+        ]
+      };
+    }
+
+    // 通常の <Article> の場合
+    const content = {};
+
+    const captionNode = node.querySelector(':scope > ArticleCaption');
+    if (captionNode) {
+      content.ArticleCaption = captionNode.textContent.trim();
+    }
+
+    const titleNode = node.querySelector(':scope > ArticleTitle');
+    if (titleNode) {
+      content.ArticleTitle = titleNode.textContent.trim();
+    }
+
+    const paragraphNodes = node.querySelectorAll(':scope > Paragraph');
+    if (paragraphNodes.length > 0) {
+      content.Paragraph = Array.from(paragraphNodes).map(pNode => {
+        const pObj = {};
+        const numNode = pNode.querySelector(':scope > ParagraphNum');
+        pObj.ParagraphNum = numNode ? numNode.textContent.trim() : '';
+
+        const pSentenceNode = pNode.querySelector(':scope > ParagraphSentence');
+        if (pSentenceNode) {
+          pObj.ParagraphSentence = {
+            Sentence: Array.from(pSentenceNode.querySelectorAll(':scope > Sentence')).map(s => ({
+              '#text': s.textContent
+            }))
+          };
+        }
+
+        // Item（号）
+        const itemNodes = pNode.querySelectorAll(':scope > Item');
+        if (itemNodes.length > 0) {
+          pObj.Item = Array.from(itemNodes).map(itNode => {
+            const itObj = {};
+            const itTitle = itNode.querySelector(':scope > ItemTitle');
+            if (itTitle) itObj.ItemTitle = itTitle.textContent.trim();
+
+            const itSentence = itNode.querySelector(':scope > ItemSentence');
+            if (itSentence) {
+              itObj.ItemSentence = {
+                Sentence: Array.from(itSentence.querySelectorAll(':scope > Sentence')).map(s => ({
+                  '#text': s.textContent
+                }))
+              };
+            }
+
+            // Subitem1（イ、ロ、ハ...）
+            const sub1Nodes = itNode.querySelectorAll(':scope > Subitem1');
+            if (sub1Nodes.length > 0) {
+              itObj.Subitem1 = Array.from(sub1Nodes).map(sub1Node => {
+                const sub1Obj = {};
+                const s1Title = sub1Node.querySelector(':scope > Subitem1Title');
+                if (s1Title) sub1Obj.Subitem1Title = s1Title.textContent.trim();
+
+                const s1Sentence = sub1Node.querySelector(':scope > Subitem1Sentence');
+                if (s1Sentence) {
+                  sub1Obj.Subitem1Sentence = {
+                    Sentence: Array.from(s1Sentence.querySelectorAll(':scope > Sentence')).map(s => ({
+                      '#text': s.textContent
+                    }))
+                  };
+                }
+
+                // Subitem2（（１）、（２）...）
+                const sub2Nodes = sub1Node.querySelectorAll(':scope > Subitem2');
+                if (sub2Nodes.length > 0) {
+                  sub1Obj.Subitem2 = Array.from(sub2Nodes).map(sub2Node => {
+                    const sub2Obj = {};
+                    const s2Title = sub2Node.querySelector(':scope > Subitem2Title');
+                    if (s2Title) sub2Obj.Subitem2Title = s2Title.textContent.trim();
+
+                    const s2Sentence = sub2Node.querySelector(':scope > Subitem2Sentence');
+                    if (s2Sentence) {
+                      sub2Obj.Subitem2Sentence = {
+                        Sentence: Array.from(s2Sentence.querySelectorAll(':scope > Sentence')).map(s => ({
+                          '#text': s.textContent
+                        }))
+                      };
+                    }
+                    return sub2Obj;
+                  });
+                }
+
+                return sub1Obj;
+              });
+            }
+
+            return itObj;
+          });
+        }
+
+        return pObj;
+      });
+    }
+
+    return content;
+  }
+
+  /**
+   * XML APIから条文を取得してプレビューDOMを生成するフォールバック処理
+   * @param {string} lawId
+   * @param {string} objectId
+   * @param {string} parentTitle
+   * @param {string} lawName
+   * @param {string} path
+   * @param {string} enforcementDate
+   * @returns {Promise<HTMLElement|null>}
+   */
+  async function fetchArticlePreviewFromXml(lawId, objectId, parentTitle, lawName, path, enforcementDate) {
+    const xmlDoc = await fetchLawXmlDocument(lawId, enforcementDate);
+    if (!xmlDoc) return null;
+
+    const targetNode = findTargetArticleNodeInXml(xmlDoc, objectId, path);
+    if (!targetNode) return null;
+
+    const content = xmlNodeToContent(targetNode);
+    if (!content) return null;
+
+    const highlightTerms = extractHighlightTerms(parentTitle);
+    return renderArticlePreview(content, highlightTerms, lawName, path);
+  }
+
+  /**
+   * 条文テキストを取得しプレビュー用DOMを生成する統合関数。
+   * まず軽量な e-Gov内部API（SelectInyoLawTextData.json）を試し、
+   * HTML形式法令（isHTML: true）や未対応・エラー法令の場合は自動で公式XML API（law_file/xml）へフォールバックします。
    */
   async function fetchAndBuildArticlePreview(lawId, objectId, parentTitle, lawName, path, enforcementDate) {
     const date = new Date();
     const occasion = `${date.getFullYear()}/${String(date.getMonth() + 1).padStart(2, '0')}/${String(date.getDate()).padStart(2, '0')}`;
 
-    const textRes = await fetch('https://laws.e-gov.go.jp/internal-api/SelectInyoLawTextData.json', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Accept': 'application/json, text/plain, */*'
-      },
-      body: JSON.stringify({
-        law_id: lawId,
-        occasion: occasion,
-        enforcement_date: enforcementDate || occasion,
-        objectID: objectId
-      })
-    });
-    if (!textRes.ok) throw new Error(`Text fetch failed: ${textRes.status}`);
-    const data = await textRes.json();
-    if (!data || !data.result || !data.result.success || !data.result.inyo_text_data) {
-      throw new Error(data?.result?.errorMessage || 'No inyo_text_data');
+    let isHtmlLaw = false;
+
+    // 1. 軽量な SelectInyoLawTextData.json を試行
+    try {
+      const textRes = await fetch('https://laws.e-gov.go.jp/internal-api/SelectInyoLawTextData.json', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json, text/plain, */*'
+        },
+        body: JSON.stringify({
+          law_id: lawId,
+          occasion: occasion,
+          enforcement_date: enforcementDate || occasion,
+          objectID: objectId
+        })
+      });
+
+      if (textRes.ok) {
+        const data = await textRes.json();
+        if (data && data.result && data.result.success && data.result.inyo_text_data) {
+          const inyoTextData = data.result.inyo_text_data;
+          if (inyoTextData.isHTML) {
+            isHtmlLaw = true;
+          } else {
+            const inyoArray = inyoTextData.InyoResult_array || [];
+            if (inyoArray.length > 0) {
+              const target = findTargetArticle(inyoArray, objectId, path);
+              if (target && target.Content) {
+                const highlightTerms = extractHighlightTerms(parentTitle);
+                return renderArticlePreview(target.Content, highlightTerms, lawName, path);
+              }
+            }
+          }
+        }
+      }
+    } catch (e) {
+      // 内部APIの失敗・JSONエラー時は XML フォールバックへ
     }
 
-    const inyoTextData = data.result.inyo_text_data;
-    if (inyoTextData.isHTML) {
+    // 2. 公式XML API（law_file/xml）へのフォールバック（HTML形式法令・JSON未対応法令の救済）
+    try {
+      const xmlPreviewDOM = await fetchArticlePreviewFromXml(lawId, objectId, parentTitle, lawName, path, enforcementDate);
+      if (xmlPreviewDOM) {
+        return xmlPreviewDOM;
+      }
+    } catch (e) {
+      console.warn('egov-ext: XML fallback failed:', e);
+    }
+
+    // 3. XMLからも取得できなかった場合
+    if (isHtmlLaw) {
       return createHtmlNoticeView(lawName, path);
     }
-
-    const inyoArray = inyoTextData.InyoResult_array || [];
-    if (inyoArray.length === 0) {
-      return null;
-    }
-
-    const target = findTargetArticle(inyoArray, objectId, path);
-    if (!target || !target.Content) {
-      return null;
-    }
-
-    const highlightTerms = extractHighlightTerms(parentTitle);
-    return renderArticlePreview(target.Content, highlightTerms, lawName, path);
+    return null;
   }
 
   /**
@@ -976,6 +1233,10 @@ window.egovExt = window.egovExt || {};
       highlightTextNode,
       findTargetArticle,
       getOrFetchArticlePreview,
+      fetchLawXmlDocument,
+      findTargetArticleNodeInXml,
+      xmlNodeToContent,
+      fetchArticlePreviewFromXml,
       get inFlightFetches() { return inFlightFetches; },
       get activePreviewLink() { return activePreviewLink; }
     };

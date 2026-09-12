@@ -741,6 +741,296 @@ check('定義語の抽出とハイライト', async () => true);
     return 'WeakMap メモ化正常（同一参照を即時返却）';
   });
 
+  console.log('\n--- 実機操作シミュレーション・堅牢性検証 ---');
+
+  await check('アンカー内部でマウスが手振れ移動（子要素間移動）してもタイマーがキャンセルされず、確実に開く', async () => {
+    let resolverCallCount = 0;
+    const testTip = ext.createTooltip({ variant: 'shake-test', showDelay: 300 });
+
+    // 内部に子要素を持つボタン（被引用ボタンやリンクと同じ構造）
+    const container = document.createElement('div');
+    container.innerHTML = `
+      <button class="test-shake-btn">
+        <span class="icon">🔍</span>
+        <span class="label">引用</span>
+      </button>
+    `;
+    document.body.appendChild(container);
+    const btn = container.querySelector('.test-shake-btn');
+    const iconSpan = container.querySelector('.icon');
+    const labelSpan = container.querySelector('.label');
+
+    ext.bindHoverTooltip({
+      selector: '.test-shake-btn',
+      tooltip: testTip,
+      resolveContent: () => {
+        resolverCallCount++;
+        const div = document.createElement('div');
+        div.textContent = '手振れテスト完了';
+        return div;
+      }
+    });
+
+    // 1. ボタンに進入 (mouseover)
+    btn.dispatchEvent(new window.MouseEvent('mouseover', { bubbles: true }));
+
+    // 2. 50ms後、ボタン内のアイコンへ移動 (iconSpan で mouseover, btn から mouseout)
+    await new Promise(r => setTimeout(r, 50));
+    btn.dispatchEvent(new window.MouseEvent('mouseout', { bubbles: true, relatedTarget: iconSpan }));
+    iconSpan.dispatchEvent(new window.MouseEvent('mouseover', { bubbles: true }));
+
+    // 3. さらに 50ms後、アイコンからラベルテキストへ移動 (labelSpan で mouseover, iconSpan から mouseout)
+    await new Promise(r => setTimeout(r, 50));
+    iconSpan.dispatchEvent(new window.MouseEvent('mouseout', { bubbles: true, relatedTarget: labelSpan }));
+    labelSpan.dispatchEvent(new window.MouseEvent('mouseover', { bubbles: true }));
+
+    // 4. 合計 350ms 待機（最初の進入から 300ms 以上経過）
+    await new Promise(r => setTimeout(r, 250));
+
+    // 手振れ移動があってもタイマーはキャンセルされず、1回だけ開くこと！
+    if (resolverCallCount !== 1) {
+      throw new Error(`手振れ時にタイマーが破壊または無限リセットされた (resolverCallCount=${resolverCallCount})`);
+    }
+    if (!testTip.el.classList.contains('visible')) {
+      throw new Error('手振れ後にツールチップが表示されていない');
+    }
+
+    testTip.destroy();
+    container.remove();
+    return 'アンカー内部の連続移動でもタイマーが保護され正常に開くことを実証';
+  });
+
+  await check('高速API通信（50ms）完了時でも「読み込み中...」でフリーズせず正常にプレビューが表示される', async () => {
+    const originalGlobalFetch = global.fetch;
+    const originalWindowFetch = window.fetch;
+
+    // 50ms で超高速にレスポンスを返すモック
+    const mockFastFetch = async () => {
+      await new Promise(r => setTimeout(r, 50));
+      return {
+        ok: true,
+        text: async () => '',
+        json: async () => ({
+          result: {
+            success: true,
+            revision_list: [{ law_data_id: 'dummy', subRevision: 'dummy' }],
+            inyo_text_data: {
+              isHTML: false,
+              LawTitle: '高速テスト法',
+              InyoResult_array: [
+                {
+                  ObjectId: '#Mp-At_1',
+                  Type: 'Article',
+                  Content: {
+                    ArticleTitle: '第一条',
+                    Paragraph: [{
+                      ParagraphNum: '',
+                      ParagraphSentence: {
+                        Sentence: [{ '#text': '高速プレビュー本文です。' }]
+                      }
+                    }]
+                  }
+                }
+              ]
+            }
+          }
+        })
+      };
+    };
+
+    global.fetch = mockFastFetch;
+    window.fetch = mockFastFetch;
+
+    try {
+      ext.settings.global = true;
+      ext.settings.popup = true;
+      ext.enablePopup();
+
+      const testA = document.createElement('a');
+      testA.href = 'https://laws.e-gov.go.jp/law/999AC0000000001#Mp-At_1';
+      testA.textContent = '高速テスト法第一条';
+      document.body.appendChild(testA);
+
+      // ホバー開始
+      testA.dispatchEvent(new window.MouseEvent('mouseover', { bubbles: true }));
+
+      // 380ms 待機（showDelay 300ms + 通信50ms を経過した時点）
+      await new Promise(r => setTimeout(r, 380));
+
+      if (!ext.referenceTooltip.el.classList.contains('visible')) {
+        throw new Error('380ms経過後にツールチップが表示されていない');
+      }
+
+      const bodyText = ext.referenceTooltip.el.textContent || '';
+      if (bodyText.includes('読み込み中') && !bodyText.includes('高速プレビュー本文です')) {
+        throw new Error('「読み込み中...」のままフリーズしている！');
+      }
+      if (!bodyText.includes('高速プレビュー本文です')) {
+        throw new Error(`プレビュー本文が見当たらない: ${bodyText}`);
+      }
+
+      testA.remove();
+      return '高速通信完了時に本文プレビューが確実に描画（読み込み中フリーズ完全根絶）';
+    } finally {
+      global.fetch = originalGlobalFetch;
+      window.fetch = originalWindowFetch;
+    }
+  });
+
+  await check('低速API通信（300ms）時、先にローディングが表示され、通信完了後に本文へ滑らかに切り替わる', async () => {
+    const originalGlobalFetch = global.fetch;
+    const originalWindowFetch = window.fetch;
+
+    // 300ms かかる低速通信モック
+    const mockSlowFetch = async () => {
+      await new Promise(r => setTimeout(r, 300));
+      return {
+        ok: true,
+        text: async () => '',
+        json: async () => ({
+          result: {
+            success: true,
+            revision_list: [{ law_data_id: 'dummy', subRevision: 'dummy' }],
+            inyo_text_data: {
+              isHTML: false,
+              LawTitle: '低速テスト法',
+              InyoResult_array: [
+                {
+                  ObjectId: '#Mp-At_2',
+                  Type: 'Article',
+                  Content: {
+                    ArticleTitle: '第二条',
+                    Paragraph: [{
+                      ParagraphNum: '',
+                      ParagraphSentence: {
+                        Sentence: [{ '#text': '低速プレビュー本文です。' }]
+                      }
+                    }]
+                  }
+                }
+              ]
+            }
+          }
+        })
+      };
+    };
+
+    global.fetch = mockSlowFetch;
+    window.fetch = mockSlowFetch;
+
+    try {
+      ext.settings.global = true;
+      ext.settings.popup = true;
+      ext.enablePopup();
+
+      const testA = document.createElement('a');
+      testA.href = 'https://laws.e-gov.go.jp/law/999AC0000000002#Mp-At_2';
+      testA.textContent = '低速テスト法第二条';
+      document.body.appendChild(testA);
+
+      // ホバー開始
+      testA.dispatchEvent(new window.MouseEvent('mouseover', { bubbles: true }));
+
+      // 320ms 待機（showDelay 300ms 経過直後: 通信300msはまだ完了していないのでローディング画面が表示されていること）
+      await new Promise(r => setTimeout(r, 320));
+      if (!ext.referenceTooltip.el.classList.contains('visible')) {
+        throw new Error('320ms経過後にローディング画面が表示されていない');
+      }
+      const initialText = ext.referenceTooltip.el.textContent || '';
+      if (!initialText.includes('読み込み中')) {
+        throw new Error(`初期表示がローディング画面になっていない: ${initialText}`);
+      }
+
+      // さらに 350ms 待機（合計670ms: 通信300msが完了しているはず）
+      await new Promise(r => setTimeout(r, 350));
+
+      const updatedText = ext.referenceTooltip.el.textContent || '';
+      if (!updatedText.includes('低速プレビュー本文です')) {
+        throw new Error(`低速通信完了後に本文へ切り替わっていない: ${updatedText}`);
+      }
+
+      testA.remove();
+      return '低速通信時にローディングから本文へ正常に自動切り替え';
+    } finally {
+      global.fetch = originalGlobalFetch;
+      window.fetch = originalWindowFetch;
+    }
+  });
+
+  await check('キャッシュ済みの他法令リンクは、300msホバー時にローディングを挟まず即座にプレビュー表示される', async () => {
+    // 上記の「高速テスト法第一条」は既に citationPreviewCache に入っている
+    const testA = document.createElement('a');
+    testA.href = 'https://laws.e-gov.go.jp/law/999AC0000000001#Mp-At_1';
+    testA.textContent = '高速テスト法第一条';
+    document.body.appendChild(testA);
+
+    // ホバー開始
+    testA.dispatchEvent(new window.MouseEvent('mouseover', { bubbles: true }));
+
+    // 330ms 待機
+    await new Promise(r => setTimeout(r, 330));
+
+    if (!ext.referenceTooltip.el.classList.contains('visible')) {
+      throw new Error('キャッシュ済みリンクでツールチップが表示されていない');
+    }
+    const text = ext.referenceTooltip.el.textContent || '';
+    if (text.includes('読み込み中')) {
+      throw new Error('キャッシュ済みリンクなのにローディングが表示された');
+    }
+    if (!text.includes('高速プレビュー本文です')) {
+      throw new Error(`キャッシュ本文が表示されていない: ${text}`);
+    }
+
+    testA.remove();
+    return 'キャッシュ済みリンクのゼロ待ち時間プレビュー表示を確認';
+  });
+
+  check('isSelfGeneratedElement が拡張機能の自作UIおよび子孫要素を確実に識別し再帰走査を防止する', () => {
+    const { isSelfGeneratedElement } = ext._testContent;
+
+    // 1. 自作要素クラスを持つ要素
+    const tipEl = document.createElement('div');
+    tipEl.className = 'egov-ext-tip visible';
+    const tipChild = document.createElement('span');
+    tipChild.textContent = '子要素テキスト';
+    tipEl.appendChild(tipChild);
+
+    if (!isSelfGeneratedElement(tipEl)) throw new Error('egov-ext-tip が自作要素と判定されなかった');
+    if (!isSelfGeneratedElement(tipChild)) throw new Error('tipの子要素が自作要素と判定されなかった');
+
+    // 2. 定義語ハイライト要素
+    const defEl = document.createElement('span');
+    defEl.className = 'egov-definition-highlight';
+    if (!isSelfGeneratedElement(defEl)) throw new Error('egov-definition-highlight が自作要素と判定されなかった');
+
+    // 3. 薄字化要素
+    const dimEl = document.createElement('span');
+    dimEl.className = 'egov-ext-dimmed';
+    if (!isSelfGeneratedElement(dimEl)) throw new Error('egov-ext-dimmed が自作要素と判定されなかった');
+
+    // 4. 被引用ボタン
+    const citeBtn = document.createElement('button');
+    citeBtn.className = 'egov-ext-citation-btn';
+    const citeIcon = document.createElement('span');
+    citeBtn.appendChild(citeIcon);
+    if (!isSelfGeneratedElement(citeBtn)) throw new Error('被引用ボタンが自作要素と判定されなかった');
+    if (!isSelfGeneratedElement(citeIcon)) throw new Error('被引用ボタンの子要素が自作要素と判定されなかった');
+
+    // 5. 通常の法令本文要素（自作要素ではないことの確認）
+    const normalArticle = document.createElement('div');
+    normalArticle.className = 'Article';
+    const normalSentence = document.createElement('span');
+    normalSentence.className = 'ParagraphSentence';
+    normalSentence.textContent = '第一条 この法律は...';
+    normalArticle.appendChild(normalSentence);
+
+    if (isSelfGeneratedElement(normalArticle)) throw new Error('通常のArticleが自作要素と誤判定された');
+    if (isSelfGeneratedElement(normalSentence)) throw new Error('通常のParagraphSentenceが自作要素と誤判定された');
+
+    return '自作要素・通常要素の完全分離識別確認';
+  });
+
+
   if (errors.length) {
     console.error('\nwindow error:', errors);
     failures += errors.length;

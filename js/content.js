@@ -687,4 +687,10 @@ window.egovExt = window.egovExt || {};
     init();
   }
 
+  // テスト用内部オブジェクトの公開
+  ext._testContent = {
+    isSelfGeneratedElement
+  };
+
 })(window.egovExt);
+

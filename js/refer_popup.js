@@ -239,25 +239,32 @@ window.egovExt = window.egovExt || {};
         ext.applyHorizontalConversion(previewDOM);
       }
 
-      // まだこのリンクにユーザーが注目している場合（ホバー中またはツールチップ表示中）
+      // まだこのリンクにユーザーが注目している場合（ホバー中・待機中・またはツールチップ表示中）
+      const tip = ext.referenceTooltip;
       const isTargetActive = (activeExternalLink === link) ||
-        (ext.referenceTooltip && ext.referenceTooltip.anchor === link && ext.referenceTooltip.el.classList.contains('visible'));
+        (tip && (tip.anchor === link || tip.pendingAnchor === link));
 
-      if (isTargetActive) {
-        if (ext.referenceTooltip && ext.referenceTooltip.el.classList.contains('visible')) {
-          ext.referenceTooltip.update(previewDOM.cloneNode(true));
+      if (isTargetActive && tip) {
+        if (tip.el.classList.contains('visible')) {
+          tip.update(previewDOM.cloneNode(true));
+        } else {
+          // まだディレイ待機中（未表示）だった場合は即座にプレビューを表示（読み込み中フリーズを完全根絶）
+          tip.show(link, previewDOM.cloneNode(true), true);
         }
       }
     } catch (err) {
+      const tip = ext.referenceTooltip;
       const isTargetActive = (activeExternalLink === link) ||
-        (ext.referenceTooltip && ext.referenceTooltip.anchor === link && ext.referenceTooltip.el.classList.contains('visible'));
+        (tip && (tip.anchor === link || tip.pendingAnchor === link));
 
-      if (isTargetActive) {
-        if (ext.referenceTooltip && ext.referenceTooltip.el.classList.contains('visible')) {
-          const errorFrag = ext.createErrorView
-            ? ext.createErrorView(lawName, path, err.message)
-            : document.createTextNode(err.message);
-          ext.referenceTooltip.update(errorFrag);
+      if (isTargetActive && tip) {
+        const errorFrag = ext.createErrorView
+          ? ext.createErrorView(lawName, path, err.message)
+          : document.createTextNode(err.message);
+        if (tip.el.classList.contains('visible')) {
+          tip.update(errorFrag);
+        } else {
+          tip.show(link, errorFrag, true);
         }
       }
     }

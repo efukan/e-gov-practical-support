@@ -1036,12 +1036,27 @@ window.egovExt = window.egovExt || {};
     const frag = document.createDocumentFragment();
     if (!sentenceContainer) return frag;
 
+    if (typeof sentenceContainer === 'string') {
+      const cleanText = stripHtmlTags(sentenceContainer);
+      if (cleanText) {
+        frag.appendChild(highlightTextNode(cleanText, terms));
+      }
+      return frag;
+    }
+
     const sentences = Array.isArray(sentenceContainer.Sentence)
       ? sentenceContainer.Sentence
-      : (sentenceContainer.Sentence ? [sentenceContainer.Sentence] : []);
+      : (sentenceContainer.Sentence ? [sentenceContainer.Sentence] : (Array.isArray(sentenceContainer) ? sentenceContainer : []));
 
     for (const s of sentences) {
       if (!s) continue;
+      if (typeof s === 'string') {
+        const cleanText = stripHtmlTags(s);
+        if (cleanText) {
+          frag.appendChild(highlightTextNode(cleanText, terms));
+        }
+        continue;
+      }
       let fullText = '';
       if (s['#childs']) {
         for (const c of s['#childs']) {

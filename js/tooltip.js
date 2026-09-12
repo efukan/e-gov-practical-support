@@ -88,6 +88,8 @@ window.egovExt = window.egovExt || {};
     let hideTimer = null;
     /** 現在ツールチップを開いているアンカー要素 @type {HTMLElement|null} */
     let currentAnchor = null;
+    /** 現在表示待機中のアンカー要素 @type {HTMLElement|null} */
+    let pendingAnchor = null;
     /** 子ツールチップインスタンスのSet @type {Set<Object>} */
     const children = new Set();
 
@@ -184,13 +186,18 @@ window.egovExt = window.egovExt || {};
        * @param {boolean} [immediate=false] - true ならディレイ無しで即表示
        */
       show(anchor, contentOrResolver, immediate = false) {
-        clearTimers();
-
-        // 同じアンカーで既に表示中なら中身の作り直しはしない
+        // 1. 同じアンカーで既に表示中なら中身の作り直し・タイマーリセットはしない
         if (currentAnchor === anchor && el.classList.contains('visible')) return;
+
+        // 2. すでにこのアンカーでタイマー待機中なら、タイマーをリセットしない（手振れによる無限リセット防止）
+        if (!immediate && pendingAnchor === anchor && showTimer !== null) return;
+
+        clearTimers();
+        pendingAnchor = anchor;
 
         const render = () => {
           showTimer = null;
+          pendingAnchor = null;
 
           // 遅延評価: 実際に表示する直前までDOM構築やAPIリクエストを一切行わない
           let resolvedContent = contentOrResolver;
@@ -260,6 +267,7 @@ window.egovExt = window.egovExt || {};
        * @param {boolean} [immediate=false] - true ならディレイ無しで即非表示
        */
       hide(immediate = false) {
+        pendingAnchor = null;
         if (showTimer !== null) { clearTimeout(showTimer); showTimer = null; }
         if (hideTimer !== null) { clearTimeout(hideTimer); hideTimer = null; }
 
@@ -290,8 +298,12 @@ window.egovExt = window.egovExt || {};
       /** 現在このツールチップを開いているアンカー要素 */
       get anchor() { return currentAnchor; },
 
+      /** 現在表示待機中（showTimer動作中）のアンカー要素 */
+      get pendingAnchor() { return pendingAnchor; },
+
       /** ツールチップをDOMから取り除き、インスタンスを破棄する */
       destroy() {
+        pendingAnchor = null;
         clearTimers();
         if (parent && parent.children) {
           parent.children.delete(instance);
@@ -309,12 +321,16 @@ window.egovExt = window.egovExt || {};
     // ツールチップ本体にマウスが乗っている間は閉じない（中をスクロール・クリックできるようにする）
     el.addEventListener('mouseenter', () => instance.cancelHide());
     el.addEventListener('mouseleave', (e) => {
-      // 子ツールチップへ移動した場合は親を閉じない
       const related = e.relatedTarget;
       if (related) {
+        // 親ツールチップへ移動した場合は閉じない
+        if (parent && (related === parent.el || parent.el.contains(related))) return;
+        // 子ツールチップへ移動した場合は親を閉じない
         for (const child of children) {
           if (related === child.el || child.el.contains(related)) return;
         }
+        // アンカーへ戻った場合も閉じない
+        if (currentAnchor && (related === currentAnchor || currentAnchor.contains(related))) return;
       }
       instance.hide();
     });
@@ -423,10 +439,24 @@ window.egovExt = window.egovExt || {};
       const resolved = resolveBinding(e);
       if (!resolved) return;
 
-      // ツールチップ本体へ移動した場合は閉じない（hideDelay 中に mouseenter が拾う）
+      const anchor = resolved.anchor;
       const related = e.relatedTarget;
       const tip = resolved.binding.tooltip.el;
+
+      // ガード1: 移動先（relatedTarget）が同一アンカー内、またはアンカー自身なら、
+      // マウスはアンカーから外に出ていない（手振れ・子要素間移動）ため、hide() を呼んではならない！
+      if (related && (related === anchor || anchor.contains(related))) return;
+
+      // ガード2: ツールチップ本体へ移動した場合は閉じない（hideDelay 中に mouseenter が拾う）
       if (related && (related === tip || tip.contains(related))) return;
+
+      // ガード3: 子ツールチップ（フライアウトプレビュー）へ移動した場合も閉じない
+      const children = resolved.binding.tooltip.children;
+      if (children && related) {
+        for (const child of children) {
+          if (related === child.el || child.el.contains(related)) return;
+        }
+      }
 
       resolved.binding.tooltip.hide();
     });

@@ -524,7 +524,7 @@ window.egovExt = window.egovExt || {};
     }
 
     // 2. キャッシュが無い場合、ローディング表示をセットして表示予約
-    const loadingFrag = createLoadingView(lawName, path);
+    const loadingFrag = createLoadingView(lawName, path, link.href);
     ext.citationPreviewTooltip.show(link, loadingFrag, false);
 
     // 3. データを非同期取得（先行通信があれば重複リクエストせず自動相乗り）
@@ -549,7 +549,7 @@ window.egovExt = window.egovExt || {};
         (ext.citationPreviewTooltip.anchor === link && ext.citationPreviewTooltip.el.classList.contains('visible'));
 
       if (isTargetActive) {
-        const errorFrag = createErrorView(lawName, path, err.message);
+        const errorFrag = createErrorView(lawName, path, err.message, link.href);
         if (ext.citationPreviewTooltip.el.classList.contains('visible')) {
           ext.citationPreviewTooltip.update(errorFrag);
         } else {
@@ -557,6 +557,7 @@ window.egovExt = window.egovExt || {};
         }
       }
     }
+
   }
 
   /**
@@ -780,7 +781,7 @@ window.egovExt = window.egovExt || {};
    * @param {string} enforcementDate
    * @returns {Promise<HTMLElement|null>}
    */
-  async function fetchArticlePreviewFromXml(lawId, objectId, parentTitle, lawName, path, enforcementDate) {
+  async function fetchArticlePreviewFromXml(lawId, objectId, parentTitle, lawName, path, enforcementDate, targetUrl) {
     const xmlDoc = await fetchLawXmlDocument(lawId, enforcementDate);
     if (!xmlDoc) return null;
 
@@ -791,7 +792,7 @@ window.egovExt = window.egovExt || {};
     if (!content) return null;
 
     const highlightTerms = extractHighlightTerms(parentTitle);
-    return renderArticlePreview(content, highlightTerms, lawName, path);
+    return renderArticlePreview(content, highlightTerms, lawName, path, targetUrl);
   }
 
   /**
@@ -802,6 +803,7 @@ window.egovExt = window.egovExt || {};
   async function fetchAndBuildArticlePreview(lawId, objectId, parentTitle, lawName, path, enforcementDate) {
     const date = new Date();
     const occasion = `${date.getFullYear()}/${String(date.getMonth() + 1).padStart(2, '0')}/${String(date.getDate()).padStart(2, '0')}`;
+    const targetUrl = 'https://laws.e-gov.go.jp/law/' + encodeURIComponent(lawId) + (objectId ? '#' + objectId : '');
 
     let isHtmlLaw = false;
 
@@ -836,7 +838,7 @@ window.egovExt = window.egovExt || {};
                   target.Content.LawTitle = inyoTextData.LawTitle;
                 }
                 const highlightTerms = extractHighlightTerms(parentTitle);
-                return renderArticlePreview(target.Content, highlightTerms, lawName, path);
+                return renderArticlePreview(target.Content, highlightTerms, lawName, path, targetUrl);
               }
             }
           }
@@ -848,7 +850,7 @@ window.egovExt = window.egovExt || {};
 
     // 2. 公式XML API（law_file/xml）へのフォールバック（HTML形式法令・JSON未対応法令の救済）
     try {
-      const xmlPreviewDOM = await fetchArticlePreviewFromXml(lawId, objectId, parentTitle, lawName, path, enforcementDate);
+      const xmlPreviewDOM = await fetchArticlePreviewFromXml(lawId, objectId, parentTitle, lawName, path, enforcementDate, targetUrl);
       if (xmlPreviewDOM) {
         return xmlPreviewDOM;
       }
@@ -858,10 +860,11 @@ window.egovExt = window.egovExt || {};
 
     // 3. XMLからも取得できなかった場合
     if (isHtmlLaw) {
-      return createHtmlNoticeView(lawName, path);
+      return createHtmlNoticeView(lawName, path, targetUrl);
     }
     return null;
   }
+
 
   /**
    * 被引用条文一覧（InyoResult_array）から、目的の条文要素を特定する。
@@ -1102,7 +1105,7 @@ window.egovExt = window.egovExt || {};
   /**
    * 条文構造化JSONからプレビュー用DOM要素を生成
    */
-  function renderArticlePreview(content, terms, lawName, path) {
+  function renderArticlePreview(content, terms, lawName, path, targetUrl) {
     const container = document.createElement('div');
     container.className = 'egov-ext-preview-container';
 
@@ -1111,22 +1114,42 @@ window.egovExt = window.egovExt || {};
     // ヘッダー
     const header = document.createElement('div');
     header.className = 'egov-ext-tip-header';
+
+    const titleWrap = document.createElement('div');
+    titleWrap.className = 'egov-ext-tip-header-title';
+
     const lawTitleEl = document.createElement('span');
     lawTitleEl.className = 'egov-ext-preview-lawname';
     lawTitleEl.textContent = finalLawName;
-    header.appendChild(lawTitleEl);
+    titleWrap.appendChild(lawTitleEl);
 
     if (path) {
       const pathEl = document.createElement('span');
       pathEl.className = 'egov-ext-preview-path';
       pathEl.textContent = ` ${path}`;
-      header.appendChild(pathEl);
+      titleWrap.appendChild(pathEl);
     }
+    header.appendChild(titleWrap);
+
+    // 別タブで開くボタン
+    if (targetUrl && ext.createTipActionButton) {
+      const openBtn = ext.createTipActionButton({
+        icon: 'open',
+        label: '開く',
+        title: '別タブでこの条文を開く',
+        onClick: () => {
+          window.open(targetUrl, '_blank', 'noopener,noreferrer');
+        }
+      });
+      header.appendChild(openBtn);
+    }
+
     container.appendChild(header);
 
     // 本文ブロック
     const body = document.createElement('div');
     body.className = 'egov-ext-preview-body';
+
 
     if (content) {
       // 見出し（ArticleCaption）
@@ -1251,14 +1274,33 @@ window.egovExt = window.egovExt || {};
     return container;
   }
 
-  function createLoadingView(lawName, path) {
-    const container = document.createElement('div');
-    container.className = 'egov-ext-preview-container';
-
+  function buildPreviewHeader(lawName, path, targetUrl) {
     const header = document.createElement('div');
     header.className = 'egov-ext-tip-header';
-    header.textContent = `${lawName} ${path}`.trim();
-    container.appendChild(header);
+
+    const titleWrap = document.createElement('div');
+    titleWrap.className = 'egov-ext-tip-header-title';
+    titleWrap.textContent = `${lawName} ${path}`.trim();
+    header.appendChild(titleWrap);
+
+    if (targetUrl && ext.createTipActionButton) {
+      const openBtn = ext.createTipActionButton({
+        icon: 'open',
+        label: '開く',
+        title: '別タブでこの条文を開く',
+        onClick: () => {
+          window.open(targetUrl, '_blank', 'noopener,noreferrer');
+        }
+      });
+      header.appendChild(openBtn);
+    }
+    return header;
+  }
+
+  function createLoadingView(lawName, path, targetUrl) {
+    const container = document.createElement('div');
+    container.className = 'egov-ext-preview-container';
+    container.appendChild(buildPreviewHeader(lawName, path, targetUrl));
 
     const loading = document.createElement('div');
     loading.className = 'egov-ext-tip-loading';
@@ -1268,14 +1310,10 @@ window.egovExt = window.egovExt || {};
     return container;
   }
 
-  function createErrorView(lawName, path, msg) {
+  function createErrorView(lawName, path, msg, targetUrl) {
     const container = document.createElement('div');
     container.className = 'egov-ext-preview-container';
-
-    const header = document.createElement('div');
-    header.className = 'egov-ext-tip-header';
-    header.textContent = `${lawName} ${path}`.trim();
-    container.appendChild(header);
+    container.appendChild(buildPreviewHeader(lawName, path, targetUrl));
 
     const error = document.createElement('div');
     error.className = 'egov-ext-tip-error';
@@ -1285,14 +1323,10 @@ window.egovExt = window.egovExt || {};
     return container;
   }
 
-  function createHtmlNoticeView(lawName, path) {
+  function createHtmlNoticeView(lawName, path, targetUrl) {
     const container = document.createElement('div');
     container.className = 'egov-ext-preview-container';
-
-    const header = document.createElement('div');
-    header.className = 'egov-ext-tip-header';
-    header.textContent = `${lawName} ${path}`.trim();
-    container.appendChild(header);
+    container.appendChild(buildPreviewHeader(lawName, path, targetUrl));
 
     const notice = document.createElement('div');
     notice.className = 'egov-ext-tip-error';
@@ -1301,6 +1335,7 @@ window.egovExt = window.egovExt || {};
 
     return container;
   }
+
 
   // 外部モジュール（refer_popup.js 等）連携用に公開
   ext.createLoadingView = createLoadingView;

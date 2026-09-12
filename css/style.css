@@ -138,6 +138,10 @@
 
 /* ヘッダー（出典の条項番号・「被引用法令一覧」など） */
 .egov-ext-tip-header {
+  display: flex !important;
+  justify-content: space-between !important;
+  align-items: center !important;
+  gap: 8px !important;
   margin: 0 0 8px !important;
   padding-bottom: 6px;
   border-bottom: 1px solid var(--tip-border);
@@ -146,6 +150,46 @@
   font-weight: 700;
   letter-spacing: .02em;
 }
+
+.egov-ext-tip-header-title {
+  display: inline-flex !important;
+  align-items: center !important;
+  min-width: 0 !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  white-space: nowrap !important;
+}
+
+/* ポップアップヘッダー内のアクションボタン（別タブで開く / この条文へジャンプ） */
+.egov-ext-tip-action-btn {
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 3px !important;
+  flex-shrink: 0 !important;
+  padding: 2px 7px !important;
+  background: rgba(16, 66, 164, 0.08) !important;
+  color: var(--tip-accent, #1042a4) !important;
+  border: 1px solid rgba(16, 66, 164, 0.22) !important;
+  border-radius: 4px !important;
+  font-size: 10.5px !important;
+  font-weight: 600 !important;
+  line-height: 1.2 !important;
+  cursor: pointer !important;
+  text-decoration: none !important;
+  transition: all 0.15s ease !important;
+  vertical-align: middle !important;
+}
+
+.egov-ext-tip-action-btn:hover {
+  background: rgba(16, 66, 164, 0.18) !important;
+  border-color: rgba(16, 66, 164, 0.4) !important;
+  color: #0a2d73 !important;
+}
+
+.egov-ext-tip-action-btn svg {
+  flex-shrink: 0 !important;
+}
+
 
 /* 本文。e-Gov側の余白指定を打ち消して詰めて表示する */
 .egov-ext-tip-body {
@@ -631,10 +675,12 @@ body.egov-fastrender-enabled .main-content {
 /* ----- 9. アクセシビリティ・フォーカス視認性 (Accessibility Focus Styles) ----- */
 .egov-ext-jump-input:focus-visible,
 .egov-ext-citation-btn:focus-visible,
-.egov-ext-jump-clear:focus-visible {
+.egov-ext-jump-clear:focus-visible,
+.egov-ext-tip-action-btn:focus-visible {
   outline: 2px solid #1042a4 !important;
   outline-offset: 2px !important;
 }
+
 
 /* ----- 10. 印刷時の非表示・最適化設定 (Hide elements and optimize during print) ----- */
 @media print {

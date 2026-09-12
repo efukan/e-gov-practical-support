@@ -767,9 +767,12 @@ window.egovExt = window.egovExt || {};
     // すでにスクロール中の場合は、もともと高速レンダリングが有効だったフラグを引き継ぐ
     let wasFastRenderEnabled = ext.isScrolling && ext.wasFastRenderEnabled;
 
+    const rAF = typeof requestAnimationFrame !== 'undefined' ? requestAnimationFrame : (cb) => setTimeout(() => cb(Date.now()), 16);
+    const cAF = typeof cancelAnimationFrame !== 'undefined' ? cancelAnimationFrame : (id) => clearTimeout(id);
+
     // 既存のスクロールアニメーションが動いている場合はキャンセル
     if (ext.activeScrollAnimationFrame !== null) {
-      cancelAnimationFrame(ext.activeScrollAnimationFrame);
+      cAF(ext.activeScrollAnimationFrame);
       ext.activeScrollAnimationFrame = null;
     }
 
@@ -778,7 +781,7 @@ window.egovExt = window.egovExt || {};
     function getScrollContainer(node) {
       let parent = node.parentElement;
       while (parent && parent !== document.body && parent !== document.documentElement) {
-        const style = window.getComputedStyle(parent);
+        const style = window.getComputedStyle ? window.getComputedStyle(parent) : {};
         if ((style.overflowY === 'auto' || style.overflowY === 'scroll') && parent.scrollHeight > parent.clientHeight) {
           return parent;
         }
@@ -791,26 +794,27 @@ window.egovExt = window.egovExt || {};
     const isWindow = scrollContainer === window;
 
     // 現在のスクロール位置を一時保存
-    const startPosition = isWindow ? window.pageYOffset || document.documentElement.scrollTop : scrollContainer.scrollTop;
+    const startPosition = isWindow ? (window.pageYOffset || (document.documentElement && document.documentElement.scrollTop) || 0) : scrollContainer.scrollTop;
 
     // もともと高速レンダリングが有効だったか判定（引き継いでいない場合のみクラス所持状況から判定）
-    if (!wasFastRenderEnabled) {
+    if (!wasFastRenderEnabled && document.body && document.body.classList) {
       wasFastRenderEnabled = document.body.classList.contains('egov-fastrender-enabled');
     }
     ext.wasFastRenderEnabled = wasFastRenderEnabled;
 
     // クラスを削除して全体のレイアウト高さを確定させる
-    if (document.body.classList.contains('egov-fastrender-enabled')) {
+    if (document.body && document.body.classList && document.body.classList.contains('egov-fastrender-enabled')) {
       document.body.classList.remove('egov-fastrender-enabled');
       // 強制的にドキュメント全体の再レイアウト（リフロー）を行い、要素の高さを確定させる
-      document.body.offsetHeight;
+      if ('offsetHeight' in document.body) document.body.offsetHeight;
     }
 
     // 正確なターゲットの絶対スクロール位置を取得する
-    const targetRect = target.getBoundingClientRect();
+
+    const targetRect = target.getBoundingClientRect ? target.getBoundingClientRect() : { top: 0 };
     const targetPosition = isWindow 
-      ? targetRect.top + (window.pageYOffset || document.documentElement.scrollTop)
-      : scrollContainer.scrollTop + targetRect.top - scrollContainer.getBoundingClientRect().top;
+      ? targetRect.top + (window.pageYOffset || (document.documentElement && document.documentElement.scrollTop) || 0)
+      : scrollContainer.scrollTop + targetRect.top - (scrollContainer.getBoundingClientRect ? scrollContainer.getBoundingClientRect().top : 0);
 
     const distance = targetPosition - startPosition;
 
@@ -828,20 +832,21 @@ window.egovExt = window.egovExt || {};
       const currentScroll = startPosition + distance * ease;
 
       if (isWindow) {
-        window.scrollTo(0, currentScroll);
+        try { if (window.scrollTo) window.scrollTo(0, currentScroll); } catch (e) {}
       } else {
         scrollContainer.scrollTop = currentScroll;
       }
 
       if (timeElapsed < duration) {
-        ext.activeScrollAnimationFrame = requestAnimationFrame(animation);
+        ext.activeScrollAnimationFrame = rAF(animation);
       } else {
         // アニメーション完了時は正確な目的地に完全に着地させる
         if (isWindow) {
-          window.scrollTo(0, targetPosition);
+          try { if (window.scrollTo) window.scrollTo(0, targetPosition); } catch (e) {}
         } else {
           scrollContainer.scrollTop = targetPosition;
         }
+
 
         ext.activeScrollAnimationFrame = null;
         ext.isScrolling = false;
@@ -853,13 +858,13 @@ window.egovExt = window.egovExt || {};
           // それに伴うスクロール位置の強制リセット・引き戻しを打ち消すため、
           // 同期的にリフローを発生させた上で正しい位置に再調整する。
           document.body.offsetHeight;
-          target.scrollIntoView({ behavior: 'auto', block: 'start' });
+          if (target.scrollIntoView) target.scrollIntoView({ behavior: 'auto', block: 'start' });
         }
         ext.wasFastRenderEnabled = false;
       }
     }
 
-    ext.activeScrollAnimationFrame = requestAnimationFrame(animation);
+    ext.activeScrollAnimationFrame = rAF(animation);
   };
 
   /**
@@ -901,4 +906,46 @@ window.egovExt = window.egovExt || {};
     });
   };
 
+  /**
+   * ツールチップ・プレビューヘッダー用のコンパクトなアクションボタンを生成する共通関数
+   * @param {Object} options
+   * @param {'open'|'jump'} options.icon - アイコン種類
+   * @param {string} options.label - ボタンのテキスト
+   * @param {string} options.title - title / aria-label 属性
+   * @param {Function} options.onClick - クリック時のコールバック
+   * @returns {HTMLButtonElement}
+   */
+  ext.createTipActionButton = function(options) {
+    const { icon = 'open', label = '開く', title = '', onClick } = options || {};
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = `egov-ext-tip-action-btn egov-ext-btn-${icon}`;
+    if (title) {
+      btn.title = title;
+      btn.setAttribute('aria-label', title);
+    }
+
+    let iconSvg = '';
+    if (icon === 'open') {
+      // 外部リンクアイコン（別タブで開く ↗）
+      iconSvg = '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path><polyline points="15 3 21 3 21 9"></polyline><line x1="10" y1="14" x2="21" y2="3"></line></svg>';
+    } else if (icon === 'jump') {
+      // 下向きジャンプ矢印アイコン（この条文へジャンプ ↓）
+      iconSvg = '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><polyline points="19 12 12 19 5 12"></polyline></svg>';
+    }
+
+    btn.innerHTML = `${iconSvg}<span>${label}</span>`;
+
+    btn.addEventListener('click', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      if (typeof onClick === 'function') {
+        onClick(e);
+      }
+    });
+
+    return btn;
+  };
+
 })(window.egovExt);
+

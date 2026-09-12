@@ -307,7 +307,9 @@ async function main() {
     assert(styleCss.includes('.egov-ext-jump-input:focus-visible'), 'jump-input の focus-visible が定義されている');
     assert(styleCss.includes('.egov-ext-citation-btn:focus-visible'), 'citation-btn の focus-visible が定義されている');
     assert(styleCss.includes('.egov-definition-word:focus-visible'), 'definition-word の focus-visible が定義されている');
+    assert(styleCss.includes('.egov-ext-tip-action-btn:focus-visible'), 'tip-action-btn の focus-visible が定義されている');
   });
+
 
   runTest('css/style.css 内のツールチップ・プレビュー内引用ボタン非表示 (display: none) 定義', () => {
     const styleCss = fs.readFileSync(path.join(ROOT_DIR, 'css', 'style.css'), 'utf8');

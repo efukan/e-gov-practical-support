@@ -127,15 +127,58 @@ window.egovExt = window.egovExt || {};
     const citationBtns = clone.querySelectorAll('.egov-ext-citation-btn, [class*="citation-btn"]');
     citationBtns.forEach(btn => btn.remove());
 
-    const content = document.createElement('div');
-    content.className = 'egov-ext-tip-body';
-    content.appendChild(clone);
+    const container = document.createElement('div');
+    container.className = 'egov-ext-preview-container';
+
+    // ヘッダー（参照条文 ＋ ジャンプボタン）
+    const header = document.createElement('div');
+    header.className = 'egov-ext-tip-header';
+
+    const titleWrap = document.createElement('div');
+    titleWrap.className = 'egov-ext-tip-header-title';
+    titleWrap.textContent = '参照条文';
+    header.appendChild(titleWrap);
+
+    // ジャンプボタン
+    if (ext.createTipActionButton) {
+      const jumpBtn = ext.createTipActionButton({
+        icon: 'jump',
+        label: 'ジャンプ',
+        title: 'この条文の場所へ移動',
+        onClick: () => {
+          if (ext.referenceTooltip) {
+            ext.referenceTooltip.hide(0);
+          }
+          if (ext.fastSmoothScroll) {
+            ext.fastSmoothScroll(targetEl, 250);
+          } else if (targetEl.scrollIntoView) {
+            targetEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
+          }
+
+          targetEl.classList.remove('egov-ext-jump-target');
+          setTimeout(() => {
+            targetEl.classList.add('egov-ext-jump-target');
+            setTimeout(() => {
+              targetEl.classList.remove('egov-ext-jump-target');
+            }, 2500);
+          }, 10);
+        }
+      });
+      header.appendChild(jumpBtn);
+    }
+    container.appendChild(header);
+
+    const body = document.createElement('div');
+    body.className = 'egov-ext-tip-body';
+    body.appendChild(clone);
 
     // 共通成形関数でポップアップDOMをインライン化・クリーンアップ
-    ext.formatInlinePreview(content);
+    ext.formatInlinePreview(body);
+    container.appendChild(body);
 
-    return content;
+    return container;
   }
+
 
 
   /**
@@ -264,7 +307,7 @@ window.egovExt = window.egovExt || {};
 
       if (isTargetActive && tip) {
         const errorFrag = ext.createErrorView
-          ? ext.createErrorView(lawName, path, err.message)
+          ? ext.createErrorView(lawName, path, err.message, link.href)
           : document.createTextNode(err.message);
         if (tip.el.classList.contains('visible')) {
           tip.update(errorFrag);
@@ -325,13 +368,14 @@ window.egovExt = window.egovExt || {};
 
         // キャッシュが無い場合はローディング画面を即座に返し、非同期取得を開始
         const loadingDOM = ext.createLoadingView
-          ? ext.createLoadingView(lawName, path)
+          ? ext.createLoadingView(lawName, path, a.href)
           : document.createTextNode('読み込み中...');
         fetchAndPopulateExternalPreview(a, targetLawId, objectId, lawName, path);
         return loadingDOM;
       }
     });
   };
+
 
   // テスト用に内部関数をエクスポート
   if (typeof process !== 'undefined' && process.env && process.env.NODE_ENV === 'test') {

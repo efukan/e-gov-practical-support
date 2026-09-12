@@ -523,6 +523,50 @@ async function check(name, fn) {
     return 'プレビュー内引用ボタンの完全除去・本文保持確認';
   });
 
+  await check('ポップアップ内アクションボタン: 本法令ジャンプボタン & 他法令別タブで開くボタンの動作', async () => {
+    const { dom, ext } = await createTestEnv(SAMPLE_LAW_HTML);
+    ext.settings = { global: true, citation: true, popup: true, horizontal: true };
+
+    // 1. 本法令内参照プレビューのジャンプボタン検証
+    const targetArticle = dom.window.document.querySelector('#Mp-At_1');
+    const previewDOM = ext._testReferPopup.buildPreviewContent(targetArticle);
+    
+    const jumpBtn = previewDOM.querySelector('.egov-ext-btn-jump');
+    if (!jumpBtn) throw new Error('本法令プレビュー内にジャンプボタン (.egov-ext-btn-jump) が存在しない');
+    if (!jumpBtn.textContent.includes('ジャンプ')) throw new Error('ジャンプボタンのテキストが不正');
+
+    // ジャンプボタンのクリックをシミュレート
+    jumpBtn.click();
+    await new Promise(r => setTimeout(r, 30));
+    if (!targetArticle.classList.contains('egov-ext-jump-target')) {
+      throw new Error('ジャンプボタン押下時にターゲット条文に egov-ext-jump-target ハイライトが付与されていない');
+    }
+
+    // 2. 他法令プレビューの「別タブで開く」ボタン検証
+    let openedUrl = null;
+    dom.window.open = (url) => { openedUrl = url; };
+
+    const dummyContent = {
+      ArticleTitle: '第七百九条',
+      ParagraphSentence: '故意又は過失によって...'
+    };
+    const testUrl = 'https://laws.e-gov.go.jp/law/129AC0000000089#Mp-At_709';
+    const externalDOM = ext.renderArticlePreview(dummyContent, [], '民法', '第七百九条', testUrl);
+
+    const openBtn = externalDOM.querySelector('.egov-ext-btn-open');
+    if (!openBtn) throw new Error('他法令プレビュー内に「開く」ボタン (.egov-ext-btn-open) が存在しない');
+    if (!openBtn.textContent.includes('開く')) throw new Error('開くボタンのテキストが不正');
+
+    // 開くボタンのクリックをシミュレート
+    openBtn.click();
+    if (openedUrl !== testUrl) {
+      throw new Error(`window.open で開かれたURLが一致しない (期待値: ${testUrl}, 実際: ${openedUrl})`);
+    }
+
+    return '本法令ジャンプおよび他法令別タブリンクの正常動作確認';
+  });
+
+
 
   // ==========================================
   // 5. 動的DOM更新（MutationObserver）の相互作用テスト

@@ -593,7 +593,63 @@ async function check(name, fn) {
     }
     articleContainer.remove();
 
-    return '本法令ジャンプ（可視要素特定・自然な着地）および他法令別タブリンク（cloneNode耐性）の正常動作確認';
+    // 4. 項（Paragraph）への参照プレビューからジャンプした際、親条文ではなく項自身に着地・ハイライトされる検証
+    const multiParaArticle = dom.window.document.createElement('div');
+    multiParaArticle.className = '_div_Article';
+    multiParaArticle.id = 'Mp-At_50';
+    multiParaArticle.innerHTML = `
+      <div class="_div_ArticleTitle">第五十条</div>
+      <div class="_div_Paragraph" id="Mp-At_50-Pr_1">第一項本文</div>
+      <div class="_div_Paragraph" id="Mp-At_50-Pr_2">第二項本文</div>
+    `;
+    dom.window.document.body.appendChild(multiParaArticle);
+
+    const para2 = multiParaArticle.querySelector('#Mp-At_50-Pr_2');
+    const previewPara2 = ext._testReferPopup.buildPreviewContent(para2);
+    const jumpBtnPara2 = previewPara2.querySelector('.egov-ext-btn-jump');
+    if (!jumpBtnPara2) throw new Error('項プレビュー内にジャンプボタンが存在しない');
+    jumpBtnPara2.click();
+    await new Promise(r => setTimeout(r, 30));
+
+    // 親条文ではなく、第2項自身にハイライトが付与されていること
+    if (!para2.classList.contains('egov-ext-jump-target')) {
+      throw new Error('項へのジャンプで第2項自身にハイライトが付与されていない');
+    }
+    if (multiParaArticle.classList.contains('egov-ext-jump-target')) {
+      throw new Error('項へのジャンプなのに親条文全体がハイライトされてしまっている');
+    }
+    multiParaArticle.remove();
+
+    // 5. 表記揺れ解決（アンダースコア ID）および附則条文の解決検証
+    const spArticle = dom.window.document.createElement('div');
+    spArticle.className = '_div_Article';
+    spArticle.id = 'Sp_At_1';
+    spArticle.innerHTML = '<div class="_div_ArticleTitle">附則第一条</div>';
+    dom.window.document.body.appendChild(spArticle);
+
+    const resolvedEl = ext.resolveTargetElement('Sp-At_1');
+    if (!resolvedEl || resolvedEl.id !== 'Sp_At_1') {
+      throw new Error(`表記揺れID解決失敗 (期待: Sp_At_1, 実際: ${resolvedEl ? resolvedEl.id : 'null'})`);
+    }
+
+    // 条文ジャンプ検索による附則検索シミュレーション
+    ext.settings.jump = true;
+    ext.removeJumpSearch();
+    ext.setupJumpSearch();
+    const jumpInput = dom.window.document.querySelector('.egov-ext-jump-input');
+    if (jumpInput) {
+      jumpInput.value = '附則1';
+      jumpInput.dispatchEvent(new dom.window.KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+      await new Promise(r => setTimeout(r, 40));
+      if (!spArticle.classList.contains('egov-ext-jump-target')) {
+        throw new Error('条文ジャンプ検索「附則1」で附則条文がハイライトされなかった');
+      }
+    } else {
+      throw new Error('条文ジャンプ検索入力欄が見つかりません');
+    }
+    spArticle.remove();
+
+    return '本法令ジャンプ（項・号ピンポイント解決・附則/表記揺れ対応）および他法令別タブリンクの正常動作確認';
   });
 
 

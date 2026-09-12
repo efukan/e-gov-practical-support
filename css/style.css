@@ -390,15 +390,40 @@ body.egov-ext-dim-active a.egov-ext-dimmed-text {
   background-color: #f0f0f0 !important;
 }
 
-/* ジャンプした先の条文をハイライトするアニメーション */
+/* ジャンプした先の条文・項・号をハイライトするアニメーション */
 @keyframes egov-ext-highlight-fade {
-  0% { background-color: rgba(255, 235, 59, 0.8); }
-  50% { background-color: rgba(255, 235, 59, 0.4); }
+  0% { background-color: rgba(255, 235, 59, 0.7); }
+  30% { background-color: rgba(255, 235, 59, 0.55); }
   100% { background-color: transparent; }
 }
 
 .egov-ext-jump-target {
   animation: egov-ext-highlight-fade 2.5s ease-out forwards !important;
+  border-radius: 4px;
+}
+
+/* スクロール移動時に固定ヘッダーに被らないよう心地よい余白を自動確保する */
+._div_Article,
+.Article,
+article.law,
+article.article,
+._div_ArticleTitle,
+.ArticleTitle,
+._div_Paragraph,
+.Paragraph,
+._div_Item,
+.Item,
+._div_Subitem1,
+.Subitem1,
+._div_AppdxTable,
+.AppdxTable,
+._div_Preamble,
+.Preamble,
+._div_SupplProvision,
+.SupplProvision,
+[id^="Mp-"],
+[id^="Sp-"] {
+  scroll-margin-top: var(--egov-header-offset, 72px) !important;
 }
 
 /* ----- 6. 定義語ホバー辞書＆ハイライト (Defined Terms Highlight & Tooltip) ----- */

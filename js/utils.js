@@ -747,154 +747,142 @@ window.egovExt = window.egovExt || {};
   ext.activeScrollAnimationFrame = null;
 
   /**
-   * 現在スクロール中かどうかを示すフラグ
-   * @type {boolean}
+   * 固定ヘッダー（titlebarや上部ナビゲーション）の高さを測定し、
+   * CSS変数 --egov-header-offset を更新する。
+   * @returns {number} ヘッダーの高さ＋余白（ピクセル）
    */
-  ext.isScrolling = false;
-
-  /**
-   * スクロール開始前に高速レンダリングが有効だったかどうかを保持するフラグ
-   * @type {boolean}
-   */
-  ext.wasFastRenderEnabled = false;
-
-  /**
-   * カスタムの高速スムーズスクロール関数
-   * 距離に応じた自然な加減速（easeInOutCubic）と上部視認性余白（ヘッダー考慮）を備え、
-   * 着地時のカクつき（二重ジャンプ）を排して滑らかに移動します。
-   *
-   * @param {HTMLElement} target - スクロール先の要素
-   * @param {number} [customDuration=null] - スクロールにかかる時間（ミリ秒、未指定時は距離から自動計算）
-   * @param {number} [topPadding=28] - 条文見出しの上の心地よい視認性余白（ピクセル）
-   */
-  ext.fastSmoothScroll = function(target, customDuration = null, topPadding = 28) {
-    if (!target) return;
-
-    // すでにスクロール中の場合は、もともと高速レンダリングが有効だったフラグを引き継ぐ
-    let wasFastRenderEnabled = ext.isScrolling && ext.wasFastRenderEnabled;
-
-    const rAF = typeof requestAnimationFrame !== 'undefined' ? requestAnimationFrame : (cb) => setTimeout(() => cb(Date.now()), 16);
-    const cAF = typeof cancelAnimationFrame !== 'undefined' ? cancelAnimationFrame : (id) => clearTimeout(id);
-
-    // 既存のスクロールアニメーションが動いている場合はキャンセル
-    if (ext.activeScrollAnimationFrame !== null) {
-      cAF(ext.activeScrollAnimationFrame);
-      ext.activeScrollAnimationFrame = null;
-    }
-
-    ext.isScrolling = true;
-
-    function getScrollContainer(node) {
-      let parent = node.parentElement;
-      while (parent && parent !== document.body && parent !== document.documentElement) {
-        const style = window.getComputedStyle ? window.getComputedStyle(parent) : {};
-        if ((style.overflowY === 'auto' || style.overflowY === 'scroll') && parent.scrollHeight > parent.clientHeight) {
-          return parent;
-        }
-        parent = parent.parentElement;
-      }
-      return window;
-    }
-
-    const scrollContainer = getScrollContainer(target);
-    const isWindow = scrollContainer === window;
-
-    // 現在のスクロール位置を一時保存
-    const startPosition = isWindow 
-      ? (window.pageYOffset || (document.documentElement && document.documentElement.scrollTop) || 0) 
-      : scrollContainer.scrollTop;
-
-    // もともと高速レンダリングが有効だったか判定（引き継いでいない場合のみクラス所持状況から判定）
-    if (!wasFastRenderEnabled && document.body && document.body.classList) {
-      wasFastRenderEnabled = document.body.classList.contains('egov-fastrender-enabled');
-    }
-    ext.wasFastRenderEnabled = wasFastRenderEnabled;
-
-    // クラスを削除して全体のレイアウト高さを確定させる
-    if (document.body && document.body.classList && document.body.classList.contains('egov-fastrender-enabled')) {
-      document.body.classList.remove('egov-fastrender-enabled');
-      // 強制的にドキュメント全体の再レイアウト（リフロー）を行い、要素の高さを確定させる
-      if ('offsetHeight' in document.body) document.body.offsetHeight;
-    }
-
-    // 正確なターゲットの絶対スクロール位置を取得する
-    const targetRect = target.getBoundingClientRect ? target.getBoundingClientRect() : { top: 0 };
-    const rawTargetPosition = isWindow 
-      ? targetRect.top + (window.pageYOffset || (document.documentElement && document.documentElement.scrollTop) || 0)
-      : scrollContainer.scrollTop + targetRect.top - (scrollContainer.getBoundingClientRect ? scrollContainer.getBoundingClientRect().top : 0);
-
-    // 固定ヘッダー（titlebar や上部バー）の高さを検出し、上部余白と合算
-    let totalOffset = topPadding;
+  ext.updateHeaderOffset = function() {
+    if (typeof document === 'undefined') return 72;
+    let headerHeight = 0;
     const titlebar = document.getElementById('titlebar');
     if (titlebar && window.getComputedStyle) {
       const tbStyle = window.getComputedStyle(titlebar);
       if (tbStyle.position === 'fixed' || tbStyle.position === 'sticky') {
-        totalOffset += (titlebar.offsetHeight || 0);
+        headerHeight = Math.max(headerHeight, titlebar.offsetHeight || 0);
       }
     }
+    const offset = Math.max(72, headerHeight + 20);
+    if (document.documentElement && document.documentElement.style) {
+      document.documentElement.style.setProperty('--egov-header-offset', `${offset}px`);
+    }
+    return offset;
+  };
 
-    // 画面最上部に張り付かないよう、余白を考慮した目的地を設定
-    const targetPosition = Math.max(0, Math.round(rawTargetPosition - totalOffset));
-    const distance = targetPosition - startPosition;
+  /**
+   * リンクの参照先 ID から、実際の対象要素を解決する共通関数。
+   * ハイフン／アンダースコアの表記揺れ（Mp-At_ ⇄ Mp_At_）や改正附則の前方一致・後方一致に対応。
+   *
+   * @param {string} targetId - 要素IDまたはハッシュ
+   * @returns {HTMLElement|null}
+   */
+  ext.resolveTargetElement = function(targetId) {
+    if (!targetId || typeof document === 'undefined') return null;
 
-    // スクロール距離に応じて自然な時間を自動計算（260ms 〜 400ms）
-    let duration = customDuration;
-    if (!duration) {
-      const absDist = Math.abs(distance);
-      duration = Math.min(400, Math.max(260, Math.round(260 + Math.sqrt(absDist) * 2.5)));
+    const findById = (id) => document.getElementById(id) ||
+                             document.querySelector(`[name="${id}"]`) ||
+                             (ext.deepQuerySelectorAll ? ext.deepQuerySelectorAll(document.body, `[id="${id}"], [name="${id}"]`)[0] : null);
+
+    const direct = findById(targetId);
+    if (direct) return direct;
+
+    // 1. ハイフンとアンダースコアの表記揺れを相互変換して再検索
+    let altId = null;
+    if (targetId.includes('-')) {
+      altId = targetId.replace(/-/g, '_');
+    } else if (targetId.includes('_')) {
+      altId = targetId.replace(/_/g, '-');
+    }
+    if (altId) {
+      const alt = findById(altId);
+      if (alt) return alt;
     }
 
-    let startTime = null;
+    // 2. 改正附則などの前方一致・後方一致検索（ハイフン／アンダースコア両対応）
+    const match = targetId.match(/^(Mp|Sp|Sp_.*)-(.+)$/);
+    if (match) {
+      const selector = `[id^="${match[1]}-"][id$="${match[2]}"], [id^="${match[1]}_"][id$="${match[2]}"]`;
+      return document.querySelector(selector) ||
+             (ext.deepQuerySelectorAll ? ext.deepQuerySelectorAll(document.body, selector)[0] : null);
+    }
 
-    function animation(currentTime) {
-      if (startTime === null) startTime = currentTime;
-      const timeElapsed = currentTime - startTime;
-      
-      const progress = Math.min(timeElapsed / duration, 1);
-      // easeInOutCubic: 滑らかに加速し、フワッと自然に減速してピタッと静止する
-      const ease = progress < 0.5 
-        ? 4 * progress * progress * progress 
-        : 1 - Math.pow(-2 * progress + 2, 3) / 2;
+    return null;
+  };
 
-      const currentScroll = Math.round(startPosition + distance * ease);
+  /**
+   * 目的の要素から、実際にスクロールおよびハイライトすべき可視要素（項・号・見出し等）を解決する。
+   * 空の <a> アンカータグの場合は直近の最小可視コンテナ（項・号・条・見出し）を特定。
+   * すでに可視要素自身（項や号など）である場合は、親の Article に無暗に拡大せずそのまま返す。
+   *
+   * @param {HTMLElement} targetEl - 解決前の要素
+   * @returns {HTMLElement} スクロール・ハイライト対象の要素
+   */
+  ext.resolveScrollTarget = function(targetEl) {
+    if (!targetEl) return null;
 
-      if (isWindow) {
-        try { if (window.scrollTo) window.scrollTo(0, currentScroll); } catch (e) {}
-      } else {
-        scrollContainer.scrollTop = currentScroll;
+    // 空のアンカー <a> の場合
+    if (targetEl.tagName && targetEl.tagName.toLowerCase() === 'a' && targetEl.hasAttribute('name')) {
+      // 1. 最小の可視ブロック親要素（項、号、条見出し、条文）があるか探索
+      const closestBlock = targetEl.closest('._div_Paragraph, .Paragraph, ._div_Item, .Item, ._div_Subitem1, .Subitem1, ._div_ArticleTitle, .ArticleTitle, ._div_Article, Article');
+      if (closestBlock) {
+        return closestBlock;
       }
 
-      if (timeElapsed < duration) {
-        ext.activeScrollAnimationFrame = rAF(animation);
-      } else {
-        // アニメーション完了時は正確な目的地に完全に着地させる
-        if (isWindow) {
-          try { if (window.scrollTo) window.scrollTo(0, targetPosition); } catch (e) {}
-        } else {
-          scrollContainer.scrollTop = targetPosition;
+      // 2. 親コンテナがないフラット構造の場合、直後の可視要素を探索
+      let sib = targetEl.nextElementSibling;
+      while (sib) {
+        if (sib.offsetHeight > 0 || (sib.textContent && sib.textContent.trim().length > 0)) {
+          return sib;
         }
-
-        ext.activeScrollAnimationFrame = null;
-        ext.isScrolling = false;
-
-        // 高速レンダリングを再有効化する
-        if (wasFastRenderEnabled) {
-          document.body.classList.add('egov-fastrender-enabled');
-          // content-visibility: auto 適用時のリフローを促しつつ、
-          // 従来の scrollIntoView('start') による画面の不快な跳ね（ガクつき）を排除し、
-          // 計算された自然な着地位置を維持する。
-          if ('offsetHeight' in document.body) document.body.offsetHeight;
-          if (isWindow) {
-            try { if (window.scrollTo) window.scrollTo(0, targetPosition); } catch (e) {}
-          } else {
-            scrollContainer.scrollTop = targetPosition;
-          }
-        }
-        ext.wasFastRenderEnabled = false;
+        sib = sib.nextElementSibling;
       }
+      return targetEl;
     }
 
-    ext.activeScrollAnimationFrame = rAF(animation);
+    // すでに可視要素（_div_Paragraph, _div_Item, _div_ArticleTitle 等）の場合はそのまま返す
+    return targetEl;
+  };
+
+  /**
+   * 自然で滑らかなスムーズスクロール関数
+   * CSS scroll-margin-top とブラウザネイティブの scrollIntoView を活用し、
+   * content-visibility: auto の仮想化を崩すことなく、固定ヘッダー下へ正確かつ滑らかにスクロールします。
+   *
+   * @param {HTMLElement} target - スクロール先の要素
+   * @param {number} [customDuration=null] - オプション（互換性用）
+   * @param {number} [topPadding=28] - オプション（互換性用）
+   */
+  ext.fastSmoothScroll = function(target, customDuration = null, topPadding = 28) {
+    if (!target) return;
+
+    // ヘッダーオフセットCSS変数を最新化
+    ext.updateHeaderOffset();
+
+    // スクロール対象の可視要素をピンポイント解決（項・号・見出し等）
+    const scrollTarget = ext.resolveScrollTarget ? ext.resolveScrollTarget(target) : target;
+    if (!scrollTarget) return;
+
+    // ブラウザネイティブの scrollIntoView による滑らかなスクロール（Compositor駆動）
+    if (scrollTarget.scrollIntoView) {
+      try {
+        scrollTarget.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      } catch (e) {
+        scrollTarget.scrollIntoView(true);
+      }
+    } else if (typeof window !== 'undefined' && window.scrollTo) {
+      const rect = scrollTarget.getBoundingClientRect ? scrollTarget.getBoundingClientRect() : { top: 0 };
+      const offset = ext.updateHeaderOffset ? ext.updateHeaderOffset() : 72;
+      const top = (window.pageYOffset || 0) + rect.top - offset;
+      window.scrollTo(0, Math.max(0, top));
+    }
+
+    // ハイライトアニメーションの付与（既存のアニメーションをリセットして再発火）
+    scrollTarget.classList.remove('egov-ext-jump-target');
+    setTimeout(() => {
+      scrollTarget.classList.add('egov-ext-jump-target');
+      setTimeout(() => {
+        scrollTarget.classList.remove('egov-ext-jump-target');
+      }, 2500);
+    }, 10);
   };
 
   /**
@@ -1010,27 +998,9 @@ window.egovExt = window.egovExt || {};
           ext.referenceTooltip.hide(0);
         }
         if (targetId) {
-          const targetEl = document.getElementById(targetId) || 
-                           document.querySelector(`[name="${targetId}"]`) ||
-                           (ext.deepQuerySelectorAll ? ext.deepQuerySelectorAll(document.body, `[id="${targetId}"], [name="${targetId}"]`)[0] : null);
-          if (targetEl) {
-            const scrollTarget = (targetEl.tagName && targetEl.tagName.toLowerCase() === 'a' && targetEl.hasAttribute('name'))
-              ? (targetEl.closest('._div_Article, Article') || targetEl.nextElementSibling || targetEl)
-              : (targetEl.closest('._div_Article, Article') || targetEl);
-
-            if (ext.fastSmoothScroll) {
-              ext.fastSmoothScroll(scrollTarget);
-            } else if (scrollTarget.scrollIntoView) {
-              scrollTarget.scrollIntoView({ behavior: 'smooth', block: 'start' });
-            }
-
-            scrollTarget.classList.remove('egov-ext-jump-target');
-            setTimeout(() => {
-              scrollTarget.classList.add('egov-ext-jump-target');
-              setTimeout(() => {
-                scrollTarget.classList.remove('egov-ext-jump-target');
-              }, 2500);
-            }, 10);
+          const targetEl = ext.resolveTargetElement ? ext.resolveTargetElement(targetId) : (document.getElementById(targetId) || document.querySelector(`[name="${targetId}"]`));
+          if (targetEl && ext.fastSmoothScroll) {
+            ext.fastSmoothScroll(targetEl);
           }
         }
       }

@@ -17,49 +17,14 @@ window.egovExt = window.egovExt || {};
 
   /**
    * リンクの参照先 ID から、実際の対象要素を解決する。
-   * e-Gov の法令ページは ID の表記が揺れることがあるため、多段のフォールバックを行う。
-   *
    * @param {string} targetId - URL のハッシュ部分
    * @returns {HTMLElement|null} 見つかった要素、なければ null
    */
   function resolveTargetElement(targetId) {
-    if (!targetId) return null;
-
-    /**
-     * 通常のDOMとShadow DOMの両方から id / name で要素を探す
-     * @param {string} id
-     * @returns {HTMLElement|null}
-     */
-    const findById = (id) => document.getElementById(id) ||
-                             document.querySelector(`[name="${id}"]`) ||
-                             ext.deepQuerySelectorAll(document.body, `[id="${id}"], [name="${id}"]`)[0] ||
-                             null;
-
-    const direct = findById(targetId);
-    if (direct) return direct;
-
-    // 1. ハイフンとアンダースコアの表記揺れを相互変換して再検索
-    let altId = null;
-    if (targetId.includes('-')) {
-      altId = targetId.replace(/-/g, '_');
-    } else if (targetId.includes('_')) {
-      altId = targetId.replace(/_/g, '-');
+    if (ext.resolveTargetElement) {
+      return ext.resolveTargetElement(targetId);
     }
-    if (altId) {
-      const alt = findById(altId);
-      if (alt) return alt;
-    }
-
-    // 2. 改正附則などの前方一致・後方一致検索（ハイフン／アンダースコア両対応）
-    const match = targetId.match(/^(Mp|Sp|Sp_.*)-(.+)$/);
-    if (match) {
-      const selector = `[id^="${match[1]}-"][id$="${match[2]}"], [id^="${match[1]}_"][id$="${match[2]}"]`;
-      return document.querySelector(selector) ||
-             ext.deepQuerySelectorAll(document.body, selector)[0] ||
-             null;
-    }
-
-    return null;
+    return document.getElementById(targetId) || document.querySelector(`[name="${targetId}"]`) || null;
   }
 
   /**
@@ -141,11 +106,6 @@ window.egovExt = window.egovExt || {};
 
     // ジャンプボタン
     if (ext.createTipActionButton) {
-      // 空のアンカー <a> ではなく、可視の条文見出しやArticle要素を特定して自然に着地させる
-      const scrollTarget = (targetEl.tagName && targetEl.tagName.toLowerCase() === 'a' && targetEl.hasAttribute('name'))
-        ? (targetEl.closest('._div_Article, Article') || targetEl.nextElementSibling || targetEl)
-        : (targetEl.closest('._div_Article, Article') || targetEl);
-
       const targetId = targetEl.id || targetEl.getAttribute('name') || '';
 
       const jumpBtn = ext.createTipActionButton({
@@ -158,18 +118,8 @@ window.egovExt = window.egovExt || {};
             ext.referenceTooltip.hide(0);
           }
           if (ext.fastSmoothScroll) {
-            ext.fastSmoothScroll(scrollTarget);
-          } else if (scrollTarget.scrollIntoView) {
-            scrollTarget.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            ext.fastSmoothScroll(targetEl);
           }
-
-          scrollTarget.classList.remove('egov-ext-jump-target');
-          setTimeout(() => {
-            scrollTarget.classList.add('egov-ext-jump-target');
-            setTimeout(() => {
-              scrollTarget.classList.remove('egov-ext-jump-target');
-            }, 2500);
-          }, 10);
         }
       });
       header.appendChild(jumpBtn);

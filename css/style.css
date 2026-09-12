@@ -625,13 +625,35 @@ body.egov-fastrender-enabled .main-content {
   outline-offset: 2px !important;
 }
 
-/* ----- 10. 印刷時の非表示設定 (Hide elements during print) ----- */
+/* ----- 10. 印刷時の非表示・最適化設定 (Hide elements and optimize during print) ----- */
 @media print {
   .egov-ext-header-container,
   .egov-ext-status-badge,
   .egov-ext-jump-container,
-  .egov-ext-tip {
+  .egov-ext-jump-modal,
+  .egov-ext-jump-backdrop,
+  .egov-ext-tip,
+  .egov-ext-citation-btn,
+  .egov-ext-citation-modal,
+  .egov-ext-citation-overlay,
+  .egov-ext-toast,
+  [class*="egov-ext-modal"],
+  [class*="egov-ext-overlay"],
+  [class*="egov-ext-backdrop"] {
     display: none !important;
   }
+
+  /* 印刷時は括弧書きや定義語の下線を原本同様にクリアに出力 */
+  .egov-ext-dimmed-text,
+  .egov-ext-dim-paren {
+    color: inherit !important;
+    opacity: 1 !important;
+  }
+
+  .egov-definition-word {
+    border-bottom: none !important;
+    text-decoration: none !important;
+  }
 }
+
 

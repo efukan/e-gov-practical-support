@@ -7,11 +7,12 @@ scripts/
 *.zip
 .DS_Store
 
-# tests/ 配下は npm test で実行する4本のみを追跡する。
+# tests/ 配下は npm test で実行する5本のみを追跡する。
 # 一時的な検証用のダンプデータやスクラッチを置いても追跡されない。
 tests/*
 !tests/smoke_content_scripts.js
 !tests/test_tooltip_position.js
 !tests/test_law_patterns.js
 !tests/test_interactions.js
+!tests/test_extension_integrity.js
 

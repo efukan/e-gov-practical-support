@@ -92,8 +92,14 @@ window.egovExt = window.egovExt || {};
       }
     });
 
-    // Enterキーで検索を実行
+    // Enterキーで検索を実行、Escapeキーでクリア＆フォーカス解除
     input.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') {
+        input.value = '';
+        clearBtn.classList.remove('visible');
+        input.blur();
+        return;
+      }
       if (e.key === 'Enter') {
         const val = input.value.trim();
         if (!val) return;

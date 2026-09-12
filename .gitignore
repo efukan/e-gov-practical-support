@@ -1,6 +1,7 @@
 .agents/
 .archive/
 CHROMEWEBSTORE.md
+PROMOTION_GUIDE.md
 node_modules/
 assets/
 scripts/

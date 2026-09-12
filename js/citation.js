@@ -272,8 +272,8 @@ window.egovExt = window.egovExt || {};
       variant: 'preview',
       placement: 'side',
       parent: ext.citationTooltip,
-      showDelay: 200,
-      hideDelay: 200
+      showDelay: 300,
+      hideDelay: 240
     });
 
     ext.bindHoverTooltip({

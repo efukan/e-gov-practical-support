@@ -58,15 +58,15 @@ window.egovExt = window.egovExt || {};
    *
    * @param {Object} [options]
    * @param {string} [options.variant='default'] - 'definition' | 'reference' | 'citation'
-   * @param {number} [options.showDelay=120] - 表示までの遅延（ms）。マウス通過時のチラつきを防ぐ
-   * @param {number} [options.hideDelay=180] - 非表示までの遅延（ms）。ツールチップ本体へ移動する猶予
+   * @param {number} [options.showDelay=300] - 表示までの遅延（ms）。条文読書中のマウス通過による誤表示を防ぐ
+   * @param {number} [options.hideDelay=240] - 非表示までの遅延（ms）。ツールチップ本体へ移動する猶予
    * @returns {{el: HTMLElement, show: Function, hide: Function, cancelHide: Function, destroy: Function}}
    */
   ext.createTooltip = function(options) {
     const {
       variant = 'default',
-      showDelay = 120,
-      hideDelay = 180,
+      showDelay = 300,
+      hideDelay = 240,
       placement = 'auto',
       parent = null
     } = options || {};

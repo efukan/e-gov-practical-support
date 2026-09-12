@@ -647,9 +647,76 @@ async function check(name, fn) {
     } else {
       throw new Error('条文ジャンプ検索入力欄が見つかりません');
     }
-    spArticle.remove();
-
     return '本法令ジャンプ（項・号ピンポイント解決・附則/表記揺れ対応）および他法令別タブリンクの正常動作確認';
+  });
+
+  await check('長距離ジャンプ: ハイブリッド近接展開と精密到着補正（Arrival Precision Tracker）', async () => {
+    const { dom, ext } = await createTestEnv(SAMPLE_LAW_HTML);
+
+    // 2500px 下にある長距離条文を模擬
+    const distantArticle = dom.window.document.createElement('div');
+    distantArticle.className = '_div_Article';
+    distantArticle.id = 'Mp-At_800';
+    distantArticle.innerHTML = '<div class="_div_ArticleTitle">第八百条</div>';
+    dom.window.document.body.appendChild(distantArticle);
+
+    let scrolledCalls = [];
+    distantArticle.scrollIntoView = (opts) => {
+      scrolledCalls.push(opts);
+    };
+
+    // 初期位置を 2500px 下にモック
+    let currentTop = 2500;
+    distantArticle.getBoundingClientRect = () => ({
+      top: currentTop,
+      bottom: currentTop + 80,
+      height: 80
+    });
+
+    let scrolledBy = [];
+    dom.window.scrollBy = (opts) => {
+      scrolledBy.push(opts);
+      if (typeof opts === 'object' && opts.top !== undefined) {
+        currentTop -= opts.top;
+      }
+    };
+
+    // 長距離ジャンプを実行
+    ext.fastSmoothScroll(distantArticle);
+
+    // 1. 長距離（2000px超）のため、まず先行して instant 展開が行われ、次に smooth 着地が行われること
+    const hasInstant = scrolledCalls.some(c => typeof c === 'object' && c.behavior === 'instant');
+    const hasSmooth = scrolledCalls.some(c => typeof c === 'object' && c.behavior === 'smooth');
+    if (!hasInstant || !hasSmooth) {
+      throw new Error(`長距離ハイブリッドスクロールが正しく呼ばれていない (instant: ${hasInstant}, smooth: ${hasSmooth})`);
+    }
+
+    // 2. スクロール中に途中の要素が展開され、目標位置から 40px のレイアウト伸縮ズレが生じた状況をシミュレート
+    const expectedHeaderOffset = ext.updateHeaderOffset();
+    currentTop = expectedHeaderOffset + 40; // 40px 下に押し出されたズレ
+
+    // scrollend イベントを発火させて精密到着補正を発動
+    const scrollEndEvent = new dom.window.Event('scrollend');
+    dom.window.dispatchEvent(scrollEndEvent);
+
+    await new Promise(r => setTimeout(r, 40));
+
+    // 3. scrollBy によりズレ（40px）が吸着補正されたことを検証
+    if (scrolledBy.length === 0) {
+      throw new Error('scrollend 時に精密到着補正（scrollBy）が発動しなかった');
+    }
+    const lastCorrection = scrolledBy[scrolledBy.length - 1];
+    if (typeof lastCorrection === 'object' && lastCorrection.top !== 40) {
+      throw new Error(`補正スクロール量が一致しない (期待値: 40, 実際: ${lastCorrection.top})`);
+    }
+
+    // 4. ハイライトが付与されていること
+    if (!distantArticle.classList.contains('egov-ext-jump-target')) {
+      throw new Error('長距離ジャンプ後に目標要素にハイライトが付与されていない');
+    }
+
+    distantArticle.remove();
+    return '長距離先行展開（instant）→ 滑らか着地（smooth）→ 到着補正（scrollend吸着）の完全動作確認';
   });
 
 

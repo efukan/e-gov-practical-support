@@ -843,9 +843,11 @@ window.egovExt = window.egovExt || {};
   };
 
   /**
-   * 自然で滑らかなスムーズスクロール関数
-   * CSS scroll-margin-top とブラウザネイティブの scrollIntoView を活用し、
-   * content-visibility: auto の仮想化を崩すことなく、固定ヘッダー下へ正確かつ滑らかにスクロールします。
+   * 自然で滑らかなスムーズスクロール関数（精密到着補正＆長距離対応）
+   * 
+   * CSS scroll-margin-top とネイティブ scrollIntoView をベースにしつつ、
+   * content-visibility: auto の動的伸縮や非同期DOM変換によるレイアウトシフトを自動検知し、
+   * スクロール終了時にピタッと吸着させる精密補正（Arrival Precision Tracker）を備えます。
    *
    * @param {HTMLElement} target - スクロール先の要素
    * @param {number} [customDuration=null] - オプション（互換性用）
@@ -861,7 +863,23 @@ window.egovExt = window.egovExt || {};
     const scrollTarget = ext.resolveScrollTarget ? ext.resolveScrollTarget(target) : target;
     if (!scrollTarget) return;
 
-    // ブラウザネイティブの scrollIntoView による滑らかなスクロール（Compositor駆動）
+    // 現在のビューポートと目標要素の相対距離を測定
+    const initialRect = scrollTarget.getBoundingClientRect ? scrollTarget.getBoundingClientRect() : { top: 0 };
+    const headerOffset = ext.updateHeaderOffset ? ext.updateHeaderOffset() : 72;
+    const distance = Math.abs(initialRect.top - headerOffset);
+
+    // 長距離（2000px以上）の場合：
+    // 途中の数百個の未描画要素による累積伸縮誤差を防ぐため、
+    // まず目標要素自身を即座にビューポート近傍に引き込み（展開確定）、次のフレームで滑らかに最終着地させる
+    if (distance > 2000 && scrollTarget.scrollIntoView) {
+      try {
+        scrollTarget.scrollIntoView({ behavior: 'instant', block: 'start' });
+      } catch (e) {
+        scrollTarget.scrollIntoView(true);
+      }
+    }
+
+    // ネイティブの滑らかなスクロールを開始
     if (scrollTarget.scrollIntoView) {
       try {
         scrollTarget.scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -870,10 +888,64 @@ window.egovExt = window.egovExt || {};
       }
     } else if (typeof window !== 'undefined' && window.scrollTo) {
       const rect = scrollTarget.getBoundingClientRect ? scrollTarget.getBoundingClientRect() : { top: 0 };
-      const offset = ext.updateHeaderOffset ? ext.updateHeaderOffset() : 72;
-      const top = (window.pageYOffset || 0) + rect.top - offset;
+      const top = (window.pageYOffset || 0) + rect.top - headerOffset;
       window.scrollTo(0, Math.max(0, top));
     }
+
+    // 精密到着補正（Arrival Precision Tracker）:
+    // スクロール中に途中の要素が実寸展開されたり非同期DOM変換（横書き・引用ボタン）が走って
+    // ドキュメント高さが伸縮しても、到着時に必ずピタッと目的位置に静止させる。
+    let correctionAttempts = 0;
+    const maxCorrectionAttempts = 3;
+
+    function applyArrivalCorrection() {
+      if (!scrollTarget || !scrollTarget.getBoundingClientRect) return;
+      const currentRect = scrollTarget.getBoundingClientRect();
+      const currentOffset = ext.updateHeaderOffset ? ext.updateHeaderOffset() : 72;
+      const diff = currentRect.top - currentOffset;
+
+      // 4px以上のズレが生じている場合のみ微調整
+      if (Math.abs(diff) > 4 && correctionAttempts < maxCorrectionAttempts) {
+        correctionAttempts++;
+        if (typeof window !== 'undefined' && window.scrollBy) {
+          try {
+            window.scrollBy({ top: diff, behavior: 'smooth' });
+          } catch (e) {
+            window.scrollBy(0, diff);
+          }
+        } else if (scrollTarget.scrollIntoView) {
+          try {
+            scrollTarget.scrollIntoView({ behavior: 'smooth', block: 'start' });
+          } catch (e) {}
+        }
+      }
+    }
+
+    // 1. スクロール停止の検知（scrollend イベント）
+    let scrollEndFired = false;
+    const onScrollEnd = () => {
+      scrollEndFired = true;
+      if (typeof window !== 'undefined' && window.removeEventListener) {
+        window.removeEventListener('scrollend', onScrollEnd);
+      }
+      applyArrivalCorrection();
+      setTimeout(applyArrivalCorrection, 120);
+    };
+
+    if (typeof window !== 'undefined' && 'onscrollend' in window) {
+      window.addEventListener('scrollend', onScrollEnd, { once: true });
+    }
+
+    // 2. タイマーによるセーフティネット（scrollend未対応環境や停止検知用）
+    const checkDelay = Math.min(600, Math.max(250, Math.round(200 + Math.sqrt(distance) * 5)));
+    setTimeout(() => {
+      if (!scrollEndFired) {
+        applyArrivalCorrection();
+      }
+    }, checkDelay);
+
+    // 3. 非同期DOM変換（被引用ボタン挿入等）による微小ズレに対する最終ガード
+    setTimeout(applyArrivalCorrection, Math.max(checkDelay + 150, 450));
 
     // ハイライトアニメーションの付与（既存のアニメーションをリセットして再発火）
     scrollTarget.classList.remove('egov-ext-jump-target');

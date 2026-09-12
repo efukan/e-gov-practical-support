@@ -102,6 +102,12 @@
   border-bottom: 1px solid var(--tip-border);
 }
 
+/* サイド配置（フライアウト）の場合は矢印を非表示にする */
+.egov-ext-tip.is-flipped-left::after,
+.egov-ext-tip--preview::after {
+  display: none !important;
+}
+
 /* 中身が長い場合はこの内側要素がスクロールする */
 .egov-ext-tip-scroll {
   max-height: min(56vh, 420px);
@@ -121,6 +127,13 @@
 
 /* バリアント: 定義語ホバー辞書はティール系のアクセント */
 .egov-ext-tip--definition { --tip-accent: #00695c; }
+
+/* バリアント: 引用元条文プレビュー（フライアウト） */
+.egov-ext-tip--preview {
+  --tip-max-w: 440px;
+  --tip-accent: #1042a4;
+  z-index: 10001;
+}
 
 /* ヘッダー（出典の条項番号・「被引用法令一覧」など） */
 .egov-ext-tip-header {
@@ -462,6 +475,118 @@ body.egov-fastrender-enabled article.article {
   color: #666 !important;
   font-size: 11px !important;
   margin-top: 2px !important;
+}
+
+/* ----- 8-1. 引用元条文フライアウトプレビュー (Citation Article Preview) ----- */
+.egov-ext-preview-container {
+  display: flex !important;
+  flex-direction: column !important;
+}
+
+.egov-ext-preview-lawname {
+  font-weight: 700 !important;
+  color: var(--tip-accent) !important;
+}
+
+.egov-ext-preview-path {
+  font-weight: 600 !important;
+  color: var(--tip-fg) !important;
+}
+
+.egov-ext-preview-body {
+  font-size: 12.5px !important;
+  line-height: 1.65 !important;
+  color: var(--tip-fg) !important;
+}
+
+.egov-ext-preview-caption {
+  font-size: 11.5px !important;
+  color: var(--tip-muted) !important;
+  margin-bottom: 3px !important;
+}
+
+.egov-ext-preview-title {
+  font-weight: 700 !important;
+  color: var(--tip-fg) !important;
+  margin-bottom: 4px !important;
+}
+
+.egov-ext-preview-paragraph {
+  margin-bottom: 6px !important;
+}
+
+.egov-ext-preview-paragraph:last-child {
+  margin-bottom: 0 !important;
+}
+
+.egov-ext-preview-paragraph-num {
+  font-weight: 600 !important;
+}
+
+.egov-ext-preview-sentence {
+  color: var(--tip-fg) !important;
+}
+
+.egov-ext-preview-item {
+  margin-left: 1.2em !important;
+  margin-top: 3px !important;
+}
+
+.egov-ext-preview-item-title {
+  font-weight: 600 !important;
+}
+
+.egov-ext-preview-subitem {
+  margin-left: 1.2em !important;
+  margin-top: 2px !important;
+}
+
+.egov-ext-preview-subitem-title {
+  font-weight: 600 !important;
+}
+
+.egov-ext-preview-subitem2 {
+  margin-left: 1.2em !important;
+  margin-top: 2px !important;
+}
+
+/* 引用条文のハイライト */
+.egov-ext-citation-highlight {
+  background-color: #fef08a !important;
+  color: #854d0e !important;
+  font-weight: 700 !important;
+  padding: 1px 3px !important;
+  border-radius: 3px !important;
+  box-shadow: 0 0 0 1px rgba(133, 77, 14, 0.25) !important;
+}
+
+/* ローディング・エラー表示 */
+.egov-ext-tip-loading,
+.egov-ext-tip-error {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  padding: 18px 12px !important;
+  color: var(--tip-muted) !important;
+  font-size: 12px !important;
+  gap: 8px !important;
+}
+
+.egov-ext-tip-error {
+  color: #dc2626 !important;
+}
+
+.egov-ext-tip-spinner {
+  width: 14px !important;
+  height: 14px !important;
+  border: 2px solid rgba(16, 66, 164, 0.2) !important;
+  border-top-color: #1042a4 !important;
+  border-radius: 50% !important;
+  animation: egov-ext-spin .6s linear infinite !important;
+}
+
+@keyframes egov-ext-spin {
+  to { transform: rotate(360deg); }
 }
 
 /* ----- 9. アクセシビリティ・フォーカス視認性 (Accessibility Focus Styles) ----- */

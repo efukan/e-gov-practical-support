@@ -63,7 +63,13 @@ window.egovExt = window.egovExt || {};
    * @returns {{el: HTMLElement, show: Function, hide: Function, cancelHide: Function, destroy: Function}}
    */
   ext.createTooltip = function(options) {
-    const { variant = 'default', showDelay = 120, hideDelay = 180 } = options || {};
+    const {
+      variant = 'default',
+      showDelay = 120,
+      hideDelay = 180,
+      placement = 'auto',
+      parent = null
+    } = options || {};
 
     const el = document.createElement('div');
     el.className = `egov-ext-tip egov-ext-tip--${variant}`;
@@ -82,6 +88,8 @@ window.egovExt = window.egovExt || {};
     let hideTimer = null;
     /** 現在ツールチップを開いているアンカー要素 @type {HTMLElement|null} */
     let currentAnchor = null;
+    /** 子ツールチップインスタンスのSet @type {Set<Object>} */
+    const children = new Set();
 
     /** タイマーをすべて解除する */
     function clearTimers() {
@@ -105,6 +113,32 @@ window.egovExt = window.egovExt || {};
       el.style.top = '0px';
       const tipW = el.offsetWidth;
       const tipH = el.offsetHeight;
+
+      if (placement === 'side') {
+        // --- 水平方向: アンカーの右側に配置、はみ出す場合は左側へフリップ ---
+        const spaceRight = viewportW - anchorRect.right - ANCHOR_GAP;
+        const spaceLeft = anchorRect.left - ANCHOR_GAP;
+        const flipLeft = tipW > spaceRight && spaceLeft > spaceRight;
+
+        let left;
+        if (flipLeft) {
+          left = anchorRect.left - ANCHOR_GAP - tipW;
+        } else {
+          left = anchorRect.right + ANCHOR_GAP;
+        }
+        left = Math.max(VIEWPORT_MARGIN, Math.min(left, viewportW - tipW - VIEWPORT_MARGIN));
+
+        // --- 垂直方向: アンカーの上端に揃え、ビューポート内にクランプ ---
+        let top = anchorRect.top;
+        top = Math.max(VIEWPORT_MARGIN, Math.min(top, viewportH - tipH - VIEWPORT_MARGIN));
+
+        el.classList.toggle('is-flipped-left', flipLeft);
+        el.classList.remove('is-flipped');
+        el.style.setProperty('--egov-arrow-x', '0px');
+        el.style.left = `${left + window.scrollX}px`;
+        el.style.top = `${top + window.scrollY}px`;
+        return;
+      }
 
       // --- 垂直方向: 下に収まらなければ上へフリップする ---
       const spaceBelow = viewportH - anchorRect.bottom - ANCHOR_GAP;
@@ -131,6 +165,7 @@ window.egovExt = window.egovExt || {};
       const arrowX = Math.max(14, Math.min(anchorCenter - left, tipW - 14));
 
       el.classList.toggle('is-flipped', flipUp);
+      el.classList.remove('is-flipped-left');
       el.style.setProperty('--egov-arrow-x', `${arrowX}px`);
       el.style.left = `${left + window.scrollX}px`;
       el.style.top = `${top + window.scrollY}px`;
@@ -138,6 +173,8 @@ window.egovExt = window.egovExt || {};
 
     const instance = {
       el,
+      parent,
+      children,
 
       /**
        * ツールチップを表示する。showDelay 経過後に実際の表示が行われる。
@@ -154,9 +191,19 @@ window.egovExt = window.egovExt || {};
         const render = () => {
           showTimer = null;
 
-          // 他のツールチップが開いていれば閉じる（複数が重なるのを防ぐ）
+          // 他のツールチップが開いていれば閉じる（自分・祖先・子孫は閉じる対象から除外）
           instances.forEach(other => {
-            if (other !== instance) other.hide(true);
+            if (other === instance) return;
+            // other が自分の祖先かチェック
+            let cur = parent;
+            while (cur) {
+              if (cur === other) return;
+              cur = cur.parent;
+            }
+            // other が自分の子孫かチェック
+            if (children.has(other)) return;
+
+            other.hide(true);
           });
 
           scroller.textContent = '';
@@ -178,6 +225,17 @@ window.egovExt = window.egovExt || {};
       },
 
       /**
+       * 表示中のツールチップの内容を差し替え、必要に応じて再配置する。
+       * @param {Node} newContent
+       */
+      update(newContent) {
+        if (!el.classList.contains('visible') || !currentAnchor) return;
+        scroller.textContent = '';
+        scroller.appendChild(newContent);
+        position(currentAnchor);
+      },
+
+      /**
        * ツールチップを隠す。
        * @param {boolean} [immediate=false] - true ならディレイ無しで即非表示
        */
@@ -192,6 +250,8 @@ window.egovExt = window.egovExt || {};
             currentAnchor.removeAttribute('aria-describedby');
             currentAnchor = null;
           }
+          // 子ツールチップも連動して閉じる
+          children.forEach(c => c.hide(true));
         };
 
         if (immediate || hideDelay <= 0) {
@@ -204,6 +264,7 @@ window.egovExt = window.egovExt || {};
       /** 非表示予約を取り消す（ツールチップ本体にマウスが乗ったとき等） */
       cancelHide() {
         if (hideTimer !== null) { clearTimeout(hideTimer); hideTimer = null; }
+        if (parent) parent.cancelHide();
       },
 
       /** 現在このツールチップを開いているアンカー要素 */
@@ -212,14 +273,31 @@ window.egovExt = window.egovExt || {};
       /** ツールチップをDOMから取り除き、インスタンスを破棄する */
       destroy() {
         clearTimers();
+        if (parent && parent.children) {
+          parent.children.delete(instance);
+        }
+        children.forEach(c => c.destroy());
         instances.delete(instance);
         if (el.parentNode) el.parentNode.removeChild(el);
       }
     };
 
+    if (parent && parent.children) {
+      parent.children.add(instance);
+    }
+
     // ツールチップ本体にマウスが乗っている間は閉じない（中をスクロール・クリックできるようにする）
     el.addEventListener('mouseenter', () => instance.cancelHide());
-    el.addEventListener('mouseleave', () => instance.hide());
+    el.addEventListener('mouseleave', (e) => {
+      // 子ツールチップへ移動した場合は親を閉じない
+      const related = e.relatedTarget;
+      if (related) {
+        for (const child of children) {
+          if (related === child.el || child.el.contains(related)) return;
+        }
+      }
+      instance.hide();
+    });
 
     instances.add(instance);
     return instance;

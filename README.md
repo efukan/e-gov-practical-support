@@ -1,6 +1,6 @@
 # e-Gov 法令検索 実務サポート (e-Gov Law Search Practical Support)
 
-e-Gov法令検索（elaws.e-gov.go.jp）のUI/UXを大幅に改善し、法律実務者・法務担当者の作業効率を劇的に向上させるためのGoogle Chrome拡張機能です。
+e-Gov法令検索（laws.e-gov.go.jp / elaws.e-gov.go.jp）で条文を読むときの、行ったり来たりを減らす Google Chrome 拡張機能です。
 
 ---
 

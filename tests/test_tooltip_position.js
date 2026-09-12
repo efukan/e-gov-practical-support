@@ -142,5 +142,49 @@ check('スクロール量が座標に加算される', () => {
   return `top=${r.top} left=${r.left}`;
 });
 
+function placeSide(rect) {
+  const tooltip = ext.createTooltip({ variant: 'preview', placement: 'side', showDelay: 0, hideDelay: 0 });
+  document.body.appendChild(tooltip.el);
+  Object.defineProperty(tooltip.el, 'offsetWidth', { value: TIP_W, configurable: true });
+  Object.defineProperty(tooltip.el, 'offsetHeight', { value: TIP_H, configurable: true });
+
+  const anchor = document.createElement('span');
+  document.body.appendChild(anchor);
+  anchor.getBoundingClientRect = () => ({
+    left: rect.left, top: rect.top,
+    right: rect.left + rect.width, bottom: rect.top + rect.height,
+    width: rect.width, height: rect.height, x: rect.left, y: rect.top
+  });
+
+  tooltip.show(anchor, document.createTextNode('内容'), true);
+
+  const result = {
+    left: parseFloat(tooltip.el.style.left),
+    top: parseFloat(tooltip.el.style.top),
+    flippedLeft: tooltip.el.classList.contains('is-flipped-left')
+  };
+  tooltip.destroy();
+  anchor.remove();
+  return result;
+}
+
+check('サイド配置: 右側に余白があれば右側に出る', () => {
+  const r = placeSide({ left: 100, top: 100, width: 120, height: 20 });
+  // right = 220, gap = 8 → left = 228
+  if (r.flippedLeft) throw new Error('不要な左フリップが起きた');
+  if (r.left !== 228) throw new Error(`left=${r.left} (期待 228)`);
+  if (r.top !== 100) throw new Error(`top=${r.top} (期待 100)`);
+  return `left=${r.left} top=${r.top}`;
+});
+
+check('サイド配置: 右側に入らなければ左側へフリップする', () => {
+  // left = 700, width = 100 → right = 800. 残り 1000 - 800 - 8 = 192 < 400 なので左へ
+  // left = 700 - 8 - 400 = 292
+  const r = placeSide({ left: 700, top: 100, width: 100, height: 20 });
+  if (!r.flippedLeft) throw new Error('左フリップしていない');
+  if (r.left !== 292) throw new Error(`left=${r.left} (期待 292)`);
+  return `left=${r.left} flippedLeft`;
+});
+
 console.log(failures === 0 ? '\n✅ 全て成功' : `\n❌ ${failures} 件失敗`);
 process.exit(failures ? 1 : 0);

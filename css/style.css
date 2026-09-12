@@ -64,6 +64,7 @@
   transition: opacity .14s ease,
               transform .18s cubic-bezier(.22, 1, .36, 1),
               visibility .18s;
+  will-change: transform, opacity;
   pointer-events: none;
 }
 
@@ -389,15 +390,33 @@ body .egov-definition-word:focus-visible {
 /* ----- 7. レンダリングの高速化 (Fast Rendering for Massive DOMs) ----- */
 body.egov-fastrender-enabled ._div_Article, 
 body.egov-fastrender-enabled .Article,
-body.egov-fastrender-enabled ._div_Paragraph, 
-body.egov-fastrender-enabled .Paragraph,
 body.egov-fastrender-enabled article.law, 
-body.egov-fastrender-enabled article.article {
-  /* 画面外にある要素のレイアウト計算と描画をスキップする */
+body.egov-fastrender-enabled article.article,
+body.egov-fastrender-enabled .AppdxTable,
+body.egov-fastrender-enabled ._div_AppdxTable,
+body.egov-fastrender-enabled .Preamble,
+body.egov-fastrender-enabled ._div_Preamble {
+  /* 画面外にある条文・別表ブロックのレイアウト計算と描画をスキップする */
   content-visibility: auto !important;
-  /* 描画前の仮の高さ（500px）を指定し、一度描画された後は実際の高さを記憶(auto)させる */
-  contain-intrinsic-size: auto 500px !important;
+  /* 描画前の仮の高さを指定し、一度描画された後は実際の高さを記憶(auto)させる */
+  contain-intrinsic-size: auto 350px !important;
 }
+
+/* スクロール追従時のアンカー保護 */
+body.egov-fastrender-enabled .LawBody,
+body.egov-fastrender-enabled .main-content {
+  overflow-anchor: auto !important;
+}
+
+/* 目次サイドバーと固定UIのレイアウト独立化（スクロール時の不要な再描画・レイアウト波及を遮断） */
+.sidebar,
+[class*="sidebar"],
+._div_Sidebar,
+.toc,
+#titlebar {
+  contain: layout !important;
+}
+
 
 /* ----- 8. 被引用（引用元）表示機能 (Cited By / Citations) ----- */
 .egov-ext-citation-btn {

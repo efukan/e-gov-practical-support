@@ -33,7 +33,7 @@
   position: absolute;
   top: 0;
   left: 0;
-  z-index: 10000;
+  z-index: 2147483640 !important;
   box-sizing: border-box;
   max-width: var(--tip-max-w);
   /* 矢印（::after）を枠外に描くため、ここでは overflow を付けない。
@@ -133,7 +133,7 @@
 .egov-ext-tip--preview {
   --tip-max-w: 440px;
   --tip-accent: #1042a4;
-  z-index: 10001;
+  z-index: 2147483645 !important;
 }
 
 /* ヘッダー（出典の条項番号・「被引用法令一覧」など） */
@@ -290,7 +290,7 @@ body.egov-ext-dim-active a.egov-ext-dimmed-text {
   position: fixed !important;
   top: 16px !important; /* ヘルプと高さをきっちり揃えるために少し下へ調整 */
   right: 110px !important; /* ヘルプのすぐ左隣に配置 */
-  z-index: 2147483647 !important; /* 最前面へ */
+  z-index: 10000 !important; /* e-Gov固定ヘッダーの上に配置（ポップアップよりは背面） */
   display: flex !important;
   align-items: center !important;
   gap: 8px !important;

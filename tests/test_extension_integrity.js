@@ -317,6 +317,24 @@ async function main() {
     assert(styleCss.includes('.egov-ext-preview-container .egov-ext-citation-btn'), 'preview-container 内の citation-btn 非表示ルールが定義されている');
   });
 
+  runTest('css/style.css 内のツールチップ z-index がステータスバッジ（ヘッダーコンテナ）より前面に設定されていること', () => {
+    const styleCss = fs.readFileSync(path.join(ROOT_DIR, 'css', 'style.css'), 'utf8');
+    const headerMatch = styleCss.match(/\.egov-ext-header-container\s*\{[\s\S]*?z-index:\s*(\d+)/);
+    assert(headerMatch, '.egov-ext-header-container の z-index が定義されている');
+    const headerZIndex = parseInt(headerMatch[1], 10);
+
+    const tipMatch = styleCss.match(/\.egov-ext-tip\s*\{[\s\S]*?z-index:\s*(\d+)/);
+    assert(tipMatch, '.egov-ext-tip の z-index が定義されている');
+    const tipZIndex = parseInt(tipMatch[1], 10);
+
+    const previewMatch = styleCss.match(/\.egov-ext-tip--preview\s*\{[\s\S]*?z-index:\s*(\d+)/);
+    assert(previewMatch, '.egov-ext-tip--preview の z-index が定義されている');
+    const previewZIndex = parseInt(previewMatch[1], 10);
+
+    assert(tipZIndex > headerZIndex, `ツールチップの z-index (${tipZIndex}) はヘッダーコンテナ (${headerZIndex}) より大きいこと`);
+    assert(previewZIndex >= tipZIndex, `プレビューツールチップの z-index (${previewZIndex}) は通常ツールチップ (${tipZIndex}) 以上であること`);
+  });
+
 
   // =============================================================================
   // 4. 印刷スタイル (@media print) 検証

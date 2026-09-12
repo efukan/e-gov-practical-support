@@ -10,11 +10,11 @@ window.egovExt = window.egovExt || {};
   // 正規表現を定数化
   const HAS_NUM_REGEX = /[一二三四五六七八九十百千万億兆〇0-9０-９]/;
   const ERA_LAW_NUM_REGEX = /((?:昭和|平成|令和|明治|大正)[一二三四五六七八九十百千万億兆〇]+年)?(法律|政令|閣令|省令|府令|命令|規則|告示)第([一二三四五六七八九十百千万億兆〇]+)号/g;
-  const REFER_CLAUSE_REGEX = /第([一二三四五六七八九十百千万億兆〇]+)(条|項|号|章|節|款|目|編|表|別表)/g;
-  const REFER_CLAUSE_HALF_NUM_REGEX = /第([0-9]+)(条|項|号|章|節|款|目|編|表|別表)/g;
+  const REFER_CLAUSE_REGEX = /第([一二三四五六七八九十百千万億兆〇]+)(条|條|項|号|章|節|款|目|編|表|別表)/g;
+  const REFER_CLAUSE_HALF_NUM_REGEX = /第([0-9]+)(条|條|項|号|章|節|款|目|編|表|別表)/g;
   const SPECIAL_TABLE_STYLE_REGEX = /((?:別表|様式)第)([一二三四五六七八九十百千万億兆〇]+)/g;
-  const SUB_BRANCH_NUM_KANJI_REGEX = /([条項号章節款目編表別表様式０-９])の([一二三四五六七八九十百千万億兆〇]+)/g;
-  const SUB_BRANCH_NUM_HALF_REGEX = /([条項号章節款目編表別表様式０-９])の([0-9]+)/g;
+  const SUB_BRANCH_NUM_KANJI_REGEX = /([条條項号章節款目編表別表様式０-９])の([一二三四五六七八九十百千万億兆〇]+)/g;
+  const SUB_BRANCH_NUM_HALF_REGEX = /([条條項号章節款目編表別表様式０-９])の([0-9]+)/g;
   const ITEM_TITLE_PATTERN = /^[一二三四五六七八九十百]+(の[一二三四五六七八九十百]+)*$/;
   const ITEM_TITLE_ARABIC_PATTERN = /^\([0-9]+\)/;
 
@@ -50,7 +50,7 @@ window.egovExt = window.egovExt || {};
     });
 
     // 2c. 「前〇条」「前〇項」「前〇号」および「次〇条」「次〇項」「次〇号」の変換 (例: 前二条 ➔ 前２条、次三条 ➔ 次３条)
-    text = text.replace(/([前次])([一二三四五六七八九十百]+)(条|項|号)/g, function(match, prefix, kanji, suffix) {
+    text = text.replace(/([前次])([一二三四五六七八九十百]+)(条|條|項|号)/g, function(match, prefix, kanji, suffix) {
       return prefix + ext.kanjiToFullWidthArabic(kanji) + suffix;
     });
 

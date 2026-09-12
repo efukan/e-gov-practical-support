@@ -914,40 +914,66 @@ window.egovExt = window.egovExt || {};
   /**
    * 親条文タイトルから検索・ハイライト用の用語リストを生成
    * 例: "第２条" → ["第二条", "第２条", "第2条"]
+   * 例: "第六十七条の十五の二" → ["第六十七条の十五の二", "第６７条の１５の２", "第67条の15の2"]
    */
   function extractHighlightTerms(parentTitle) {
     if (!parentTitle) return [];
-    const match = parentTitle.match(/第([一二三四五六七八九十百千万0-9０-９]+)条(?:の([一二三四五六七八九十百千万0-9０-９]+))*/);
+    const match = parentTitle.match(/第([一二三四五六七八九十百千万0-9０-９]+)条((?:の[一二三四五六七八九十百千万0-9０-９]+)*)/);
     if (!match) {
       return [parentTitle.trim()].filter(Boolean);
     }
 
     const fullMatched = match[0];
+    const mainNumStr = match[1];
+    const branchPart = match[2] || '';
+    const branchTokens = branchPart ? branchPart.split('の').filter(Boolean) : [];
+
     const terms = new Set();
     terms.add(fullMatched);
 
     try {
-      if (ext.kanjiToArabic) {
-        const arabic = ext.kanjiToArabic(fullMatched);
-        terms.add(arabic);
-        if (ext.toFullWidthArabic) terms.add(ext.toFullWidthArabic(arabic));
-        if (ext.toHalfWidthArabic) terms.add(ext.toHalfWidthArabic(arabic));
-      }
-      if (ext.toFullWidthArabic) terms.add(ext.toFullWidthArabic(fullMatched));
-      if (ext.toHalfWidthArabic) terms.add(ext.toHalfWidthArabic(fullMatched));
-      const kanjiStr = convertDigitsToKanji(fullMatched);
-      if (kanjiStr) {
-        terms.add(kanjiStr);
-        if (kanjiStr.includes('千')) {
-          terms.add(kanjiStr.replace(/千/g, '一千'));
-          terms.add(kanjiStr.replace(/一千/g, '千'));
+      function getRepresentations(numStr) {
+        const isDigits = /^[0-9０-９]+$/.test(numStr);
+        let half = '';
+        let full = '';
+        let kanji = '';
+
+        if (isDigits) {
+          half = ext.toHalfWidthArabic ? ext.toHalfWidthArabic(numStr) : numStr;
+          full = ext.toFullWidthArabic ? ext.toFullWidthArabic(half) : numStr;
+          kanji = convertDigitsToKanji(half);
+        } else {
+          half = ext.kanjiToArabic ? ext.kanjiToArabic(numStr) : numStr;
+          full = ext.toFullWidthArabic ? ext.toFullWidthArabic(half) : half;
+          kanji = numStr;
         }
+        return { half, full, kanji };
       }
+
+      const mainReps = getRepresentations(mainNumStr);
+      const branchReps = branchTokens.map(t => getRepresentations(t));
+
+      // 1. 漢数字組み合わせ
+      const kanjiCombined = `第${mainReps.kanji}条${branchReps.map(b => 'の' + b.kanji).join('')}`;
+      terms.add(kanjiCombined);
+      if (kanjiCombined.includes('千')) {
+        terms.add(kanjiCombined.replace(/千/g, '一千'));
+        terms.add(kanjiCombined.replace(/一千/g, '千'));
+      }
+
+      // 2. 全角アラビア数字組み合わせ
+      const fullCombined = `第${mainReps.full}条${branchReps.map(b => 'の' + b.full).join('')}`;
+      terms.add(fullCombined);
+
+      // 3. 半角アラビア数字組み合わせ
+      const halfCombined = `第${mainReps.half}条${branchReps.map(b => 'の' + b.half).join('')}`;
+      terms.add(halfCombined);
+
     } catch (e) {
       // フォールバック
     }
 
-    return Array.from(terms).filter(t => t.length >= 2);
+    return Array.from(terms).filter(t => t && t.length >= 2);
   }
 
   function convertDigitsToKanji(str) {

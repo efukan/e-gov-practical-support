@@ -6,7 +6,7 @@
     "test": "tests"
   },
   "scripts": {
-    "test": "node tests/smoke_content_scripts.js && node tests/test_tooltip_position.js",
+    "test": "node tests/smoke_content_scripts.js && node tests/test_tooltip_position.js && node tests/test_law_patterns.js",
     "generate-icons": "node scripts/generate_icons.js"
   },
   "keywords": [],

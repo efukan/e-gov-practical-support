@@ -125,9 +125,21 @@ window.egovExt = window.egovExt || {};
    * 追加した被引用ボタンやポップアップを画面から消去し、機能を完全に停止する関数
    */
   ext.disableCitations = function() {
-    // 挿入したボタンを削除
-    const buttons = ext.deepQuerySelectorAll(document.body, '.egov-ext-citation-btn');
-    buttons.forEach(btn => btn.remove());
+    // ボタン削除に伴うMutationObserverの不要発火を防止
+    const wasObserving = ext.globalDOMObserver !== null && ext.globalDOMObserver !== undefined;
+    if (wasObserving) {
+      ext.globalDOMObserver.disconnect();
+    }
+
+    try {
+      // 挿入したボタンを削除
+      const buttons = ext.deepQuerySelectorAll(document.body, '.egov-ext-citation-btn');
+      buttons.forEach(btn => btn.remove());
+    } finally {
+      if (wasObserving && ext.reconnectDOMObserver) {
+        ext.reconnectDOMObserver();
+      }
+    }
 
     // ポップアップを閉じる（インスタンス自体は再利用するため破棄しない）
     if (ext.citationTooltip) {
@@ -230,35 +242,47 @@ window.egovExt = window.egovExt || {};
   function insertCitationButtons() {
     const container = ext.getLawContainer();
 
-    const articles = ext.deepQuerySelectorAll(container, ARTICLE_SELECTOR);
-    articles.forEach(articleEl => {
-      const objectId = articleEl.id;
-      if (!objectId || !ext.citationMap.has(objectId)) return;
+    // ボタンの一括挿入に伴うMutationObserverのカスケード発火（全ボタンへの不要走査）を完全に防止する
+    const wasObserving = ext.globalDOMObserver !== null && ext.globalDOMObserver !== undefined;
+    if (wasObserving) {
+      ext.globalDOMObserver.disconnect();
+    }
 
-      // すでにボタンが挿入されているかチェック
-      if (articleEl.querySelector('.egov-ext-citation-btn')) return;
+    try {
+      const articles = ext.deepQuerySelectorAll(container, ARTICLE_SELECTOR);
+      articles.forEach(articleEl => {
+        const objectId = articleEl.id;
+        if (!objectId || !ext.citationMap.has(objectId)) return;
 
-      // 条文のタイトル要素 (例: 「第１条」など) を探す (大文字・小文字・ハイフン表記等のバリエーションを網羅)
-      const titleEl = articleEl.querySelector('.ArticleTitle, ._div_ArticleTitle, .articletitle, ._div_articletitle, .article-title, .paragraph-title, .paragraphtitle');
-      if (!titleEl) return;
+        // すでにボタンが挿入されているかチェック
+        if (articleEl.querySelector('.egov-ext-citation-btn')) return;
 
-      // ボタン要素の作成 (イベントはグローバルデリゲーションで処理するため貼らない)
-      const btn = document.createElement('button');
-      btn.className = 'egov-ext-citation-btn';
-      btn.type = 'button';
-      btn.title = 'この条文の被引用法令一覧を表示';
-      btn.innerHTML = `<svg viewBox="0 0 24 24" width="12" height="12" fill="currentColor"><path d="M20 2H4c-1.1 0-1.99.9-1.99 2L2 22l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zM6 9h12v2H6V9zm8 5H6v-2h8v2zm4-6H6V6h12v2z"/></svg>引用`;
+        // 条文のタイトル要素 (例: 「第１条」など) を探す (大文字・小文字・ハイフン表記等のバリエーションを網羅)
+        const titleEl = articleEl.querySelector('.ArticleTitle, ._div_ArticleTitle, .articletitle, ._div_articletitle, .article-title, .paragraph-title, .paragraphtitle');
+        if (!titleEl) return;
 
-      // タイトルの直後に挿入 (インライン)
-      // 公職選挙法などのように、_div_ArticleTitle の中に本文が同居しているケースに対応するため、
-      // 内部の最初の span (「第一条」等の条数ラベル) の直後に挿入を試みる。
-      const labelSpan = titleEl.querySelector('span');
-      if (labelSpan && labelSpan.parentNode === titleEl) {
-        labelSpan.parentNode.insertBefore(btn, labelSpan.nextSibling);
-      } else {
-        titleEl.appendChild(btn);
+        // ボタン要素の作成 (イベントはグローバルデリゲーションで処理するため貼らない)
+        const btn = document.createElement('button');
+        btn.className = 'egov-ext-citation-btn';
+        btn.type = 'button';
+        btn.title = 'この条文の被引用法令一覧を表示';
+        btn.innerHTML = `<svg viewBox="0 0 24 24" width="12" height="12" fill="currentColor"><path d="M20 2H4c-1.1 0-1.99.9-1.99 2L2 22l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zM6 9h12v2H6V9zm8 5H6v-2h8v2zm4-6H6V6h12v2z"/></svg>引用`;
+
+        // タイトルの直後に挿入 (インライン)
+        // 公職選挙法などのように、_div_ArticleTitle の中に本文が同居しているケースに対応するため、
+        // 内部の最初の span (「第一条」等の条数ラベル) の直後に挿入を試みる。
+        const labelSpan = titleEl.querySelector('span');
+        if (labelSpan && labelSpan.parentNode === titleEl) {
+          labelSpan.parentNode.insertBefore(btn, labelSpan.nextSibling);
+        } else {
+          titleEl.appendChild(btn);
+        }
+      });
+    } finally {
+      if (wasObserving && ext.reconnectDOMObserver) {
+        ext.reconnectDOMObserver();
       }
-    });
+    }
   }
 
   /**

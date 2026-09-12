@@ -140,37 +140,51 @@ window.egovExt = window.egovExt || {};
   let activeExternalLink = null;
 
   /**
+   * 他法令リンクの解析結果キャッシュ（同一リンクへのホバー時の再探索をO(1)化）
+   * @type {WeakMap<HTMLAnchorElement, {lawName: string, path: string}>}
+   */
+  const parsedLawLinkCache = new WeakMap();
+
+  /**
    * リンク要素および前後のテキストから法令名と条番号パスを抽出する
    * @param {HTMLAnchorElement} a
    * @param {string} targetLawId
    * @returns {{lawName: string, path: string}}
    */
   function parseLawLinkText(a, targetLawId) {
+    if (a && typeof a === 'object' && parsedLawLinkCache.has(a)) {
+      return parsedLawLinkCache.get(a);
+    }
+
     const rawText = (a.textContent || '').trim();
+    let result;
 
     // 1. "民法第七百九条", "地方自治法第十条第一項" のように法令名と条番号が結合している場合
     const fullMatch = rawText.match(/^(.+?(?:法|令|規則|府令|省令|憲法|条約|条例|布告|規程))(?:\s*)(第[0-9一二三四五六七八九十百千万]+条.*)?$/);
     if (fullMatch) {
-      return {
+      result = {
         lawName: fullMatch[1],
         path: fullMatch[2] || ''
       };
-    }
-
-    // 2. "第七百九条" のように条番号のみの場合、直前のテキストから法令名を探す
-    if (/^第[0-9一二三四五六七八九十百千万]+条/.test(rawText)) {
+    } else if (/^第[0-9一二三四五六七八九十百千万]+条/.test(rawText)) {
+      // 2. "第七百九条" のように条番号のみの場合、直前のテキストから法令名を探す
       const precedingName = findPrecedingLawName(a);
-      return {
+      result = {
         lawName: precedingName,
         path: rawText
       };
+    } else {
+      // 3. その他（法令名のみの場合や特殊表記）
+      result = {
+        lawName: rawText,
+        path: ''
+      };
     }
 
-    // 3. その他（法令名のみの場合や特殊表記）
-    return {
-      lawName: rawText,
-      path: ''
-    };
+    if (a && typeof a === 'object') {
+      parsedLawLinkCache.set(a, result);
+    }
+    return result;
   }
 
   /**
@@ -181,7 +195,9 @@ window.egovExt = window.egovExt || {};
    */
   function findPrecedingLawName(a) {
     let prev = a.previousSibling;
-    while (prev) {
+    let step = 0;
+    while (prev && step < 6) {
+      step++;
       const txt = prev.textContent || '';
       const m = txt.match(/([^\s（(「]+?(?:法|令|規則|府令|省令|憲法|条約|条例|布告|規程))(?:（[^）]*）|\([^)]*\))?\s*$/);
       if (m) return m[1];
@@ -191,7 +207,8 @@ window.egovExt = window.egovExt || {};
       const parentText = a.parentElement.textContent || '';
       const linkIdx = parentText.indexOf(a.textContent);
       if (linkIdx > 0) {
-        const beforeText = parentText.slice(0, linkIdx);
+        // 直前300文字に制限して末尾マッチを探索（巨大な段落での正規表現負荷を軽減）
+        const beforeText = parentText.slice(Math.max(0, linkIdx - 300), linkIdx);
         const m = beforeText.match(/([^\s（(「]+?(?:法|令|規則|府令|省令|憲法|条約|条例|布告|規程))(?:（[^）]*）|\([^)]*\))?\s*$/);
         if (m) return m[1];
       }

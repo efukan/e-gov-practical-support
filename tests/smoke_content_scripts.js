@@ -638,6 +638,109 @@ check('定義語の抽出とハイライト', async () => true);
     return 'デフォルト showDelay: 300ms, hideDelay: 240ms 確認完了';
   });
 
+  console.log('\n--- パフォーマンス最適化・軽量化 ---');
+
+  await check('マウス通過（showDelay未満の離脱）では resolveContent が一切実行されない（Lazy Resolution）', async () => {
+    let resolverCallCount = 0;
+    const testTip = ext.createTooltip({ variant: 'test', showDelay: 300 });
+
+    const btn = document.createElement('button');
+    btn.className = 'test-lazy-btn';
+    btn.textContent = 'テストボタン';
+    document.body.appendChild(btn);
+
+    ext.bindHoverTooltip({
+      selector: '.test-lazy-btn',
+      tooltip: testTip,
+      resolveContent: () => {
+        resolverCallCount++;
+        const div = document.createElement('div');
+        div.textContent = '生成されたコンテンツ';
+        return div;
+      }
+    });
+
+    // 1. mouseover 発火（マウスが要素に乗った）
+    btn.dispatchEvent(new window.MouseEvent('mouseover', { bubbles: true }));
+
+    // 遅延評価のため、乗った直後は resolver は一切実行されていないはず
+    if (resolverCallCount !== 0) {
+      throw new Error(`Lazy Resolution 失敗: mouseover 直後に resolver が呼ばれた (calls=${resolverCallCount})`);
+    }
+
+    // 2. 100ms 後に離脱（300ms 未満でマウスが通過したケース）
+    await new Promise(r => setTimeout(r, 100));
+    btn.dispatchEvent(new window.MouseEvent('mouseout', { bubbles: true, relatedTarget: document.body }));
+
+    // 3. さらに 350ms 待機（本来の showDelay 300ms を経過した時点）
+    await new Promise(r => setTimeout(r, 350));
+
+    // 通過しただけなので、DOM 生成や API 通信処理は 0 回のまま保たれていること
+    if (resolverCallCount !== 0) {
+      throw new Error(`Lazy Resolution 失敗: マウス通過後に resolver が実行された (calls=${resolverCallCount})`);
+    }
+
+    testTip.destroy();
+    btn.remove();
+    return '通過時の resolver 呼び出し=0（CPU・通信負荷ゼロ確認）';
+  });
+
+  await check('300ms以上ホバー静止した場合は resolveContent が1回だけ実行され表示される', async () => {
+    let resolverCallCount = 0;
+    const testTip = ext.createTooltip({ variant: 'test-static', showDelay: 300 });
+
+    const btn = document.createElement('button');
+    btn.className = 'test-static-btn';
+    btn.textContent = '静止テストボタン';
+    document.body.appendChild(btn);
+
+    ext.bindHoverTooltip({
+      selector: '.test-static-btn',
+      tooltip: testTip,
+      resolveContent: () => {
+        resolverCallCount++;
+        const div = document.createElement('div');
+        div.textContent = '静止表示コンテンツ';
+        return div;
+      }
+    });
+
+    // mouseover 発火
+    btn.dispatchEvent(new window.MouseEvent('mouseover', { bubbles: true }));
+
+    // 350ms 待機（ホバー静止）
+    await new Promise(r => setTimeout(r, 350));
+
+    if (resolverCallCount !== 1) {
+      throw new Error(`ホバー静止時の resolver 呼び出し回数不一致: calls=${resolverCallCount}`);
+    }
+    if (!testTip.el.classList.contains('visible')) {
+      throw new Error('ホバー静止後にツールチップが表示されていない');
+    }
+
+    testTip.destroy();
+    btn.remove();
+    return '静止時に resolver が 1 回のみ実行され正常表示';
+  });
+
+  check('parseLawLinkText の解析結果が WeakMap でキャッシュされ同一参照が返る', () => {
+    const { parseLawLinkText } = ext._testReferPopup;
+    const link = document.createElement('a');
+    link.textContent = '会社法第四百二十三条第一項';
+
+    const first = parseLawLinkText(link, '417AC0000000086');
+    const second = parseLawLinkText(link, '417AC0000000086');
+
+    if (first !== second) {
+      throw new Error('WeakMap キャッシュが効いておらず、異なるオブジェクト参照が返された');
+    }
+    if (first.lawName !== '会社法' || first.path !== '第四百二十三条第一項') {
+      throw new Error(`解析結果不一致: ${JSON.stringify(first)}`);
+    }
+
+    return 'WeakMap メモ化正常（同一参照を即時返却）';
+  });
+
   if (errors.length) {
     console.error('\nwindow error:', errors);
     failures += errors.length;

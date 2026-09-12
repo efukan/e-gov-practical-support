@@ -114,6 +114,10 @@ window.egovExt = window.egovExt || {};
         ext.scrollSpyObserver.disconnect();
         ext.scrollSpyObserver = null;
       }
+      if (ext.scrollSpyRafId) {
+        (typeof cancelAnimationFrame !== 'undefined' ? cancelAnimationFrame : clearTimeout)(ext.scrollSpyRafId);
+        ext.scrollSpyRafId = null;
+      }
       if (ext.referenceTooltip) ext.referenceTooltip.hide(true);
       if (ext.definitionTooltip) ext.definitionTooltip.hide(true);
       if (ext.citationTooltip) ext.citationTooltip.hide(true);
@@ -277,6 +281,29 @@ window.egovExt = window.egovExt || {};
   }
 
   /**
+   * 拡張機能自身が挿入・装飾したUI要素かどうかを判定する。
+   * 自作UIの追加や変更をMutationObserverで再帰走査しないようにするための重要ガード。
+   * @param {Node} node
+   * @returns {boolean}
+   */
+  function isSelfGeneratedElement(node) {
+    if (!node) return false;
+    const el = node.nodeType === Node.ELEMENT_NODE ? node : node.parentElement;
+    if (!el) return false;
+
+    const className = el.className || '';
+    if (typeof className === 'string' && (className.includes('egov-ext-') || className.includes('egov-definition-'))) {
+      return true;
+    }
+
+    if (el.closest && el.closest('.egov-ext-tip, .egov-ext-header-container, #egov-ext-jump-container, #egov-ext-status-badge, .egov-ext-citation-btn')) {
+      return true;
+    }
+
+    return false;
+  }
+
+  /**
    * 画面の要素が変化したことを検知する「MutationObserver」を初期化・接続する関数
    */
   function observeDOMChanges() {
@@ -305,12 +332,12 @@ window.egovExt = window.egovExt || {};
         return cached;
       };
 
-      // 新たに追加された DOM 要素のみを走査して Shadow Root 監視登録を拡張
+      // 新たに追加された DOM 要素のみを走査して Shadow Root 監視登録を拡張（自作要素は無視）
       for (let i = 0; i < mutations.length; i++) {
         const addedNodes = mutations[i].addedNodes;
         for (let j = 0; j < addedNodes.length; j++) {
           const node = addedNodes[j];
-          if (node.nodeType === Node.ELEMENT_NODE) {
+          if (node.nodeType === Node.ELEMENT_NODE && !isSelfGeneratedElement(node)) {
             scanAddedNodeForShadows(node);
           }
         }
@@ -324,14 +351,14 @@ window.egovExt = window.egovExt || {};
           const addedNodes = mutation.addedNodes;
           for (let j = 0; j < addedNodes.length; j++) {
             const node = addedNodes[j];
-            if (node.nodeType === Node.ELEMENT_NODE && node.closest &&
+            if (node.nodeType === Node.ELEMENT_NODE && !isSelfGeneratedElement(node) && node.closest &&
                 node.closest(ext.LAW_CONTAINER_SELECTOR)) {
               addedElementsToProcess.push(node);
             }
           }
         } else if (mutation.type === 'characterData') {
           const parent = mutation.target.parentNode; // テキストノードの親要素
-          if (parent && parent.closest && parent.closest(ext.LAW_CONTAINER_SELECTOR)) {
+          if (parent && !isSelfGeneratedElement(parent) && parent.closest && parent.closest(ext.LAW_CONTAINER_SELECTOR)) {
             addedElementsToProcess.push(parent);
           }
         }
@@ -382,9 +409,12 @@ window.egovExt = window.egovExt || {};
       for (let i = 0; i < mutations.length; i++) {
         const mutation = mutations[i];
 
-        // サイドバーや目次の開閉などの変更は無視する (チラつき防止)
+        // サイドバーや目次の開閉などの変更、および拡張機能の自作UI変更は無視する (チラつき・負荷防止)
         const target = mutation.target;
-        if (target.closest && target.closest(ext.SIDEBAR_SELECTOR)) {
+        if (isSelfGeneratedElement(target)) {
+          continue;
+        }
+        if (target.closest && (target.closest(ext.SIDEBAR_SELECTOR) || target.closest('.egov-ext-tip'))) {
           continue;
         }
 
@@ -393,7 +423,7 @@ window.egovExt = window.egovExt || {};
         let hasUnprocessedAddition = false;
         for (let j = 0; j < addedNodes.length; j++) {
           const node = addedNodes[j];
-          if (node.nodeType === Node.ELEMENT_NODE && node.closest &&
+          if (node.nodeType === Node.ELEMENT_NODE && !isSelfGeneratedElement(node) && node.closest &&
               node.closest(ext.LAW_CONTAINER_SELECTOR) &&
               countDescendants(node) >= SYNC_PROCESS_LIMIT) {
             hasUnprocessedAddition = true;
@@ -410,7 +440,8 @@ window.egovExt = window.egovExt || {};
         if (mutation.removedNodes && mutation.removedNodes.length > 0 &&
             target.closest && target.closest(ext.LAW_CONTAINER_SELECTOR)) {
           for (let j = 0; j < mutation.removedNodes.length; j++) {
-            if (mutation.removedNodes[j].nodeType === Node.ELEMENT_NODE) {
+            const rNode = mutation.removedNodes[j];
+            if (rNode.nodeType === Node.ELEMENT_NODE && !isSelfGeneratedElement(rNode)) {
               shouldUpdate = true;
               break;
             }
@@ -563,6 +594,10 @@ window.egovExt = window.egovExt || {};
       if (ext.scrollSpyObserver) {
         ext.scrollSpyObserver.disconnect();
         ext.scrollSpyObserver = null;
+      }
+      if (ext.scrollSpyRafId) {
+        (typeof cancelAnimationFrame !== 'undefined' ? cancelAnimationFrame : clearTimeout)(ext.scrollSpyRafId);
+        ext.scrollSpyRafId = null;
       }
     }
 

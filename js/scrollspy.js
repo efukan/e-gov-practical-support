@@ -14,6 +14,12 @@ window.egovExt = window.egovExt || {};
   ext.scrollSpyObserver = null;
 
   /**
+   * 目次ハイライト監視用rAFのID
+   * @type {number|null}
+   */
+  ext.scrollSpyRafId = null;
+
+  /**
    * ScrollSpyのセットアップを行う関数。
    * 本文のスクロール位置に応じて、目次（サイドバー）の対応要素を自動ハイライトおよび追従スクロールさせます。
    */
@@ -21,6 +27,11 @@ window.egovExt = window.egovExt || {};
     // すでに監視中なら一旦解除する（二重登録防止）
     if (ext.scrollSpyObserver) {
       ext.scrollSpyObserver.disconnect();
+      ext.scrollSpyObserver = null;
+    }
+    if (ext.scrollSpyRafId) {
+      (typeof cancelAnimationFrame !== 'undefined' ? cancelAnimationFrame : clearTimeout)(ext.scrollSpyRafId);
+      ext.scrollSpyRafId = null;
     }
 
     // 条文の本文エリアと目次エリアを取得
@@ -76,6 +87,11 @@ window.egovExt = window.egovExt || {};
 
     // 画面に入っている要素を管理するセット
     const activeElements = new Set();
+    let currentSpyId = null;
+
+    const raf = typeof requestAnimationFrame !== 'undefined'
+      ? requestAnimationFrame
+      : (fn) => setTimeout(fn, 0);
 
     /**
      * ID名から目次要素の階層レベル（深さ優先度）を取得する内部関数
@@ -91,24 +107,15 @@ window.egovExt = window.egovExt || {};
       return 0;
     };
 
-    // IntersectionObserverで監視
-    ext.scrollSpyObserver = new IntersectionObserver((entries) => {
-      if (!ext.settings.global || !ext.settings.scrollspy) return;
-      
-      let changed = false;
-      entries.forEach(entry => {
-        if (entry.isIntersecting) {
-          activeElements.add(entry.target);
-          changed = true;
-        } else {
-          activeElements.delete(entry.target);
-          changed = true;
-        }
-      });
-      
-      if (!changed || activeElements.size === 0) return;
+    /**
+     * 最適な目次項目を判定し、ハイライトと自動スクロールを適用する内部関数
+     * requestAnimationFrame でバッチ化され、同一フレーム内の連続呼び出しを合流する
+     */
+    const updateActiveSpy = () => {
+      ext.scrollSpyRafId = null;
+      if (!ext.settings.global || !ext.settings.scrollspy || activeElements.size === 0) return;
 
-      // 優先度の判定
+      // 1. 読み取りフェーズ: 各要素のRectを測定して優先度を判定（DOMへの書き込みを行わない）
       let bestTarget = null;
       let bestLevel = -1;
       let bestVisibleHeight = -1;
@@ -149,12 +156,19 @@ window.egovExt = window.egovExt || {};
         }
       });
 
-      if (bestTarget) {
-        const id = bestTarget.id || bestTarget.name;
-        document.querySelectorAll('.active-spy').forEach(el => el.classList.remove('active-spy'));
-        document.querySelectorAll('.active-spy-parent').forEach(el => el.classList.remove('active-spy-parent'));
-        
-        const activeLink = tocMap.get(id);
+      if (!bestTarget) return;
+
+      const id = bestTarget.id || bestTarget.name;
+      // 前回のターゲットと同一の場合はDOM書き換えも自動スクロールもスキップ（Layout Thrashing防止）
+      if (id === currentSpyId) return;
+      currentSpyId = id;
+
+      // 2. 書き込みフェーズ: クラス付け替えと目次追従スクロールを一括実行
+      document.querySelectorAll('.active-spy').forEach(el => el.classList.remove('active-spy'));
+      document.querySelectorAll('.active-spy-parent').forEach(el => el.classList.remove('active-spy-parent'));
+      
+      const activeLink = tocMap.get(id);
+      if (activeLink) {
         activeLink.classList.add('active-spy');
         const parent = ext.deepClosest(activeLink, '.tocitem');
         if (parent) parent.classList.add('active-spy-parent');
@@ -162,6 +176,29 @@ window.egovExt = window.egovExt || {};
         if (!ext.isTOCInteracting) {
           activeLink.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
         }
+      }
+    };
+
+    // IntersectionObserverで監視
+    ext.scrollSpyObserver = new IntersectionObserver((entries) => {
+      if (!ext.settings.global || !ext.settings.scrollspy) return;
+      
+      let changed = false;
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          activeElements.add(entry.target);
+          changed = true;
+        } else {
+          activeElements.delete(entry.target);
+          changed = true;
+        }
+      });
+      
+      if (!changed || activeElements.size === 0) return;
+
+      // requestAnimationFrame で描画フレームごとに1回のみ実行（スクロール時の同期レイアウトを完全抑止）
+      if (!ext.scrollSpyRafId) {
+        ext.scrollSpyRafId = raf(updateActiveSpy);
       }
     }, {
       rootMargin: "-10% 0px -50% 0px"

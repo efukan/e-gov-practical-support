@@ -178,11 +178,12 @@ window.egovExt = window.egovExt || {};
 
       /**
        * ツールチップを表示する。showDelay 経過後に実際の表示が行われる。
+       * 遅延評価（Lazy Resolution）に対応し、content に関数を渡すと表示確定時に初めて実行される。
        * @param {HTMLElement} anchor - 基準となる要素
-       * @param {Node} content - 表示する内容（DOMノード）
+       * @param {Node|Function} contentOrResolver - 表示する内容（DOMノード）または内容を返す関数
        * @param {boolean} [immediate=false] - true ならディレイ無しで即表示
        */
-      show(anchor, content, immediate = false) {
+      show(anchor, contentOrResolver, immediate = false) {
         clearTimers();
 
         // 同じアンカーで既に表示中なら中身の作り直しはしない
@@ -190,6 +191,25 @@ window.egovExt = window.egovExt || {};
 
         const render = () => {
           showTimer = null;
+
+          // 遅延評価: 実際に表示する直前までDOM構築やAPIリクエストを一切行わない
+          let resolvedContent = contentOrResolver;
+          if (typeof contentOrResolver === 'function') {
+            try {
+              resolvedContent = contentOrResolver();
+            } catch (err) {
+              console.error("egov-ext: Error resolving tooltip content:", err);
+              resolvedContent = null;
+            }
+          }
+
+          if (!resolvedContent) {
+            // 表示するものが無い要素だった場合、直前の表示が残り続けないよう閉じる
+            if (currentAnchor && currentAnchor !== anchor) {
+              instance.hide();
+            }
+            return;
+          }
 
           // 他のツールチップが開いていれば閉じる（自分・祖先・子孫は閉じる対象から除外）
           instances.forEach(other => {
@@ -207,7 +227,7 @@ window.egovExt = window.egovExt || {};
           });
 
           scroller.textContent = '';
-          scroller.appendChild(content);
+          scroller.appendChild(resolvedContent);
           scroller.scrollTop = 0;
 
           currentAnchor = anchor;
@@ -375,17 +395,21 @@ window.egovExt = window.egovExt || {};
      * @param {boolean} immediate - キーボードフォーカス時などディレイ無しで開くか
      */
     function openFor(binding, anchor, immediate) {
-      const content = binding.resolveContent(anchor);
-      if (!content) {
-        // 表示するものが無い要素（他法令へのリンク等）にマウスが移った場合、
-        // 直前の表示が残り続けないよう閉じる
-        if (binding.tooltip.anchor && binding.tooltip.anchor !== anchor) {
-          binding.tooltip.hide();
-        }
-        return;
-      }
       ext.attachTooltip(binding.tooltip);
-      binding.tooltip.show(anchor, content, immediate);
+      // 遅延評価（Lazy Content Resolution）:
+      // immediate（キーボード等）以外は、ホバー遅延タイマー完了時に初めて resolveContent を呼び出す
+      if (immediate) {
+        const content = binding.resolveContent(anchor);
+        if (!content) {
+          if (binding.tooltip.anchor && binding.tooltip.anchor !== anchor) {
+            binding.tooltip.hide(true);
+          }
+          return;
+        }
+        binding.tooltip.show(anchor, content, true);
+      } else {
+        binding.tooltip.show(anchor, () => binding.resolveContent(anchor), false);
+      }
     }
 
     document.body.addEventListener('mouseover', (e) => {

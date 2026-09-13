@@ -114,8 +114,8 @@ async function main() {
 
   const settingKeys = Object.keys(defaultSettings);
 
-  runTest('DEFAULT_SETTINGS に10個の全機能キーが定義されていること', () => {
-    const expectedKeys = ['global', 'scrollspy', 'popup', 'definition', 'newtab', 'dim', 'jump', 'horizontal', 'fastrender', 'citation'];
+  runTest('DEFAULT_SETTINGS に11個の全機能キーが定義されていること', () => {
+    const expectedKeys = ['global', 'scrollspy', 'popup', 'definition', 'newtab', 'dim', 'jump', 'horizontal', 'conjunction', 'fastrender', 'citation'];
     assert.strictEqual(settingKeys.length, expectedKeys.length);
     expectedKeys.forEach(k => assert(settingKeys.includes(k), `キー '${k}' が DEFAULT_SETTINGS に存在する`));
   });

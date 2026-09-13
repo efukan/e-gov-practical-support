@@ -476,6 +476,66 @@ body .egov-definition-word:focus-visible {
   background-color: rgba(0, 105, 92, 0.1) !important;
 }
 
+/* ----- 6.5. 接続詞の色分け（又は・若しくは・並びに・及び） ----- */
+body .egov-conjunction,
+body div .egov-conjunction,
+body span.egov-conjunction,
+.LawBody .egov-conjunction,
+.main-content .egov-conjunction {
+  display: inline !important;
+  text-underline-offset: 3px !important;
+}
+
+/* 並列：並びに（大グループ・青・太字・太下線） */
+body .egov-conjunction-and-major,
+body div .egov-conjunction-and-major,
+.LawBody .egov-conjunction-and-major {
+  color: #0b57d0 !important;
+  font-weight: 700 !important;
+  text-decoration: underline solid #0b57d0 !important;
+  text-decoration-thickness: 2px !important;
+}
+
+/* 並列：及び（小グループ・青・通常・細下線） */
+body .egov-conjunction-and-minor,
+body div .egov-conjunction-and-minor,
+.LawBody .egov-conjunction-and-minor {
+  color: #0b57d0 !important;
+  font-weight: normal !important;
+  text-decoration: underline solid #0b57d0 !important;
+  text-decoration-thickness: 1px !important;
+}
+
+/* 選択：又は（大グループ・赤・太字・太下線） */
+body .egov-conjunction-or-major,
+body div .egov-conjunction-or-major,
+.LawBody .egov-conjunction-or-major {
+  color: #b3261e !important;
+  font-weight: 700 !important;
+  text-decoration: underline solid #b3261e !important;
+  text-decoration-thickness: 2px !important;
+}
+
+/* 選択：若しくは（小グループ・赤・通常・細下線） */
+body .egov-conjunction-or-minor,
+body div .egov-conjunction-or-minor,
+.LawBody .egov-conjunction-or-minor {
+  color: #b3261e !important;
+  font-weight: normal !important;
+  text-decoration: underline solid #b3261e !important;
+  text-decoration-thickness: 1px !important;
+}
+
+/* 括弧書きの薄字化（dimmed-text）と接続詞が入れ子になった場合でも、接続詞の色分けを維持する */
+body.egov-ext-dim-active .egov-ext-dimmed-text .egov-conjunction-and-major,
+body.egov-ext-dim-active .egov-ext-dimmed-text .egov-conjunction-and-minor {
+  color: #0b57d0 !important;
+}
+body.egov-ext-dim-active .egov-ext-dimmed-text .egov-conjunction-or-major,
+body.egov-ext-dim-active .egov-ext-dimmed-text .egov-conjunction-or-minor {
+  color: #b3261e !important;
+}
+
 /* ----- 7. レンダリングの高速化 (Fast Rendering for Massive DOMs) ----- */
 body.egov-fastrender-enabled ._div_Article, 
 body.egov-fastrender-enabled .Article,

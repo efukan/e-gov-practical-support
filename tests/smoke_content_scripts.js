@@ -99,7 +99,7 @@ function check(name, fn) {
 }
 
 console.log('\n--- ユーティリティ ---');
-check('DEFAULT_SETTINGS に10キー', () => Object.keys(ext.DEFAULT_SETTINGS).length === 10);
+check('DEFAULT_SETTINGS に11キー', () => Object.keys(ext.DEFAULT_SETTINGS).length === 11);
 check('getLawIdFromUrl (パス形式)', () => ext.getLawIdFromUrl('https://laws.e-gov.go.jp/law/415AC0000000057') === '415AC0000000057');
 check('getLawIdFromUrl (小文字クエリ)', () => ext.getLawIdFromUrl('https://laws.e-gov.go.jp/document?lawid=321constitution') === '321CONSTITUTION');
 check('getLawIdFromUrl (大文字クエリ)', () => ext.getLawIdFromUrl('https://laws.e-gov.go.jp/document?lawId=321CONSTITUTION') === '321CONSTITUTION');

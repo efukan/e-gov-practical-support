@@ -1036,6 +1036,91 @@ async function check(name, fn) {
     return '同期処理と非同期処理の完全整合';
   });
 
+  // ==========================================
+  // 6. 接続詞色分けハイライト（conjunction）の相互作用テスト
+  // ==========================================
+  console.log('\n--- 6. 接続詞色分けハイライト（並びに・及び・又は・若しくは）の検証 ---');
+
+  await check('接続詞の検出と階層クラス付与: 並びに(大)・及び(小)・又は(大)・若しくは(小)', async () => {
+    const testHtml = `
+      <div class="LawBody">
+        <div class="_div_Article" id="Mp-At_1">
+          <div class="_div_ParagraphSentence">都市計画の内容及びその決定手続を定める。健康で文化的な都市生活及び機能的な都市活動を確保すべきこと並びに適正な制限のもとに土地を利用する。公害の防止又は環境の保全を図るため、市町村若しくは都道府県が措置を講ずる。</div>
+        </div>
+      </div>
+    `;
+    const { dom, ext } = await createTestEnv(testHtml);
+    ext.settings = { global: true, conjunction: true };
+
+    ext.enableConjunctionHighlight();
+
+    const sentence = dom.window.document.querySelector('._div_ParagraphSentence');
+    const andMajor = sentence.querySelectorAll('.egov-conjunction-and-major');
+    const andMinor = sentence.querySelectorAll('.egov-conjunction-and-minor');
+    const orMajor = sentence.querySelectorAll('.egov-conjunction-or-major');
+    const orMinor = sentence.querySelectorAll('.egov-conjunction-or-minor');
+
+    if (andMajor.length !== 1 || andMajor[0].textContent !== '並びに') return false;
+    if (andMinor.length !== 2 || andMinor[0].textContent !== '及び' || andMinor[1].textContent !== '及び') return false;
+    if (orMajor.length !== 1 || orMajor[0].textContent !== '又は') return false;
+    if (orMinor.length !== 1 || orMinor[0].textContent !== '若しくは') return false;
+
+    return `全4種正常検出 (並びに: ${andMajor.length}, 及び: ${andMinor.length}, 又は: ${orMajor.length}, 若しくは: ${orMinor.length})`;
+  });
+
+  await check('重複実行（冪等性）: 3回連続実行でも二重ラップされないこと', async () => {
+    const testHtml = `
+      <div class="LawBody">
+        <div class="_div_Article" id="Mp-At_1">
+          <div class="_div_ParagraphSentence">国及び地方公共団体は、公害の防止又は環境の保全を図る。</div>
+        </div>
+      </div>
+    `;
+    const { dom, ext } = await createTestEnv(testHtml);
+    ext.settings = { global: true, conjunction: true };
+
+    ext.enableConjunctionHighlight();
+    const html1 = dom.window.document.querySelector('._div_ParagraphSentence').innerHTML;
+
+    ext.enableConjunctionHighlight();
+    const html2 = dom.window.document.querySelector('._div_ParagraphSentence').innerHTML;
+
+    ext.enableConjunctionHighlight();
+    const html3 = dom.window.document.querySelector('._div_ParagraphSentence').innerHTML;
+
+    if (html1 !== html2 || html2 !== html3) return false;
+    const nested = dom.window.document.querySelectorAll('.egov-conjunction .egov-conjunction');
+    if (nested.length > 0) return false;
+
+    return '3回連続実行で完全一致・二重ラップなし';
+  });
+
+  await check('複合共存: 括弧書き薄字化と接続詞ハイライトの両立', async () => {
+    const testHtml = `
+      <div class="LawBody">
+        <div class="_div_Article" id="Mp-At_1">
+          <div class="_div_ParagraphSentence">基本原則（国及び地方公共団体並びに事業者が遵守すべき事項に限る。）を定める。</div>
+        </div>
+      </div>
+    `;
+    const { dom, ext } = await createTestEnv(testHtml);
+    ext.settings = { global: true, dim: true, conjunction: true };
+
+    ext.enableDimParentheses();
+    ext.enableConjunctionHighlight();
+
+    const sentence = dom.window.document.querySelector('._div_ParagraphSentence');
+    const dimmed = sentence.querySelector('.egov-ext-dimmed-text');
+    if (!dimmed) return false;
+
+    const insideAndMinor = dimmed.querySelector('.egov-conjunction-and-minor');
+    const insideAndMajor = dimmed.querySelector('.egov-conjunction-and-major');
+    if (!insideAndMinor || insideAndMinor.textContent !== '及び') return false;
+    if (!insideAndMajor || insideAndMajor.textContent !== '並びに') return false;
+
+    return '薄字化括弧内の接続詞が正しく共存ラップされること確認';
+  });
+
   console.log('\n==========================================');
   if (failures === 0) {
     console.log('🎉 全ての相互作用・順序・重複検証テストに成功しました！');

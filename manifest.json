@@ -40,6 +40,7 @@
         "js/tooltip.js",
         "js/horizontal.js",
         "js/dim.js",
+        "js/conjunction.js",
         "js/scrollspy.js",
         "js/citation.js",
         "js/refer_popup.js",

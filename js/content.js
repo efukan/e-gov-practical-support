@@ -104,6 +104,7 @@ window.egovExt = window.egovExt || {};
       observedRootsSet.clear();
 
       if (ext.disableDefinitionHighlighting) ext.disableDefinitionHighlighting();
+      if (ext.disableConjunctionHighlight) ext.disableConjunctionHighlight();
       if (ext.disableDimParentheses) ext.disableDimParentheses();
       if (ext.removeHorizontalConversion) ext.removeHorizontalConversion();
       // 3機能の書き換えをまとめて1回だけ巻き戻す
@@ -389,6 +390,14 @@ window.egovExt = window.egovExt || {};
                 console.error("egov-ext: Error enabling sync dim parentheses:", e);
               }
             }
+            // 接続詞の色分け (同期的)
+            if (ext.settings.global && ext.settings.conjunction && ext.enableConjunctionHighlight) {
+              try {
+                ext.enableConjunctionHighlight(node);
+              } catch (e) {
+                console.error("egov-ext: Error enabling sync conjunction highlight:", e);
+              }
+            }
             // 定義語ホバー辞書＆ハイライト (同期的)
             if (ext.settings.global && ext.settings.definition && ext.enableDefinitionHighlighting) {
               try {
@@ -513,6 +522,12 @@ window.egovExt = window.egovExt || {};
       }
 
       try {
+        if (ext.disableConjunctionHighlight) ext.disableConjunctionHighlight();
+      } catch (e) {
+        console.error("egov-ext: Error disabling conjunction highlight:", e);
+      }
+
+      try {
         if (ext.disableDimParentheses) ext.disableDimParentheses();
       } catch (e) {
         console.error("egov-ext: Error disabling dim parentheses:", e);
@@ -554,6 +569,15 @@ window.egovExt = window.egovExt || {};
         ext.enableDimParentheses();
       } catch (e) {
         console.error("egov-ext: Error enabling dim parentheses:", e);
+      }
+    }
+
+    // 接続詞の色分け（又は・若しくは・並びに・及び）
+    if (ext.settings.conjunction && isLawPage && ext.enableConjunctionHighlight) {
+      try {
+        ext.enableConjunctionHighlight();
+      } catch (e) {
+        console.error("egov-ext: Error enabling conjunction highlight:", e);
       }
     }
     

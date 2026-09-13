@@ -33,6 +33,7 @@ window.egovExt = window.egovExt || {};
     dim: true,
     jump: true,
     horizontal: true,
+    conjunction: true,
     fastrender: true,
     citation: true
   });

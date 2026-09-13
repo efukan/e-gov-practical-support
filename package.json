@@ -7,7 +7,8 @@
   },
   "scripts": {
     "test": "node tests/smoke_content_scripts.js && node tests/test_tooltip_position.js && node tests/test_law_patterns.js && node tests/test_interactions.js && node tests/test_extension_integrity.js",
-    "generate-icons": "node scripts/generate_icons.js"
+    "generate-icons": "node scripts/generate_icons.js",
+    "generate-promos": "node scripts/generate_promo.js"
   },
   "keywords": [],
   "author": "",

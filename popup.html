@@ -12,7 +12,10 @@
         <div class="logo-icon">
           <img src="icons/icon.svg" alt="logo">
         </div>
-        <h1>e-Gov法令ひもとき</h1>
+        <div class="header-text">
+          <h1>e-Gov法令ひもとき</h1>
+          <span class="version-tag">v2.1</span>
+        </div>
       </div>
     </header>
 
@@ -25,7 +28,7 @@
           </svg>
         </div>
         <div class="card-content">
-          <span class="label">機能の有効化</span>
+          <span class="label">拡張機能の有効化</span>
         </div>
       </div>
       <label class="switch">
@@ -37,9 +40,9 @@
     <!-- レイアウト調整セクション -->
     <section class="section-group">
       <h2 class="section-title">レイアウト調整</h2>
-      <div class="settings-list">
+      <div class="settings-grid">
         
-        <div class="setting-card">
+        <div class="setting-card" title="漢数字（第一条、千二百など）を算用数字に変換して横書き表示">
           <div class="card-left">
             <div class="card-icon-container">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -49,7 +52,7 @@
                 <path d="M16 14v4" />
               </svg>
             </div>
-            <span class="label">横書き表記変換</span>
+            <span class="label">横書き数字変換</span>
           </div>
           <label class="switch">
             <input type="checkbox" id="feature-horizontal" checked>
@@ -57,7 +60,7 @@
           </label>
         </div>
 
-        <div class="setting-card">
+        <div class="setting-card" title="長大な括弧書き（注記）を薄いグレーで表示し本文の骨格を強調">
           <div class="card-left">
             <div class="card-icon-container">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -66,7 +69,7 @@
                 <path d="M16 5a9 9 0 0 1 0 14" stroke-width="2.5" stroke-dasharray="1 1.5" opacity="0.6" />
               </svg>
             </div>
-            <span class="label">括弧書き薄字化</span>
+            <span class="label">括弧の薄字化</span>
           </div>
           <label class="switch">
             <input type="checkbox" id="feature-dim" checked>
@@ -74,7 +77,7 @@
           </label>
         </div>
 
-        <div class="setting-card">
+        <div class="setting-card" title="スクロール位置に合わせて左側目次の現在地をリアルタイム強調">
           <div class="card-left">
             <div class="card-icon-container">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -85,7 +88,7 @@
                 <path d="M10 18h11" opacity="0.5" />
               </svg>
             </div>
-            <span class="label">目次連動ハイライト</span>
+            <span class="label">目次の自動追従</span>
           </div>
           <label class="switch">
             <input type="checkbox" id="feature-scrollspy" checked>
@@ -93,7 +96,7 @@
           </label>
         </div>
 
-        <div class="setting-card">
+        <div class="setting-card" title="並列（並びに/及び）と選択（又は/若しくは）の重要接続詞を色分け">
           <div class="card-left">
             <div class="card-icon-container">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -118,9 +121,9 @@
     <!-- 実務支援ツールセクション -->
     <section class="section-group">
       <h2 class="section-title">実務支援ツール</h2>
-      <div class="settings-list">
+      <div class="settings-grid">
         
-        <div class="setting-card">
+        <div class="setting-card" title="本法令および他法令への参照条文にホバーするとその場で本文プレビュー表示">
           <div class="card-left">
             <div class="card-icon-container">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -129,7 +132,7 @@
                 <path d="M7 7h10M7 11h6" opacity="0.6" />
               </svg>
             </div>
-            <span class="label">参照条文ポップアップ</span>
+            <span class="label">参照条文ポップ</span>
           </div>
           <label class="switch">
             <input type="checkbox" id="feature-popup" checked>
@@ -137,7 +140,7 @@
           </label>
         </div>
 
-        <div class="setting-card">
+        <div class="setting-card" title="法令内で定義された用語に下線を引き、ホバー時に定義条文を表示">
           <div class="card-left">
             <div class="card-icon-container">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -154,7 +157,7 @@
           </label>
         </div>
 
-        <div class="setting-card">
+        <div class="setting-card" title="画面右上の入力窓から指定条文へ一瞬で滑らかにスクロール移動">
           <div class="card-left">
             <div class="card-icon-container">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -171,7 +174,7 @@
           </label>
         </div>
 
-        <div class="setting-card">
+        <div class="setting-card" title="他法令へのリンクをクリックした際、現在の画面を維持して新しいタブで開く">
           <div class="card-left">
             <div class="card-icon-container">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -180,7 +183,7 @@
                 <line x1="10" y1="14" x2="21" y2="3" />
               </svg>
             </div>
-            <span class="label">別タブで開く</span>
+            <span class="label">他法令を別タブで</span>
           </div>
           <label class="switch">
             <input type="checkbox" id="feature-newtab" checked>
@@ -188,7 +191,7 @@
           </label>
         </div>
 
-        <div class="setting-card">
+        <div class="setting-card" title="画面外の未表示要素の描画負荷を軽減し初期表示とスクロールを高速化">
           <div class="card-left">
             <div class="card-icon-container">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -203,7 +206,7 @@
           </label>
         </div>
 
-        <div class="setting-card">
+        <div class="setting-card" title="各条文タイトルの横に引用ボタンを配置し他法令からの被引用一覧を表示">
           <div class="card-left">
             <div class="card-icon-container">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -211,7 +214,7 @@
                 <path d="M12 7v5M12 15h.01" stroke-width="2.5" stroke-linecap="round" />
               </svg>
             </div>
-            <span class="label">被引用（引用元）表示</span>
+            <span class="label">被引用条文の表示</span>
           </div>
           <label class="switch">
             <input type="checkbox" id="feature-citation" checked>

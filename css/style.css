@@ -226,6 +226,16 @@
   visibility: hidden !important;
 }
 
+/* プレビュー内で指定された項・号の視認性向上ハイライト */
+.egov-ext-preview-paragraph--target,
+.egov-ext-preview-item--target {
+  background-color: rgba(16, 66, 164, 0.07) !important;
+  border-left: 3px solid #1042a4 !important;
+  padding-left: 6px !important;
+  border-radius: 2px !important;
+  margin: 4px 0 !important;
+}
+
 
 /* アニメーションを抑制する設定のユーザーには動きを出さない */
 @media (prefers-reduced-motion: reduce) {

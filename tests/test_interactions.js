@@ -1121,6 +1121,96 @@ async function check(name, fn) {
     return '薄字化括弧内の接続詞が正しく共存ラップされること確認';
   });
 
+  console.log('\n--- 7. 他法令リンクプレビューにおける項・号指定の特定・ハイライト検証 ---');
+
+  await check('他法令リンク解析: 法令番号括弧・全角数字を含む条項号パスの正確な分離', async () => {
+    const { ext } = await createTestEnv('<div class="LawBody"></div>');
+    // dummy link
+    const dummyA = { textContent: '特定非営利活動促進法（平成１０年法律第７号）第２条第２項' };
+    const dummyB = { textContent: '会社法（平成十七年法律第八十六号）第四百二十三条第一項' };
+    const dummyC = { textContent: '第２条第２項' };
+
+    // テスト用の parseLawLinkText 実行
+    const parsedA = ext.parseLawLinkText ? ext.parseLawLinkText(dummyA, '410AC1000000007', 'Mp-At_2-Pr_2') : null;
+    const parsedB = ext.parseLawLinkText ? ext.parseLawLinkText(dummyB, '417AC0000000086', 'Mp-At_423-Pr_1') : null;
+    const parsedC = ext.parseLawLinkText ? ext.parseLawLinkText(dummyC, '410AC1000000007', 'Mp-At_2-Pr_2') : null;
+
+    if (!parsedA || parsedA.lawName !== '特定非営利活動促進法（平成１０年法律第７号）' || parsedA.path !== '第２条第２項') {
+      return false;
+    }
+    if (!parsedB || parsedB.lawName !== '会社法（平成十七年法律第八十六号）' || parsedB.path !== '第四百二十三条第一項') {
+      return false;
+    }
+    if (!parsedC || parsedC.path !== '第２条第２項') {
+      return false;
+    }
+    return '全角数字・法令番号括弧付きリンクの法令名・条項号パス完全分離確認';
+  });
+
+  await check('findTargetArticle: 項（-Pr_...）や号（-It_...）付きobjectIdにおける目的条文の正確な特定', async () => {
+    const { ext } = await createTestEnv('<div class="LawBody"></div>');
+    const mockInyoArray = [
+      { ObjectId: '#TOC', Type: 'TOC', Content: {} },
+      { ObjectId: '#Mp-Ch_1', Type: 'Chapter', Content: {} },
+      { ObjectId: '#Mp-Ch_1-At_1', Type: 'Article', Content: { ArticleTitle: '第一条', Paragraph: [{ ParagraphNum: '', ParagraphSentence: {} }] } },
+      { ObjectId: '#Mp-Ch_1-At_2', Type: 'Article', Content: { ArticleTitle: '第二条', Paragraph: [{ ParagraphNum: '', ParagraphSentence: {} }, { ParagraphNum: '２', ParagraphSentence: {} }] } },
+      { ObjectId: '#Mp-Ch_2-At_14_3', Type: 'Article', Content: { ArticleTitle: '第十四条の三', Paragraph: [{ ParagraphNum: '', ParagraphSentence: {} }] } }
+    ];
+
+    // 1. 第2条第2項 (Mp-At_2-Pr_2) の指定時 -> 第一条ではなく第二条がヒットすること
+    const targetA = ext.findTargetArticle(mockInyoArray, 'Mp-At_2-Pr_2', '第２条第２項');
+    if (!targetA || targetA.ObjectId !== '#Mp-Ch_1-At_2') {
+      return false;
+    }
+
+    // 2. 枝番号・号付き (Mp-At_14_3-Pr_1-It_2) の指定時 -> 第14条の3がヒットすること
+    const targetB = ext.findTargetArticle(mockInyoArray, 'Mp-At_14_3-Pr_1-It_2', '');
+    if (!targetB || targetB.ObjectId !== '#Mp-Ch_2-At_14_3') {
+      return false;
+    }
+
+    // 3. XML探索側 findTargetArticleNodeInXml の検証
+    const mockXmlStr = `
+      <Law>
+        <MainProvision>
+          <Article Num="1"><ArticleTitle>第一条</ArticleTitle></Article>
+          <Article Num="2"><ArticleTitle>第二条</ArticleTitle></Article>
+          <Article Num="14_3"><ArticleTitle>第十四条の三</ArticleTitle></Article>
+        </MainProvision>
+      </Law>
+    `;
+    const { DOMParser } = require('jsdom').JSDOM ? new (require('jsdom').JSDOM)().window : window;
+    const xmlDoc = new DOMParser().parseFromString(mockXmlStr, 'text/xml');
+    const xmlNodeA = ext.findTargetArticleNodeInXml(xmlDoc, 'Mp-At_2-Pr_2', '第２条第２項');
+    if (!xmlNodeA || xmlNodeA.getAttribute('Num') !== '2') {
+      return false;
+    }
+
+    return '項・号付きobjectIdおよび枝番号の正確な条文ノード特定（第一条誤認の完全解消）確認';
+  });
+
+  await check('renderArticlePreview: 指定された項（Paragraph）へのターゲットハイライト付与', async () => {
+    const { ext } = await createTestEnv('<div class="LawBody"></div>');
+    const content = {
+      LawTitle: '特定非営利活動促進法',
+      ArticleTitle: '第二条',
+      Paragraph: [
+        { ParagraphNum: '', ParagraphSentence: { Sentence: [{ '#text': '第1項本文' }] } },
+        { ParagraphNum: '２', ParagraphSentence: { Sentence: [{ '#text': '第2項本文' }] } },
+        { ParagraphNum: '３', ParagraphSentence: { Sentence: [{ '#text': '第3項本文' }] } }
+      ]
+    };
+
+    const dom = ext.renderArticlePreview(content, [], '特定非営利活動促進法', '第２条第２項', 'https://laws.e-gov.go.jp', 'Mp-At_2-Pr_2');
+    if (!dom) return false;
+
+    const targetParas = dom.querySelectorAll('.egov-ext-preview-paragraph--target');
+    if (targetParas.length !== 1) return false;
+    if (!targetParas[0].textContent.includes('第2項本文')) return false;
+
+    return '指定項（第2項）への視覚的ハイライトクラスの正確な付与確認';
+  });
+
   console.log('\n==========================================');
   if (failures === 0) {
     console.log('🎉 全ての相互作用・順序・重複検証テストに成功しました！');

@@ -609,23 +609,40 @@ window.egovExt = window.egovExt || {};
     if (!xmlDoc) return null;
 
     // 1. objectId から条番号（Num属性）を抽出して照合
-    // 例: "Mp-At_4" -> "4", "Mp-At_1_2" -> "1_2", "Mp-Ch_3-At_20" -> "20"
-    const atMatch = (objectId || '').match(/At_([0-9_]+)/);
+    // 項（-Pr_...）や号（-It_...）が付いていても確実に条番号のみを抽出
+    // 例: "Mp-At_4-Pr_2" -> "4", "Mp-At_1_2" -> "1_2", "Mp-Ch_3-At_20" -> "20"
+    const atMatch = (objectId || '').match(/(?:^|[-_])At_([0-9]+(?:_[0-9]+)*)/);
     if (atMatch) {
       const numAttr = atMatch[1];
+      const isSp = (objectId || '').includes('Sp');
+
+      // 附則か本則かでスコープを優先
+      if (isSp) {
+        const spArticle = xmlDoc.querySelector(`SupplProvision Article[Num="${numAttr}"]`);
+        if (spArticle) return spArticle;
+      } else {
+        const mpArticle = xmlDoc.querySelector(`MainProvision Article[Num="${numAttr}"]`);
+        if (mpArticle) return mpArticle;
+      }
+
       const target = xmlDoc.querySelector(`Article[Num="${numAttr}"]`);
       if (target) return target;
     }
 
-    // 2. path（例: "第四条", "第一条の二" など）から ArticleTitle のテキスト照合
+    // 2. path（例: "第四条", "第２条第２項", "第一条の二" など）から ArticleTitle のテキスト照合
     const cleanPath = (path || '').trim();
     if (cleanPath) {
+      const pathAtMatch = cleanPath.match(/第([0-9０-９一二三四五六七八九十百千万]+)条((?:の[0-9０-９一二三四五六七八九十百千万]+)*)/);
+      const kanjiTitle = pathAtMatch && ext.arabicToKanji
+        ? '第' + ext.arabicToKanji(pathAtMatch[1]) + '条' + (pathAtMatch[2] ? pathAtMatch[2].replace(/[0-9０-９]+/g, d => ext.arabicToKanji(d)) : '')
+        : null;
+
       const articles = xmlDoc.querySelectorAll('Article');
       for (let i = 0; i < articles.length; i++) {
         const titleEl = articles[i].querySelector(':scope > ArticleTitle');
         if (titleEl) {
           const tText = titleEl.textContent.trim();
-          if (tText === cleanPath || cleanPath.includes(tText) || tText.includes(cleanPath)) {
+          if (tText === cleanPath || (kanjiTitle && tText === kanjiTitle) || cleanPath.includes(tText) || tText.includes(cleanPath)) {
             return articles[i];
           }
         }
@@ -792,7 +809,7 @@ window.egovExt = window.egovExt || {};
     if (!content) return null;
 
     const highlightTerms = extractHighlightTerms(parentTitle);
-    return renderArticlePreview(content, highlightTerms, lawName, path, targetUrl);
+    return renderArticlePreview(content, highlightTerms, lawName, path, targetUrl, objectId);
   }
 
   /**
@@ -838,7 +855,7 @@ window.egovExt = window.egovExt || {};
                   target.Content.LawTitle = inyoTextData.LawTitle;
                 }
                 const highlightTerms = extractHighlightTerms(parentTitle);
-                return renderArticlePreview(target.Content, highlightTerms, lawName, path, targetUrl);
+                return renderArticlePreview(target.Content, highlightTerms, lawName, path, targetUrl, objectId);
               }
             }
           }
@@ -881,36 +898,99 @@ window.egovExt = window.egovExt || {};
     });
     if (target && target.Content) return target;
 
-    // 2. 階層ObjectId（#Mp-Ch_3-At_20, #Sp-At_1 など）の後方一致
-    target = inyoArray.find(x => {
-      const xId = (x.ObjectId || '').replace(/^#/, '');
-      return xId.endsWith('-' + cleanId) || (cleanId.startsWith('Mp-') && xId.endsWith(cleanId.slice(3))) || (cleanId.startsWith('Sp-') && xId.endsWith(cleanId.slice(3)));
-    });
+    // 2. 項（-Pr_...）や号（-It_...）を取り除いた条レベルのベースIDでの照合
+    // 例: "Mp-At_2-Pr_2" -> "Mp-At_2", "Mp-Ch_1-At_2-Pr_2" -> "Mp-Ch_1-At_2"
+    const baseId = cleanId.replace(/-(?:Pr|It|Subit)_[0-9_].*$/, '');
+    if (baseId && baseId !== cleanId) {
+      target = inyoArray.find(x => {
+        const xId = (x.ObjectId || '').replace(/^#/, '');
+        return xId === baseId;
+      });
+      if (target && target.Content) return target;
+    }
+
+    // 3. 階層ObjectId（#Mp-Ch_3-At_20, #Sp-At_1 など）の後方一致（baseId も対象）
+    const candidateIds = [cleanId, baseId].filter(Boolean);
+    for (const cId of candidateIds) {
+      target = inyoArray.find(x => {
+        const xId = (x.ObjectId || '').replace(/^#/, '');
+        return xId.endsWith('-' + cId) ||
+               (cId.startsWith('Mp-') && xId.endsWith(cId.slice(3))) ||
+               (cId.startsWith('Sp-') && xId.endsWith(cId.slice(3)));
+      });
+      if (target && target.Content) return target;
+    }
+
+    // 4. 条番号識別子（At_...）と 本則(Mp)/附則(Sp) 区分による直接照合
+    // 例: cleanId="Mp-At_2-Pr_2" -> atPart="At_2", isSp=false
+    //     xId="Mp-Ch_1-At_2" -> atPart="At_2", isSp=false => 一致！
+    const atMatch = cleanId.match(/(?:^|[-_])(At_[0-9]+(?:_[0-9]+)*)/);
+    if (atMatch) {
+      const atPart = atMatch[1];
+      const isSp = cleanId.includes('Sp');
+
+      // 本則/附則の一致を優先して探索
+      target = inyoArray.find(x => {
+        const xId = (x.ObjectId || '').replace(/^#/, '');
+        const xAtMatch = xId.match(/(?:^|[-_])(At_[0-9]+(?:_[0-9]+)*)/);
+        const xIsSp = xId.includes('Sp');
+        return xAtMatch && xAtMatch[1] === atPart && xIsSp === isSp && x.Content;
+      });
+      if (target && target.Content) return target;
+
+      // 本則/附則問わず atPart が一致する Article を探索
+      target = inyoArray.find(x => {
+        const xId = (x.ObjectId || '').replace(/^#/, '');
+        const xAtMatch = xId.match(/(?:^|[-_])(At_[0-9]+(?:_[0-9]+)*)/);
+        return xAtMatch && xAtMatch[1] === atPart && x.Content;
+      });
+      if (target && target.Content) return target;
+    }
+
+    // 5. path による照合
+    const cleanPath = (path || '').trim();
+    if (cleanPath) {
+      // 5.1 ArticleTitle と完全一致（例: "第二十条" === "第二十条"）
+      target = inyoArray.find(x => x.Content && x.Content.ArticleTitle && x.Content.ArticleTitle === cleanPath);
+      if (target && target.Content) return target;
+
+      // 5.2 cleanPath に含まれる「第X条...」を抽出して照合
+      // 例: cleanPath が "第２条第２項" や "第二条第二項" の場合 -> "第二条" または "第2条"
+      const pathAtMatch = cleanPath.match(/第([0-9０-９一二三四五六七八九十百千万]+)条((?:の[0-9０-９一二三四五六七八九十百千万]+)*)/);
+      if (pathAtMatch) {
+        const kanjiPart = ext.arabicToKanji
+          ? '第' + ext.arabicToKanji(pathAtMatch[1]) + '条' + (pathAtMatch[2] ? pathAtMatch[2].replace(/[0-9０-９]+/g, d => ext.arabicToKanji(d)) : '')
+          : null;
+
+        target = inyoArray.find(x => {
+          const title = x.Content?.ArticleTitle;
+          if (!title) return false;
+          if (kanjiPart && title === kanjiPart) return true;
+          return cleanPath.includes(title) || title.includes(pathAtMatch[0]);
+        });
+        if (target && target.Content) return target;
+      }
+
+      // 5.3 path が ArticleTitle を含む場合（例: "第二十条第一項" と "第二十条"）
+      target = inyoArray.find(x => {
+        const type = x.type || x.Type;
+        return type === 'Article' && x.Content?.ArticleTitle && cleanPath.includes(x.Content.ArticleTitle);
+      });
+      if (target && target.Content) return target;
+    }
+
+    // 6. 単文法令（条文番号がなく本則・項が直接書かれている法令）のフォールバック
+    target = inyoArray.find(x => x.Content && (x.Content.Paragraph || x.Content.ParagraphSentence));
     if (target && target.Content) return target;
 
-    // 3. ArticleTitle と path の完全一致（例: "第二十条" === "第二十条"）
-    target = inyoArray.find(x => x.Content && x.Content.ArticleTitle && x.Content.ArticleTitle === path);
-    if (target && target.Content) return target;
-
-    // 4. path が ArticleTitle を含む場合（例: "第二十条第一項" と "第二十条"）
-    target = inyoArray.find(x => {
-      const type = x.type || x.Type;
-      return type === 'Article' && path && x.Content?.ArticleTitle && path.includes(x.Content.ArticleTitle);
-    });
-    if (target && target.Content) return target;
-
-    // 5. Article要素の優先フォールバック
+    // 7. Article要素の優先フォールバック
     target = inyoArray.find(x => {
       const type = x.type || x.Type;
       return type === 'Article' && x.Content;
     });
     if (target && target.Content) return target;
 
-    // 6. 単文法令（条文番号がなく本則・項が直接書かれている法令）のフォールバック
-    target = inyoArray.find(x => x.Content && (x.Content.Paragraph || x.Content.ParagraphSentence));
-    if (target && target.Content) return target;
-
-    // 7. 最終フォールバック
+    // 8. 最終フォールバック
     return inyoArray[0] || null;
   }
 
@@ -1105,7 +1185,7 @@ window.egovExt = window.egovExt || {};
   /**
    * 条文構造化JSONからプレビュー用DOM要素を生成
    */
-  function renderArticlePreview(content, terms, lawName, path, targetUrl) {
+  function renderArticlePreview(content, terms, lawName, path, targetUrl, objectId) {
     const container = document.createElement('div');
     container.className = 'egov-ext-preview-container';
 
@@ -1169,14 +1249,45 @@ window.egovExt = window.egovExt || {};
         body.appendChild(title);
       }
 
+      // 目的の項番号・号番号を特定（指定されている場合）
+      let targetPrNum = null;
+      let targetItNum = null;
+      if (objectId) {
+        const prM = objectId.match(/(?:^|[-_])Pr_([0-9]+)/);
+        if (prM) targetPrNum = prM[1];
+        const itM = objectId.match(/(?:^|[-_])It_([0-9]+)/);
+        if (itM) targetItNum = itM[1];
+      }
+      if (!targetPrNum && path) {
+        const pathPrM = path.match(/第([0-9０-９一二三四五六七八九十]+)項/);
+        if (pathPrM) {
+          targetPrNum = ext.kanjiToArabic ? String(ext.kanjiToArabic(pathPrM[1])) : pathPrM[1];
+        }
+      }
+      if (!targetItNum && path) {
+        const pathItM = path.match(/第([0-9０-９一二三四五六七八九十]+)号/);
+        if (pathItM) {
+          targetItNum = ext.kanjiToArabic ? String(ext.kanjiToArabic(pathItM[1])) : pathItM[1];
+        }
+      }
+
       // 項（Paragraph）
       const paragraphs = Array.isArray(content.Paragraph)
         ? content.Paragraph
         : (content.Paragraph ? [content.Paragraph] : (content.ParagraphSentence ? [content] : []));
 
-      for (const p of paragraphs) {
+      for (let pIdx = 0; pIdx < paragraphs.length; pIdx++) {
+        const p = paragraphs[pIdx];
         const pDiv = document.createElement('div');
         pDiv.className = 'egov-ext-preview-paragraph';
+
+        // 目的の項と一致する場合、ハイライトクラスを付与
+        const rawNum = (p['-Num'] || p.ParagraphNum || '').toString().trim();
+        const normPNum = rawNum.replace(/[０-９]/g, s => String.fromCharCode(s.charCodeAt(0) - 0xFEE0));
+        const isTargetPr = targetPrNum && (normPNum === targetPrNum || (targetPrNum === '1' && pIdx === 0 && !normPNum));
+        if (isTargetPr) {
+          pDiv.classList.add('egov-ext-preview-paragraph--target');
+        }
 
         if (p.ParagraphNum && p.ParagraphNum.trim()) {
           const numSpan = document.createElement('span');
@@ -1195,9 +1306,16 @@ window.egovExt = window.egovExt || {};
         // 号（Item）
         if (p.Item) {
           const items = Array.isArray(p.Item) ? p.Item : [p.Item];
-          for (const it of items) {
+          for (let itIdx = 0; itIdx < items.length; itIdx++) {
+            const it = items[itIdx];
             const itemDiv = document.createElement('div');
             itemDiv.className = 'egov-ext-preview-item';
+
+            const rawItNum = (it['-Num'] || '').toString().trim();
+            const normItNum = rawItNum.replace(/[０-９]/g, s => String.fromCharCode(s.charCodeAt(0) - 0xFEE0));
+            if (targetItNum && (normItNum === targetItNum || (targetItNum === String(itIdx + 1)))) {
+              itemDiv.classList.add('egov-ext-preview-item--target');
+            }
 
             if (it.ItemTitle) {
               const itTitle = document.createElement('span');
@@ -1343,6 +1461,8 @@ window.egovExt = window.egovExt || {};
   ext.createLoadingView = createLoadingView;
   ext.createErrorView = createErrorView;
   ext.renderArticlePreview = renderArticlePreview;
+  ext.findTargetArticle = findTargetArticle;
+  ext.findTargetArticleNodeInXml = findTargetArticleNodeInXml;
 
   // テスト検証用に内部関数をエクスポート
   if (typeof process !== 'undefined' && process.env && process.env.NODE_ENV === 'test') {

@@ -152,12 +152,39 @@ window.egovExt = window.egovExt || {};
   const parsedLawLinkCache = new WeakMap();
 
   /**
+   * objectId から条・項・号の表示用パス（例: "第2条第2項"）を生成する
+   * @param {string} objectId
+   * @returns {string}
+   */
+  function formatPathFromObjectId(objectId) {
+    if (!objectId) return '';
+    const parts = [];
+    const atM = objectId.match(/(?:^|[-_])At_([0-9]+(?:_[0-9]+)*)/);
+    if (atM) {
+      const atNums = atM[1].split('_');
+      const main = '第' + atNums[0] + '条';
+      const sub = atNums.slice(1).length ? 'の' + atNums.slice(1).join('の') : '';
+      parts.push(main + sub);
+    }
+    const prM = objectId.match(/(?:^|[-_])Pr_([0-9]+)/);
+    if (prM) {
+      parts.push('第' + prM[1] + '項');
+    }
+    const itM = objectId.match(/(?:^|[-_])It_([0-9]+)/);
+    if (itM) {
+      parts.push('第' + itM[1] + '号');
+    }
+    return parts.join('');
+  }
+
+  /**
    * リンク要素および前後のテキストから法令名と条番号パスを抽出する
    * @param {HTMLAnchorElement} a
    * @param {string} targetLawId
+   * @param {string} [objectId]
    * @returns {{lawName: string, path: string}}
    */
-  function parseLawLinkText(a, targetLawId) {
+  function parseLawLinkText(a, targetLawId, objectId) {
     if (a && typeof a === 'object' && parsedLawLinkCache.has(a)) {
       return parsedLawLinkCache.get(a);
     }
@@ -165,15 +192,16 @@ window.egovExt = window.egovExt || {};
     const rawText = (a.textContent || '').trim();
     let result;
 
-    // 1. "民法第七百九条", "地方自治法第十条第一項" のように法令名と条番号が結合している場合
-    const fullMatch = rawText.match(/^(.+?(?:法|令|規則|府令|省令|憲法|条約|条例|布告|規程))(?:\s*)(第[0-9一二三四五六七八九十百千万]+条.*)?$/);
-    if (fullMatch) {
+    // 1. "民法第七百九条", "特定非営利活動促進法（平成１０年法律第７号）第２条第２項" のように法令名（＋法令番号括弧）と条番号が結合している場合
+    // 全角数字「０-９」および枝番号「の」、法令番号括弧（（平成...号））に対応
+    const fullMatch = rawText.match(/^(.+?(?:法|令|規則|府令|省令|憲法|条約|条例|布告|規程)(?:（[^）]*）|\([^)]*\))?)\s*(第[0-9０-９一二三四五六七八九十百千万]+条.*)?$/);
+    if (fullMatch && (fullMatch[2] || fullMatch[1])) {
       result = {
-        lawName: fullMatch[1],
-        path: fullMatch[2] || ''
+        lawName: fullMatch[1].trim(),
+        path: (fullMatch[2] || '').trim()
       };
-    } else if (/^第[0-9一二三四五六七八九十百千万]+条/.test(rawText)) {
-      // 2. "第七百九条" のように条番号のみの場合、直前のテキストから法令名を探す
+    } else if (/^第[0-9０-９一二三四五六七八九十百千万]+条/.test(rawText)) {
+      // 2. "第七百九条", "第２条第２項" のように条番号のみの場合、直前のテキストから法令名を探す
       const precedingName = findPrecedingLawName(a);
       result = {
         lawName: precedingName,
@@ -185,6 +213,11 @@ window.egovExt = window.egovExt || {};
         lawName: rawText,
         path: ''
       };
+    }
+
+    // path が空かつ objectId が指定されている場合、objectId から条・項・号を自動補完
+    if (!result.path && objectId) {
+      result.path = formatPathFromObjectId(objectId);
     }
 
     if (a && typeof a === 'object') {
@@ -312,7 +345,7 @@ window.egovExt = window.egovExt || {};
         if (!targetLawId) return null;
 
         const objectId = targetId || 'Mp';
-        const { lawName, path } = parseLawLinkText(a, targetLawId);
+        const { lawName, path } = parseLawLinkText(a, targetLawId, objectId);
         const cacheKey = `${targetLawId}:${objectId}`;
 
         // すでにキャッシュが存在する場合は即座に表示
@@ -336,6 +369,7 @@ window.egovExt = window.egovExt || {};
 
 
   // テスト用に内部関数をエクスポート
+  ext.parseLawLinkText = parseLawLinkText;
   if (typeof process !== 'undefined' && process.env && process.env.NODE_ENV === 'test') {
     ext._testReferPopup = {
       isInternalLink,
@@ -344,7 +378,6 @@ window.egovExt = window.egovExt || {};
       findPrecedingLawName,
       fetchAndPopulateExternalPreview
     };
-
   }
 
 })(window.egovExt);

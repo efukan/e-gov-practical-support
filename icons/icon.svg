@@ -4,19 +4,19 @@
     本家「法令ひもとき」（himotoki.efukan.jp）と同じ「-5度傾けた『法』」の印影デザインを継承し、
     背景をe-Govブランドネイビー（#1042a4）、丸枠および文字を白色（#ffffff）に統一。
     
-    外周の青帯幅（約39px）を十分に確保し、ライトモード・ダークモード双方の
-    ブラウザツールバー環境で高い視認性とシリーズとしての一体感を実現。
+    ブラウザタブ（16x16）やツールバーでの視認性を最大化するため、
+    白丸枠および「法」の文字を限界まで拡大（候補2：文字290px、白丸r=226）。
   -->
   <g transform="rotate(-5 256 256)">
-    <circle cx="256" cy="256" r="240" fill="#1042a4" />
-    <circle cx="256" cy="256" r="190" fill="none" stroke="#ffffff" stroke-width="22" />
+    <circle cx="256" cy="256" r="248" fill="#1042a4" />
+    <circle cx="256" cy="256" r="226" fill="none" stroke="#ffffff" stroke-width="26" />
     <text
       x="256"
-      y="264"
+      y="266"
       fill="#ffffff"
       font-family="Hiragino Mincho ProN, Yu Mincho, YuMincho, Shippori Mincho, serif"
       font-weight="700"
-      font-size="224"
+      font-size="290"
       text-anchor="middle"
       dominant-baseline="central"
     >法</text>

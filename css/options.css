@@ -400,11 +400,11 @@ body.global-off .setting-card {
 }
 
 .def-preview-word {
-  color: var(--egov-def-color, #6a1b9a);
-  text-decoration: underline dotted var(--egov-def-color, #6a1b9a);
+  color: var(--egov-def-color, #00695c);
+  text-decoration: underline dotted var(--egov-def-color, #00695c);
   text-decoration-thickness: 1.5px;
   text-underline-offset: 3px;
-  background-color: var(--egov-def-bg, rgba(106, 27, 154, 0.05));
+  background-color: var(--egov-def-bg, rgba(0, 105, 92, 0.05));
   font-weight: 500;
   padding: 0 3px;
   border-radius: 2px;

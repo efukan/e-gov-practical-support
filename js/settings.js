@@ -36,7 +36,7 @@ window.egovExt = window.egovExt || {};
     conjunction: true,
     fastrender: true,
     citation: true,
-    definitionColor: '#6a1b9a'
+    definitionColor: '#00695c'
   });
 
   /**
@@ -79,14 +79,14 @@ window.egovExt = window.egovExt || {};
    * @returns {string}
    */
   ext.hexToRgba = function(hex, alpha) {
-    if (!hex || typeof hex !== 'string') return `rgba(106, 27, 154, ${alpha})`;
+    if (!hex || typeof hex !== 'string') return `rgba(0, 105, 92, ${alpha})`;
     let c = hex.replace('#', '');
     if (c.length === 3) {
       c = c.split('').map(x => x + x).join('');
     }
-    const r = parseInt(c.substring(0, 2), 16) || 106;
-    const g = parseInt(c.substring(2, 4), 16) || 27;
-    const b = parseInt(c.substring(4, 6), 16) || 154;
+    const r = parseInt(c.substring(0, 2), 16) || 0;
+    const g = parseInt(c.substring(2, 4), 16) || 105;
+    const b = parseInt(c.substring(4, 6), 16) || 92;
     return `rgba(${r}, ${g}, ${b}, ${alpha})`;
   };
 
@@ -95,7 +95,7 @@ window.egovExt = window.egovExt || {};
    * @param {string} [color]
    */
   ext.applyDefinitionColor = function(color) {
-    const safeColor = color || (ext.DEFAULT_SETTINGS && ext.DEFAULT_SETTINGS.definitionColor) || '#6a1b9a';
+    const safeColor = color || (ext.DEFAULT_SETTINGS && ext.DEFAULT_SETTINGS.definitionColor) || '#00695c';
     const root = document.documentElement;
     if (root && root.style) {
       root.style.setProperty('--egov-def-color', safeColor);

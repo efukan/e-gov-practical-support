@@ -123,7 +123,7 @@ async function main() {
     const expectedKeys = ['global', 'scrollspy', 'popup', 'definition', 'newtab', 'dim', 'jump', 'horizontal', 'conjunction', 'fastrender', 'citation', 'definitionColor'];
     assert.strictEqual(settingKeys.length, expectedKeys.length);
     expectedKeys.forEach(k => assert(settingKeys.includes(k), `キー '${k}' が DEFAULT_SETTINGS に存在する`));
-    assert.strictEqual(defaultSettings.definitionColor, '#6a1b9a', 'デフォルトの定義語カラーは法令ひもとき標準紫(#6a1b9a)である');
+    assert.strictEqual(defaultSettings.definitionColor, '#00695c', 'デフォルトの定義語カラーは緑系ティール深緑(#00695c)である');
   });
 
   runTest('popup.html に 全機能トグルに対応するチェックボックスが存在すること', () => {

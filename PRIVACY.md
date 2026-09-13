@@ -1,6 +1,6 @@
-# Privacy Policy for e-Gov Law Search Practical Support (e-Gov 法令検索 実務サポート)
+# Privacy Policy for e-Gov Law Search Himotoki (e-Gov法令検索ひもとき)
 
-*Last Updated: September 12, 2026 / 最終更新日: 2026年9月12日*
+*Last Updated: September 13, 2026 / 最終更新日: 2026年9月13日*
 
 English version follows the Japanese version. (日本語版の後に英語版が続きます)
 
@@ -8,7 +8,7 @@ English version follows the Japanese version. (日本語版の後に英語版が
 
 ## 日本語版 (Japanese)
 
-本プライバシーポリシーは、「e-Gov 法令検索 実務サポート」（以下「本拡張機能」）におけるユーザー情報の取り扱いについて説明するものです。
+本プライバシーポリシーは、「e-Gov法令検索ひもとき」（以下「本拡張機能」）におけるユーザー情報の取り扱いについて説明するものです。
 
 ### 1. 個人情報の収集および送信について
 本拡張機能は、ユーザーの個人情報、閲覧履歴、入力内容、その他いかなる個人を特定可能なデータも収集・蓄積しません。当開発元のサーバーへ送信されるデータもありません。
@@ -36,7 +36,7 @@ English version follows the Japanese version. (日本語版の後に英語版が
 
 ## English Version (English)
 
-This privacy policy explains how "e-Gov Law Search Practical Support" (hereinafter "the Extension") handles user information.
+This privacy policy explains how "e-Gov Law Search Himotoki" (hereinafter "the Extension") handles user information.
 
 ### 1. Collection and Transmission of Personal Information
 The Extension does not collect, store, or transmit any personal information, browsing history, inputs, or other identifiable data. No data is transmitted to the developer's server.

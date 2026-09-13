@@ -1,4 +1,4 @@
-# e-Gov 法令検索 実務サポート (e-Gov Law Search Practical Support)
+# e-Gov法令検索ひもとき (e-Gov Law Search Himotoki)
 
 e-Gov法令検索（laws.e-gov.go.jp / elaws.e-gov.go.jp）で条文を読むときの、行ったり来たりを減らす Google Chrome 拡張機能です。
 
@@ -37,7 +37,7 @@ e-Gov法令検索（laws.e-gov.go.jp / elaws.e-gov.go.jp）で条文を読むと
 
 本拡張機能は、通常利用向けに **Chrome ウェブストア** でも公開されています。手軽に利用したい場合は、ウェブストア版のインストールを推奨します。
 
-👉 **[Chrome ウェブストア - e-Gov 法令検索 実務サポート](https://chromewebstore.google.com/detail/mpanmbfnofadfdjikanogjppeabhkkld?utm_source=item-share-cb)**
+👉 **[Chrome ウェブストア - e-Gov法令検索ひもとき](https://chromewebstore.google.com/detail/mpanmbfnofadfdjikanogjppeabhkkld?utm_source=item-share-cb)**
 
 本GitHubリポジトリで公開されているコードは、この拡張機能のソースコード（オープンソース版/開発版）です。ソースコードから直接ローカルにインストールしてテストや開発を行いたい場合は、以下の手順に従ってください。
 

@@ -725,7 +725,7 @@ window.egovExt = window.egovExt || {};
     
     badge.appendChild(dot);
     
-    let label = isLawPage ? 'e-Gov法令検索ひもとき: 稼働中' : 'e-Gov法令検索ひもとき: 有効';
+    let label = isLawPage ? 'e-Gov法令ひもとき: 稼働中' : 'e-Gov法令ひもとき: 有効';
     if (isLawPage && ext.settings.definition) {
       const count = termsCount !== null ? termsCount : ext.definitionMap.size;
       label += ` (定義語: ${count}件)`;

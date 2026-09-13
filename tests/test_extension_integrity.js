@@ -48,7 +48,7 @@ async function runAsyncTest(name, fn) {
 }
 
 async function main() {
-  console.log('=== e-Gov法令検索ひもとき: 拡張機能総合健全性 (Integrity) 検証 ===\n');
+  console.log('=== e-Gov法令ひもとき: 拡張機能総合健全性 (Integrity) 検証 ===\n');
 
   // =============================================================================
   // 1. i18n 多言語リソース整合性テスト

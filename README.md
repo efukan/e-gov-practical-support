@@ -1,6 +1,9 @@
 # e-Gov法令ひもとき (e-Gov Law Himotoki)
 
-e-Gov法令検索（laws.e-gov.go.jp / elaws.e-gov.go.jp）で条文を読むときの、行ったり来たりを減らす Google Chrome 拡張機能です。
+> **括弧を薄く、定義語を引き、**  
+> **参照・引用条文を、その場に。**
+
+e-Gov法令検索（laws.e-gov.go.jp / elaws.e-gov.go.jp）で条文を読むときの、行ったり来たりを減らす Google Chrome 拡張機能です。画面はそのままで、条文の迷子をなくし、読み解くリズムを整えます。
 
 ---
 
@@ -103,17 +106,24 @@ npm install
 npm test
 ```
 
-以下の2つが実行されます（いずれも jsdom 上で動作し、ブラウザは不要です）。
+以下の5つのテストスイートが実行されます（いずれも jsdom 上で動作し、ブラウザ不要です）。
 
-* `tests/smoke_content_scripts.js` — `manifest.json` に記載された順序で content script 一式を読み込み、定義語の抽出からハイライト、ホバー表示、元の状態への復元までを一通り検証します。
-* `tests/test_tooltip_position.js` — ホバーポップアップの配置ロジック（画面端での上下反転・左右の収まり・矢印の位置）を検証します。
+* `tests/smoke_content_scripts.js` — content script 一式の通しテスト、非同期通信制御、手振れ・誤爆防止シミュレーション
+* `tests/test_tooltip_position.js` — ホバーポップアップの配置ロジック（画面端での上下反転・左右の収まり・矢印の位置）
+* `tests/test_law_patterns.js` — 日本の多様な法令形式・DOM構造（単文法令、文語体・舊字体、枝番号、別表等）全10パターンの網羅検証
+* `tests/test_interactions.js` — 機能間の実行順序入れ替え、多重実行（冪等性）、設定トグル復元サイクル、自作UI保護
+* `tests/test_extension_integrity.js` — i18n多言語リソース整合性、設定UI同期、キーボードA11y、印刷スタイル保護、配布ZIP整合性
 
-### アイコンの再生成
+### アセットの再生成
 
-`icons/icon.svg` を更新した場合は、以下で各解像度の PNG を生成します。
+`icons/icon.svg` や `assets/*.svg` を更新した場合は、以下のコマンドで各種PNGを一括再生成できます。
 
 ```bash
+# 拡張機能アイコンの再生成 (16, 48, 128, 360px)
 npm run generate-icons
+
+# プロモーションバナーの再生成 (小タイル 440x280, マーキー 1400x560, noteカバー 1280x670)
+npm run generate-promos
 ```
 
 ### 変更履歴

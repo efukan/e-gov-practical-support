@@ -329,14 +329,14 @@ body.egov-ext-dim-active a.egov-ext-dimmed-text {
   padding: 2px 8px !important; /* 上下の余白を減らして高さを抑える */
   box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1) !important;
   transition: all 0.3s ease !important;
-  width: 155px !important; /* ヘッダー右上の余白に合わせてスリム化 */
+  width: 180px !important; /* 「12-2」の枝番号例を保持しつつヘッダー右上の余白をスリム化 */
   height: 28px !important; /* 高さを固定してスリムに */
   pointer-events: auto !important; /* クリック可能にする */
   box-sizing: border-box !important;
 }
 
 .egov-ext-jump-container:focus-within {
-  width: 155px !important; /* フォーカス時も幅を広げない */
+  width: 180px !important; /* フォーカス時も幅を広げない */
   background: rgba(255, 255, 255, 1) !important;
   box-shadow: 0 6px 12px rgba(0, 0, 0, 0.15) !important;
   border-color: #0a2d73 !important;
@@ -366,7 +366,7 @@ body.egov-ext-dim-active a.egov-ext-dimmed-text {
 
 .egov-ext-jump-input::placeholder {
   color: #888 !important; /* プレースホルダーを少し薄く */
-  font-size: 12px !important;
+  font-size: 11px !important; /* 12-2 の例示が収まるよう微調整 */
 }
 
 .egov-ext-jump-clear {

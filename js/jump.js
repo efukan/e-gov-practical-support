@@ -50,7 +50,7 @@ window.egovExt = window.egovExt || {};
     const input = document.createElement('input');
     input.type = 'text';
     input.className = 'egov-ext-jump-input';
-    input.placeholder = '条文へジャンプ (例: 5)';
+    input.placeholder = '条文へジャンプ (例: 5, 12-2)';
     input.setAttribute('aria-label', '条文番号検索');
 
     // クリアボタン

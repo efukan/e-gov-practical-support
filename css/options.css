@@ -309,3 +309,103 @@ body.global-off .setting-card {
   background-color: rgba(0, 0, 0, 0.01);
   border-color: rgba(0, 0, 0, 0.05);
 }
+
+/* 定義語カラー設定エリア */
+.color-setting-area {
+  margin-top: 10px;
+  padding-top: 8px;
+  border-top: 1px dashed rgba(0, 0, 0, 0.08);
+}
+
+.color-setting-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.color-setting-title {
+  font-size: 11.5px;
+  font-weight: 700;
+  color: var(--md-sys-color-text-sub);
+}
+
+.color-swatches-group {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.def-color-swatch {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  border: 2px solid transparent;
+  cursor: pointer;
+  outline: none;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+.def-color-swatch:hover {
+  transform: scale(1.2);
+}
+
+.def-color-swatch.active {
+  border-color: #ffffff;
+  box-shadow: 0 0 0 2px var(--md-sys-color-primary), 0 2px 5px rgba(0, 0, 0, 0.2);
+  transform: scale(1.15);
+}
+
+.custom-color-label {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  border: 1px dashed #cbd5e1;
+  cursor: pointer;
+  position: relative;
+  transition: border-color 0.15s ease;
+  box-sizing: border-box;
+}
+
+.custom-color-label:hover {
+  border-color: var(--md-sys-color-primary);
+}
+
+.custom-color-input {
+  position: absolute;
+  opacity: 0;
+  width: 100%;
+  height: 100%;
+  cursor: pointer;
+}
+
+.custom-color-icon {
+  font-size: 11px;
+  line-height: 1;
+}
+
+.color-preview-box {
+  margin-top: 8px;
+  font-size: 12px;
+  color: var(--md-sys-color-text-sub);
+  background: rgba(0, 0, 0, 0.02);
+  padding: 6px 10px;
+  border-radius: 6px;
+  border: 1px solid rgba(0, 0, 0, 0.04);
+}
+
+.def-preview-word {
+  color: var(--egov-def-color, #6a1b9a);
+  text-decoration: underline dotted var(--egov-def-color, #6a1b9a);
+  text-decoration-thickness: 1.5px;
+  text-underline-offset: 3px;
+  background-color: var(--egov-def-bg, rgba(106, 27, 154, 0.05));
+  font-weight: 500;
+  padding: 0 3px;
+  border-radius: 2px;
+}

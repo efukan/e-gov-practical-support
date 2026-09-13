@@ -92,6 +92,9 @@ window.egovExt = window.egovExt || {};
    */
   function applySettings() {
     ext.updateStatusBadge();
+    if (ext.applyDefinitionColor) {
+      ext.applyDefinitionColor(ext.settings.definitionColor);
+    }
 
     if (!ext.settings.global) {
       document.body.classList.remove('egov-fastrender-enabled');

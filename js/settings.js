@@ -35,7 +35,8 @@ window.egovExt = window.egovExt || {};
     horizontal: true,
     conjunction: true,
     fastrender: true,
-    citation: true
+    citation: true,
+    definitionColor: '#6a1b9a'
   });
 
   /**
@@ -72,7 +73,39 @@ window.egovExt = window.egovExt || {};
   };
 
   /**
-   * popup.html / options.html 共通のトグルUIを初期化する。
+   * 16進数カラーコードを rgba 文字列に変換する
+   * @param {string} hex
+   * @param {number} alpha
+   * @returns {string}
+   */
+  ext.hexToRgba = function(hex, alpha) {
+    if (!hex || typeof hex !== 'string') return `rgba(106, 27, 154, ${alpha})`;
+    let c = hex.replace('#', '');
+    if (c.length === 3) {
+      c = c.split('').map(x => x + x).join('');
+    }
+    const r = parseInt(c.substring(0, 2), 16) || 106;
+    const g = parseInt(c.substring(2, 4), 16) || 27;
+    const b = parseInt(c.substring(4, 6), 16) || 154;
+    return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+  };
+
+  /**
+   * 定義語ハイライト用のCSS変数をルート要素に適用する
+   * @param {string} [color]
+   */
+  ext.applyDefinitionColor = function(color) {
+    const safeColor = color || (ext.DEFAULT_SETTINGS && ext.DEFAULT_SETTINGS.definitionColor) || '#6a1b9a';
+    const root = document.documentElement;
+    if (root && root.style) {
+      root.style.setProperty('--egov-def-color', safeColor);
+      root.style.setProperty('--egov-def-bg', ext.hexToRgba(safeColor, 0.05));
+      root.style.setProperty('--egov-def-bg-hover', ext.hexToRgba(safeColor, 0.12));
+    }
+  };
+
+  /**
+   * popup.html / options.html 共通のトグルUIおよびカラー選択UIを初期化する。
    * DEFAULT_SETTINGS の各キーに対応する `#feature-<キー>` のチェックボックスを自動で束ねる。
    *
    * @param {Object} [config]
@@ -86,13 +119,19 @@ window.egovExt = window.egovExt || {};
     /** @type {Object<string, HTMLInputElement>} */
     const toggles = {};
     for (const key in ext.DEFAULT_SETTINGS) {
+      if (key === 'definitionColor') continue; // カラー設定は別途バインド
       const el = document.getElementById(`feature-${key}`);
       if (el) toggles[key] = el;
     }
 
     let settings = await ext.loadSettings();
 
-    /** 現在の settings をチェックボックスへ反映する */
+    // カラーUI要素の取得
+    const swatches = Array.from(document.querySelectorAll('.def-color-swatch'));
+    const colorPicker = document.getElementById('def-color-picker');
+    const colorPreview = document.getElementById('def-color-preview-sample');
+
+    /** 現在の settings をチェックボックスおよびカラーUIへ反映する */
     function syncUI() {
       for (const key in toggles) {
         if (settings[key] !== undefined) {
@@ -101,13 +140,30 @@ window.egovExt = window.egovExt || {};
       }
       // グローバルスイッチが OFF のときは画面全体をグレーアウトする
       document.body.classList.toggle('global-off', !(toggles.global && toggles.global.checked));
+
+      // 定義語カラーの反映
+      const currentColor = settings.definitionColor || ext.DEFAULT_SETTINGS.definitionColor;
+      ext.applyDefinitionColor(currentColor);
+
+      if (colorPicker) {
+        colorPicker.value = currentColor.startsWith('#') ? currentColor : '#6a1b9a';
+      }
+      if (swatches.length > 0) {
+        swatches.forEach(swatch => {
+          const match = swatch.getAttribute('data-color').toLowerCase() === currentColor.toLowerCase();
+          swatch.classList.toggle('active', match);
+        });
+      }
+      if (colorPreview) {
+        colorPreview.style.setProperty('--egov-def-color', currentColor);
+      }
     }
 
     syncUI();
 
     /**
      * 変更後の設定を、対象となる e-Gov タブへ通知する
-     * @param {Object<string, boolean>} newSettings
+     * @param {Object<string, boolean|string>} newSettings
      */
     async function broadcast(newSettings) {
       const message = { type: 'SETTINGS_CHANGED', settings: newSettings };
@@ -128,6 +184,31 @@ window.egovExt = window.egovExt || {};
         if (key === 'global') {
           document.body.classList.toggle('global-off', !e.target.checked);
         }
+        await ext.saveSettings(settings);
+        await broadcast(settings);
+      });
+    }
+
+    // カラーパレットスウォッチのイベント登録
+    if (swatches.length > 0) {
+      swatches.forEach(swatch => {
+        swatch.addEventListener('click', async () => {
+          const selectedColor = swatch.getAttribute('data-color');
+          if (!selectedColor) return;
+          settings.definitionColor = selectedColor;
+          syncUI();
+          await ext.saveSettings(settings);
+          await broadcast(settings);
+        });
+      });
+    }
+
+    // カラーピッカーのイベント登録
+    if (colorPicker) {
+      colorPicker.addEventListener('input', async (e) => {
+        const pickedColor = e.target.value;
+        settings.definitionColor = pickedColor;
+        syncUI();
         await ext.saveSettings(settings);
         await broadcast(settings);
       });

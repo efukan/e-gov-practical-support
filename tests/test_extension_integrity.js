@@ -108,22 +108,28 @@ async function main() {
   assert(defaultSettingsMatch, 'DEFAULT_SETTINGS が settings.js に定義されている');
   const defaultSettings = {};
   defaultSettingsMatch[1].split(',').forEach(line => {
-    const m = line.match(/([a-zA-Z0-9_]+)\s*:\s*(true|false)/);
-    if (m) defaultSettings[m[1]] = m[2] === 'true';
+    const m = line.match(/([a-zA-Z0-9_]+)\s*:\s*(['"][^'"]+['"]|true|false)/);
+    if (m) {
+      if (m[2] === 'true') defaultSettings[m[1]] = true;
+      else if (m[2] === 'false') defaultSettings[m[1]] = false;
+      else defaultSettings[m[1]] = m[2].replace(/['"]/g, '');
+    }
   });
 
   const settingKeys = Object.keys(defaultSettings);
+  const toggleKeys = settingKeys.filter(k => k !== 'definitionColor');
 
-  runTest('DEFAULT_SETTINGS に11個の全機能キーが定義されていること', () => {
-    const expectedKeys = ['global', 'scrollspy', 'popup', 'definition', 'newtab', 'dim', 'jump', 'horizontal', 'conjunction', 'fastrender', 'citation'];
+  runTest('DEFAULT_SETTINGS に全12設定キー（11機能トグル＋定義語カラー）が定義されていること', () => {
+    const expectedKeys = ['global', 'scrollspy', 'popup', 'definition', 'newtab', 'dim', 'jump', 'horizontal', 'conjunction', 'fastrender', 'citation', 'definitionColor'];
     assert.strictEqual(settingKeys.length, expectedKeys.length);
     expectedKeys.forEach(k => assert(settingKeys.includes(k), `キー '${k}' が DEFAULT_SETTINGS に存在する`));
+    assert.strictEqual(defaultSettings.definitionColor, '#6a1b9a', 'デフォルトの定義語カラーは法令ひもとき標準紫(#6a1b9a)である');
   });
 
-  runTest('popup.html に DEFAULT_SETTINGS の全キーに対応するチェックボックスが存在すること', () => {
+  runTest('popup.html に 全機能トグルに対応するチェックボックスが存在すること', () => {
     const dom = new JSDOM(popupHtml);
     const doc = dom.window.document;
-    settingKeys.forEach(key => {
+    toggleKeys.forEach(key => {
       const el = doc.getElementById(`feature-${key}`);
       assert(el, `popup.html に #feature-${key} が存在する`);
       assert.strictEqual(el.type, 'checkbox', `#feature-${key} は checkbox である`);
@@ -132,14 +138,18 @@ async function main() {
     assert(openOptions, 'popup.html に #open-options ボタンが存在する');
   });
 
-  runTest('options.html に DEFAULT_SETTINGS の全キーに対応するチェックボックスが存在すること', () => {
+  runTest('options.html に 全機能トグルおよび定義語カラー設定UIが存在すること', () => {
     const dom = new JSDOM(optionsHtml);
     const doc = dom.window.document;
-    settingKeys.forEach(key => {
+    toggleKeys.forEach(key => {
       const el = doc.getElementById(`feature-${key}`);
       assert(el, `options.html に #feature-${key} が存在する`);
       assert.strictEqual(el.type, 'checkbox', `#feature-${key} は checkbox である`);
     });
+    const colorPicker = doc.getElementById('def-color-picker');
+    assert(colorPicker, 'options.html に #def-color-picker が存在する');
+    const swatches = doc.querySelectorAll('.def-color-swatch');
+    assert(swatches.length >= 5, 'options.html に 5個以上のカラースウォッチが存在する');
   });
 
   await runAsyncTest('initSettingsUI による設定読み込みとトグル変更時のメッセージ通知 (broadcast)', async () => {

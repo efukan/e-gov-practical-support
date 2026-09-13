@@ -428,19 +428,26 @@ article.article,
 
 /* ----- 6. 定義語ホバー辞書＆ハイライト (Defined Terms Highlight & Tooltip) ----- */
 
+/* 定義語のカラーパレットCSS変数（デフォルト: 法令ひもとき標準紫） */
+:root {
+  --egov-def-color: #6a1b9a;
+  --egov-def-bg: rgba(106, 27, 154, 0.05);
+  --egov-def-bg-hover: rgba(106, 27, 154, 0.12);
+}
+
 /* 定義語のハイライト表示（優先度を最大限に強化して他スタイルの競合を回避） */
 body .egov-definition-word,
 body div .egov-definition-word,
 body span.egov-definition-word,
 .LawBody .egov-definition-word,
 .main-content .egov-definition-word {
-  color: #00695c !important; /* 控えめで上品な深緑/深青緑系（ティール） */
+  color: var(--egov-def-color, #6a1b9a) !important;
   /* border-bottom ではなく text-decoration を使うことで、行送りを押し広げず、
      複数行にまたがる定義語でも下線が正しく折り返す */
-  text-decoration: underline dotted #00695c !important;
+  text-decoration: underline dotted var(--egov-def-color, #6a1b9a) !important;
   text-decoration-thickness: 1.5px !important;
   text-underline-offset: 3px !important;
-  background-color: rgba(0, 105, 92, 0.04) !important; /* ごく薄いティールの背景 */
+  background-color: var(--egov-def-bg, rgba(106, 27, 154, 0.05)) !important;
   border-radius: 3px !important;
   transition: background-color 0.15s ease !important;
   display: inline !important; /* テキストの流れを崩さないインライン表示 */
@@ -450,7 +457,7 @@ body span.egov-definition-word,
 body .egov-definition-word:hover,
 body div .egov-definition-word:hover,
 .LawBody .egov-definition-word:hover {
-  background-color: rgba(0, 105, 92, 0.1) !important; /* ホバー時に少し背景を強調 */
+  background-color: var(--egov-def-bg-hover, rgba(106, 27, 154, 0.12)) !important; /* ホバー時に少し背景を強調 */
 }
 
 /* リンク内の定義語は下線や色をリンクに合わせる */
@@ -464,16 +471,16 @@ body a .egov-definition-word,
 body.egov-ext-dim-active .egov-ext-dimmed-text .egov-definition-word,
 body.egov-ext-dim-active .egov-definition-word .egov-ext-dimmed-text,
 body.egov-ext-dim-active .egov-definition-word.egov-ext-dimmed-text {
-  color: #00695c !important;
-  text-decoration: underline dotted #00695c !important;
-  background-color: rgba(0, 105, 92, 0.04) !important;
+  color: var(--egov-def-color, #6a1b9a) !important;
+  text-decoration: underline dotted var(--egov-def-color, #6a1b9a) !important;
+  background-color: var(--egov-def-bg, rgba(106, 27, 154, 0.05)) !important;
 }
 
 /* キーボード操作でも定義語にフォーカスできるので、フォーカスリングを明示する */
 body .egov-definition-word:focus-visible {
-  outline: 2px solid #00695c !important;
+  outline: 2px solid var(--egov-def-color, #6a1b9a) !important;
   outline-offset: 2px !important;
-  background-color: rgba(0, 105, 92, 0.1) !important;
+  background-color: var(--egov-def-bg-hover, rgba(106, 27, 154, 0.12)) !important;
 }
 
 /* ----- 6.5. 接続詞の色分け（又は・若しくは・並びに・及び） ----- */

@@ -166,6 +166,25 @@
             <div class="card-text">
               <span class="label">定義語ホバー辞書</span>
               <span class="desc">法令内で定義されている定義語を検知して下線を付与し、ホバー時にその定義された条文をポップアップで表示します。</span>
+              <div class="color-setting-area">
+                <div class="color-setting-header">
+                  <span class="color-setting-title">着色カラー:</span>
+                  <div class="color-swatches-group">
+                    <button type="button" class="def-color-swatch active" data-color="#6a1b9a" title="紫（法令ひもとき標準）" style="background-color: #6a1b9a;"></button>
+                    <button type="button" class="def-color-swatch" data-color="#00695c" title="ティール深緑（従来色）" style="background-color: #00695c;"></button>
+                    <button type="button" class="def-color-swatch" data-color="#1a5fb4" title="藍 / ブルー" style="background-color: #1a5fb4;"></button>
+                    <button type="button" class="def-color-swatch" data-color="#c05621" title="琥珀 / アンバー" style="background-color: #c05621;"></button>
+                    <button type="button" class="def-color-swatch" data-color="#b83280" title="ローズ / ピンク" style="background-color: #b83280;"></button>
+                    <label class="custom-color-label" title="カスタムカラー選択">
+                      <input type="color" id="def-color-picker" value="#6a1b9a" class="custom-color-input">
+                      <span class="custom-color-icon">🎨</span>
+                    </label>
+                  </div>
+                </div>
+                <div class="color-preview-box">
+                  プレビュー: この法律において「<span id="def-color-preview-sample" class="def-preview-word">開発行為</span>」とは、建築物の建築をいう。
+                </div>
+              </div>
             </div>
           </div>
           <label class="switch">

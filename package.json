@@ -8,7 +8,8 @@
   "scripts": {
     "test": "node tests/smoke_content_scripts.js && node tests/test_tooltip_position.js && node tests/test_law_patterns.js && node tests/test_interactions.js && node tests/test_extension_integrity.js",
     "generate-icons": "node scripts/generate_icons.js",
-    "generate-promos": "node scripts/generate_promo.js"
+    "generate-promos": "node scripts/generate_promo.js",
+    "package": "rm -f e-gov-layout-changes.zip && zip -r e-gov-layout-changes.zip manifest.json options.html popup.html LICENSE _locales css js icons -x \"*.DS_Store*\""
   },
   "keywords": [],
   "author": "",

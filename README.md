@@ -124,6 +124,9 @@ npm run generate-icons
 
 # プロモーションバナーの再生成 (小タイル 440x280, マーキー 1400x560, noteカバー 1280x670)
 npm run generate-promos
+
+# 配布・提出用ZIPパッケージの生成
+npm run package
 ```
 
 ### 変更履歴

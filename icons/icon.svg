@@ -1,33 +1,24 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" width="128" height="128">
-  <!-- Material 3 Minimalist Icon (Dynamic Scale, e-Gov Navy Version) -->
-  <!-- Background (e-Gov Navy: #1042a4) -->
-  <rect width="128" height="128" rx="28" fill="#1042a4" />
-  
-  <!-- Dynamic Scaling & Offset to match the original high-visibility layout -->
-  <g transform="translate(-22.4, -22.4) scale(1.35)">
-    <!-- Book Outline (High visibility) -->
-    <path d="M36 40 C36 34, 42 30, 64 36 C86 30, 92 34, 92 40 L92 92 C92 86, 86 82, 64 88 C42 82, 36 86, 36 92 Z" fill="#FFFFFF" />
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512" role="img" aria-label="e-Gov法令ひもとき">
+  <!--
+    e-Gov法令ひもとき アイコン原本（マスターベクターSVG）
+    本家「法令ひもとき」（himotoki.efukan.jp）と同じ「-5度傾けた『法』」の印影デザインを継承し、
+    背景をe-Govブランドネイビー（#1042a4）、丸枠および文字を白色（#ffffff）に統一。
     
-    <!-- Spine Crease -->
-    <line x1="64" y1="36" x2="64" y2="84" stroke="#1042a4" stroke-width="4.5" stroke-linecap="round" />
-    
-    <!-- Text Lines (Left Page) -->
-    <line x1="46" y1="52" x2="58" y2="52" stroke="#1042a4" stroke-width="4.5" stroke-linecap="round" opacity="0.15" />
-    <line x1="46" y1="64" x2="56" y2="64" stroke="#1042a4" stroke-width="4.5" stroke-linecap="round" opacity="0.15" />
-    <line x1="46" y1="76" x2="58" y2="76" stroke="#1042a4" stroke-width="4.5" stroke-linecap="round" opacity="0.15" />
-    
-    <!-- Text Lines (Right Page) -->
-    <line x1="70" y1="52" x2="82" y2="52" stroke="#1042a4" stroke-width="4.5" stroke-linecap="round" opacity="0.15" />
-    <line x1="70" y1="64" x2="78" y2="64" stroke="#1042a4" stroke-width="4.5" stroke-linecap="round" opacity="0.15" />
-    
-    <!-- Magnifying Glass -->
-    <!-- Handle (under rim) -->
-    <line x1="92" y1="86" x2="102" y2="96" stroke="#F9AB00" stroke-width="6.5" stroke-linecap="round" />
-    
-    <!-- Rim (overlapping the book pages) -->
-    <circle cx="82" cy="76" r="14" fill="#FFFFFF" stroke="#F9AB00" stroke-width="5" />
-    
-    <!-- Lens Reflection -->
-    <path d="M 75 72 A 10 10 0 0 1 82 66" stroke="#FFE082" stroke-width="2" stroke-linecap="round" fill="none" opacity="0.8" />
+    外周の青帯幅（約39px）を十分に確保し、ライトモード・ダークモード双方の
+    ブラウザツールバー環境で高い視認性とシリーズとしての一体感を実現。
+  -->
+  <g transform="rotate(-5 256 256)">
+    <circle cx="256" cy="256" r="240" fill="#1042a4" />
+    <circle cx="256" cy="256" r="190" fill="none" stroke="#ffffff" stroke-width="22" />
+    <text
+      x="256"
+      y="264"
+      fill="#ffffff"
+      font-family="Hiragino Mincho ProN, Yu Mincho, YuMincho, Shippori Mincho, serif"
+      font-weight="700"
+      font-size="224"
+      text-anchor="middle"
+      dominant-baseline="central"
+    >法</text>
   </g>
 </svg>

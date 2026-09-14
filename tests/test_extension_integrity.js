@@ -83,6 +83,11 @@ async function main() {
     }
   });
 
+  runTest('extDesc の文字数が Manifest / Chrome Web Store の上限（132文字）以内であること', () => {
+    assert(jaMessages.extDesc.message.length <= 132, `ja: extDesc (${jaMessages.extDesc.message.length}文字) は 132 文字以内であること`);
+    assert(enMessages.extDesc.message.length <= 132, `en: extDesc (${enMessages.extDesc.message.length}文字) は 132 文字以内であること`);
+  });
+
   runTest('manifest.json 内の全 __MSG_xxx__ プレースホルダーがロケールに定義されていること', () => {
     const manifestStr = fs.readFileSync(manifestPath, 'utf8');
     const matches = manifestStr.match(/__MSG_([a-zA-Z0-9_]+)__/g) || [];

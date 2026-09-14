@@ -1595,6 +1595,72 @@ async function check(name, fn) {
     return '建築基準法のカラム型定義語（建築物・特殊建築物）の抽出・ハイライト・Promise共有・完了フラグの健全性を確認';
   });
 
+  // テスト 25: 定義語ポップアップ成形における空テキストノード混在時・カラム末尾空白およびクロス境界二重空白（　　）完全抑止テスト
+  await check('定義語ポップアップ成形における空テキストノード混在時・カラム末尾空白およびクロス境界二重空白（　　）完全抑止テスト', async () => {
+    const { window, ext } = await createTestEnv('<div class="LawBody"></div>');
+    ext.settings.horizontal = true;
+
+    // 1. 実機Vue構造の模擬: コメントノードや空テキストノード、末尾全角スペースが入り組んだDOM
+    const tipContainer = window.document.createElement('div');
+    tipContainer.className = 'egov-ext-tip-body';
+    tipContainer.innerHTML = `
+      <div id="Mp-Ch_1-At_2-Pr_1-It_1" class="item istitle">
+        <span class="itemtitle">一　</span>
+        <div class="column">
+          <!--comment1-->
+          <p class="sentence"><span class="egov-definition-word" data-word="建築物">建築物</span></p>
+          <!--comment2-->
+        </div>
+        <div class="column">
+          <!--comment3-->
+          <p class="sentence">土地に定着する工作物のうち、屋根及び柱若しくは壁を有するもの...</p>
+        </div>
+      </div>
+    `;
+
+    // 実際のVue DOMのように、末尾に全角スペースと空テキストノードを手動挿入
+    const col1 = tipContainer.querySelectorAll('.column')[0];
+    col1.appendChild(window.document.createTextNode('　')); // 全角スペース
+    col1.appendChild(window.document.createTextNode(''));  // 空テキストノード（len=0）
+
+    // Column 2の先頭にも空テキストノードを挿入
+    const col2 = tipContainer.querySelectorAll('.column')[1];
+    col2.insertBefore(window.document.createTextNode(''), col2.firstChild);
+
+    // 成形処理を実行
+    ext.formatInlinePreview(tipContainer);
+
+    const fullText = tipContainer.textContent;
+
+    // 検証1: 「(1)　建築物　土地に定着する工作物のうち」と厳密に1文字スペースで連結されていること
+    if (!fullText.includes('(1)　建築物　土地に定着する工作物のうち')) {
+      throw new Error(`期待される成形テキストが見つかりません: ${JSON.stringify(fullText.slice(0, 40))}`);
+    }
+
+    // 検証2: どこにも二重全角スペース（　　）が含まれていないこと
+    if (fullText.includes('　　')) {
+      throw new Error(`成形結果に二重全角スペースが含まれています: ${JSON.stringify(fullText.slice(0, 40))}`);
+    }
+
+    // 検証3: 「建築物」と「土地」の間が厳密に全角1文字であること
+    const match = fullText.match(/建築物(.*?)土地/);
+    if (!match || match[1] !== '　') {
+      throw new Error(`「建築物」と「土地」の間のスペースが全角1文字ではありません: ${JSON.stringify(match ? match[1] : 'null')}`);
+    }
+
+    // 2. クロス要素境界二重空白の正規化検証（直前ノード末尾が全角スペース、直後ノード先頭も全角スペース）
+    const boundaryContainer = window.document.createElement('div');
+    boundaryContainer.className = 'egov-ext-tip-body';
+    boundaryContainer.innerHTML = '<div><span>前半文　</span></div><div><span>　後半文</span></div>';
+    ext.formatInlinePreview(boundaryContainer);
+    const boundaryText = boundaryContainer.textContent;
+    if (boundaryText.includes('　　') || !boundaryText.includes('前半文　後半文')) {
+      throw new Error(`クロス要素境界二重空白が解消されていません: ${JSON.stringify(boundaryText)}`);
+    }
+
+    return '空テキストノード混在時のカラム末尾空白完全除去およびクロス要素境界二重空白（　　）の根絶を確認';
+  });
+
   console.log('\n==========================================');
   if (failures === 0) {
     console.log('🎉 全ての相互作用・順序・重複検証テストに成功しました！');

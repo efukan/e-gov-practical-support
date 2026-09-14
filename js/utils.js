@@ -995,9 +995,12 @@ window.egovExt = window.egovExt || {};
     }
     toRemove.forEach(n => n.remove());
 
-    // 各テキストノードの先頭・末尾にある余計な改行やインデントを除去
+    // 各テキストノードの先頭・末尾にある余計な改行やインデントを除去し、空になったノードはDOMから完全除去
     textNodes.forEach(n => {
       n.nodeValue = n.nodeValue.replace(/^[\r\n\t ]+/, '').replace(/[\r\n\t ]+$/, '');
+      if (!n.nodeValue) {
+        n.remove();
+      }
     });
 
     // 1. 条タイトル (ArticleTitle) のインライン化
@@ -1040,14 +1043,18 @@ window.egovExt = window.egovExt || {};
       // 直後の後続要素（ItemSentence等）の先頭にある余計な全角・半角スペースを除去して二重空白を防止
       const nextElem = it.nextElementSibling;
       if (nextElem) {
+        const nextTextNodes = [];
         const nextWalker = document.createTreeWalker(nextElem, NodeFilter.SHOW_TEXT, null);
-        let firstTextNode = nextWalker.nextNode();
-        while (firstTextNode && /^[　 ]+/.test(firstTextNode.nodeValue)) {
-          firstTextNode.nodeValue = firstTextNode.nodeValue.replace(/^[　 ]+/, '');
-          if (!firstTextNode.nodeValue) {
-            const nextNode = nextWalker.nextNode();
-            firstTextNode.remove();
-            firstTextNode = nextNode;
+        while (nextWalker.nextNode()) {
+          nextTextNodes.push(nextWalker.currentNode);
+        }
+        for (let i = 0; i < nextTextNodes.length; i++) {
+          const tNode = nextTextNodes[i];
+          tNode.nodeValue = tNode.nodeValue.replace(/^[　 \t\r\n]+/, '');
+          if (!tNode.nodeValue) {
+            tNode.remove();
+          } else {
+            break;
           }
         }
       }
@@ -1064,30 +1071,35 @@ window.egovExt = window.egovExt || {};
       });
       const next = col.nextElementSibling;
       if (next && next.matches('._div_Column, .Column, .column, [class*="Column"]')) {
-        // 1. col の末尾にある全角・半角スペースを除去
+        // 1. col の末尾にある全角・半角スペース（および空テキストノード）を逆順走査で確実に除去
+        const colTextNodes = [];
         const colWalker = document.createTreeWalker(col, NodeFilter.SHOW_TEXT, null);
-        let lastTextNode = null;
         while (colWalker.nextNode()) {
-          lastTextNode = colWalker.currentNode;
+          colTextNodes.push(colWalker.currentNode);
         }
-        while (lastTextNode && /[　 ]+$/.test(lastTextNode.nodeValue)) {
-          lastTextNode.nodeValue = lastTextNode.nodeValue.replace(/[　 ]+$/, '');
-          if (!lastTextNode.nodeValue) {
-            const prev = colWalker.previousNode();
-            lastTextNode.remove();
-            lastTextNode = prev;
+        for (let i = colTextNodes.length - 1; i >= 0; i--) {
+          const tNode = colTextNodes[i];
+          tNode.nodeValue = tNode.nodeValue.replace(/[　 \t\r\n]+$/, '');
+          if (!tNode.nodeValue) {
+            tNode.remove();
+          } else {
+            break;
           }
         }
 
-        // 2. next の先頭にある全角・半角スペースを除去
+        // 2. next の先頭にある全角・半角スペース（および空テキストノード）を順方向走査で確実に除去
+        const nextTextNodes = [];
         const nextWalker = document.createTreeWalker(next, NodeFilter.SHOW_TEXT, null);
-        let firstTextNode = nextWalker.nextNode();
-        while (firstTextNode && /^[　 ]+/.test(firstTextNode.nodeValue)) {
-          firstTextNode.nodeValue = firstTextNode.nodeValue.replace(/^[　 ]+/, '');
-          if (!firstTextNode.nodeValue) {
-            const nextNode = nextWalker.nextNode();
-            firstTextNode.remove();
-            firstTextNode = nextNode;
+        while (nextWalker.nextNode()) {
+          nextTextNodes.push(nextWalker.currentNode);
+        }
+        for (let i = 0; i < nextTextNodes.length; i++) {
+          const tNode = nextTextNodes[i];
+          tNode.nodeValue = tNode.nodeValue.replace(/^[　 \t\r\n]+/, '');
+          if (!tNode.nodeValue) {
+            tNode.remove();
+          } else {
+            break;
           }
         }
 
@@ -1113,13 +1125,22 @@ window.egovExt = window.egovExt || {};
       s.querySelectorAll('br').forEach(br => br.remove());
     });
 
-    // 6. 重複全角スペースの最終正規化（連続全角スペースを1つに集約）
+    // 6. 重複全角スペースの最終正規化（同一テキストノード内集約＋要素境界をまたぐ二重空白の根絶）
     container.normalize();
     const finalWalker = document.createTreeWalker(container, NodeFilter.SHOW_TEXT, null);
+    let prevTextNode = null;
     while (finalWalker.nextNode()) {
       const node = finalWalker.currentNode;
+      // 単一テキストノード内の連続全角スペースを集約
       if (node.nodeValue.includes('　　')) {
         node.nodeValue = node.nodeValue.replace(/　{2,}/g, '　');
+      }
+      // 要素境界をまたぐ二重空白（前のノード末尾が全角空白、かつ現在のノード先頭も全角空白）を正規化
+      if (prevTextNode && /[　 ]+$/.test(prevTextNode.nodeValue) && /^[　 ]+/.test(node.nodeValue)) {
+        node.nodeValue = node.nodeValue.replace(/^[　 ]+/, '');
+      }
+      if (node.nodeValue) {
+        prevTextNode = node;
       }
     }
   };

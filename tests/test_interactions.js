@@ -1461,6 +1461,140 @@ async function check(name, fn) {
     return '定義語ポップアップでの号番号(1)化・Columnインライン化・厳密な全角1文字スペース区切り（2文字スペース完全防止）確認';
   });
 
+  // テスト 23: 建築基準法施行令（旧様式 _div_ItemSentence）および新様式における号番号(1)化後の厳密な全角1文字スペース検証
+  await check('建築基準法施行令（旧様式）および新様式における号番号(1)化後の二重空白防止テスト', async () => {
+    const { window, ext } = await createTestEnv(`
+      <!DOCTYPE html>
+      <html>
+        <body>
+          <main class="main-content">
+            <!-- 旧様式（建築基準法施行令 Mp-Ch_1-Se_1-At_1）: span の直後に全角スペーステキストノードがある構造 -->
+            <div id="Mp-Ch_1-Se_1-At_1-Pr_1-It_1" class="_div_ItemSentence">
+              <span style="font-weight: bold;">一</span>　<span>敷地</span>　<span>一の建築物又は用途上不可分の関係にある二以上の建築物のある一団の土地をいう。</span>
+            </div>
+            <div id="Mp-Ch_1-Se_1-At_1-Pr_1-It_2" class="_div_ItemSentence">
+              <span style="font-weight: bold;">二</span>　<span>地階</span>　<span>床が地盤面下にある階で...</span>
+            </div>
+            <!-- 新様式（Vue版）: span.itemtitle の末尾に全角スペースが含まれている構造 -->
+            <div id="Mp-Ch_1-At_2-Pr_1-It_1" class="item istitle">
+              <span class="itemtitle">一　</span>
+              <div class="column"><p class="sentence">建築物</p>　</div>
+            </div>
+          </main>
+        </body>
+      </html>
+    `);
+
+    ext.settings.global = true;
+    ext.settings.horizontal = true;
+
+    // 横書き表記変換を実行
+    ext.applyHorizontalConversion(window.document.body);
+
+    // 1. 旧様式第1号の検証: (1) の後に厳密に全角スペースが1文字だけであり、二重空白（　　）がないこと
+    const it1_1 = window.document.querySelector('#Mp-Ch_1-Se_1-At_1-Pr_1-It_1');
+    if (!it1_1) return false;
+    const text1_1 = it1_1.textContent;
+    if (!text1_1.includes('(1)　敷地') || text1_1.includes('(1)　　') || text1_1.includes('　　敷地')) {
+      throw new Error(`旧様式第1号で二重空白が発生しています: ${JSON.stringify(text1_1)}`);
+    }
+
+    // 2. 旧様式第2号の検証
+    const it1_2 = window.document.querySelector('#Mp-Ch_1-Se_1-At_1-Pr_1-It_2');
+    if (!it1_2) return false;
+    const text1_2 = it1_2.textContent;
+    if (!text1_2.includes('(2)　地階') || text1_2.includes('(2)　　')) {
+      throw new Error(`旧様式第2号で二重空白が発生しています: ${JSON.stringify(text1_2)}`);
+    }
+
+    // 3. 新様式の検証
+    const itVue = window.document.querySelector('#Mp-Ch_1-At_2-Pr_1-It_1');
+    if (!itVue) return false;
+    const textVue = itVue.textContent;
+    if (!textVue.includes('(1)　') || textVue.includes('(1)　　')) {
+      throw new Error(`新様式第1号で二重空白が発生しています: ${JSON.stringify(textVue)}`);
+    }
+
+    return '旧様式・新様式ともに号番号(1)化後の全角スペースが厳密に1文字（二重空白なし）であることを確認';
+  });
+
+  // テスト 24: 建築基準法（カラム型定義条文）における定義語抽出・ハイライトおよび再入耐性テスト
+  await check('建築基準法（カラム構造第2条）における定義語抽出・ハイライトおよび再入耐性テスト', async () => {
+    const { window, ext } = await createTestEnv(`
+      <!DOCTYPE html>
+      <html>
+        <body>
+          <main class="main-content">
+            <section id="Mp-Ch_1-At_1" class="Article">
+              <div class="ArticleTitle"><span style="font-weight: bold;">第一条</span>　<span>この法律は、建築物の敷地、構造、設備及び用途に関する最低の基準を定めて、国民の生命、健康及び財産の保護を図り、もつて公共の福祉の増進に資することを目的とする。</span></div>
+            </section>
+            <section id="Mp-Ch_1-At_2" class="Article">
+              <div class="ArticleCaption"><span>（用語の定義）</span></div>
+              <div class="ArticleTitle"><span style="font-weight: bold;">第二条</span>　<span>この法律において次の各号に掲げる用語の意義は、それぞれ当該各号に定めるところによる。</span></div>
+              <div id="Mp-Ch_1-At_2-Pr_1-It_1" class="item istitle">
+                <span class="itemtitle">一　</span>
+                <div class="column"><p class="sentence">建築物</p>　</div>
+                <div class="column"><p class="sentence">土地に定着する工作物のうち、屋根及び柱若しくは壁を有するもの...</p></div>
+              </div>
+              <div id="Mp-Ch_1-At_2-Pr_1-It_2" class="item istitle">
+                <span class="itemtitle">二　</span>
+                <div class="column"><p class="sentence">特殊建築物</p>　</div>
+                <div class="column"><p class="sentence">学校、体育館、病院、劇場、観覧場、集会場、展示場、百貨店...</p></div>
+              </div>
+            </section>
+          </main>
+        </body>
+      </html>
+    `);
+
+    ext.settings.global = true;
+    ext.settings.definition = true;
+
+    // 1. 定義語抽出の実行
+    await ext.extractDefinitionsAsync();
+
+    // 2. 抽出結果の検証（パターン4のカラム分割から「建築物」「特殊建築物」が抽出されていること）
+    if (!ext.definitionMap.has('建築物') || !ext.definitionMap.has('特殊建築物')) {
+      throw new Error(`定義語マップに「建築物」または「特殊建築物」が存在しません: ${Array.from(ext.definitionMap.keys())}`);
+    }
+    const defData = ext.definitionMap.get('建築物');
+    if (defData.pattern !== 4) {
+      throw new Error(`「建築物」のパターンが4（カラム型）ではありません: ${defData.pattern}`);
+    }
+    if (!defData.source.includes('２条') && !defData.source.includes('二条')) {
+      throw new Error(`「建築物」の出典条文番号が第二条を含んでいません: ${defData.source}`);
+    }
+
+    // 3. ハイライト適用の実行
+    ext.enableDefinitionHighlighting(window.document.body);
+
+    // 4. 第1条本文中の「建築物」が正しくハイライトされていること
+    const at1 = window.document.querySelector('#Mp-Ch_1-At_1');
+    const highlightedWords = at1.querySelectorAll('.egov-definition-word');
+    if (highlightedWords.length === 0) {
+      throw new Error('第1条本文中に .egov-definition-word が存在しません');
+    }
+    const firstDefWord = highlightedWords[0];
+    if (firstDefWord.textContent !== '建築物' || firstDefWord.dataset.word !== '建築物') {
+      throw new Error(`ハイライトされた語が正しくありません: text=${firstDefWord.textContent}, dataset=${firstDefWord.dataset.word}`);
+    }
+
+    // 5. 抽出完了フラグおよび進行中 Promise 共有の検証
+    if (!ext.definitionExtractionCompleted) {
+      throw new Error('definitionExtractionCompleted が true になっていません');
+    }
+
+    // 進行中の多重呼び出しでPromiseが共有され、二重抽出されないこと
+    const p1 = ext.extractDefinitionsAsync();
+    const p2 = ext.extractDefinitionsAsync();
+    await Promise.all([p1, p2]);
+    if (ext.definitionMap.size < 2) {
+      throw new Error(`再抽出後の件数が不正です: ${ext.definitionMap.size}`);
+    }
+
+    return '建築基準法のカラム型定義語（建築物・特殊建築物）の抽出・ハイライト・Promise共有・完了フラグの健全性を確認';
+  });
+
   console.log('\n==========================================');
   if (failures === 0) {
     console.log('🎉 全ての相互作用・順序・重複検証テストに成功しました！');

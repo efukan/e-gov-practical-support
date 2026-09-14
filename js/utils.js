@@ -179,10 +179,13 @@ window.egovExt = window.egovExt || {};
   };
 
   /**
-   * すべての非同期タスクを中断する関数
+   * すべての非同期タスクを中断する関数（除外タスク指定可能）
+   * @param {string[]|string} [excludeNames=[]] - 中断対象外とするタスク名
    */
-  ext.cancelAllTasks = function() {
+  ext.cancelAllTasks = function(excludeNames = []) {
+    const excludeSet = new Set(Array.isArray(excludeNames) ? excludeNames : [excludeNames]);
     for (const name in ext.activeTasks) {
+      if (excludeSet.has(name)) continue;
       ext.cancelTask(name);
     }
   };

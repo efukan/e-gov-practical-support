@@ -88,6 +88,10 @@ window.egovExt = window.egovExt || {};
     if (/^\([0-9]+\)(の[0-9]+)*$/.test(trimmed)) {
       return originalText;
     }
+
+    // 元の文字列に末尾スペースが含まれていた場合のみ、変換後も末尾に全角スペースを付与
+    const hasTrailingSpace = /[ 　\t]$/.test(originalText);
+    const spaceSuffix = hasTrailingSpace ? '　' : '';
     
     // 枝番の処理 (パターンA: (1)の2, パターンB: (1)の2の3)
     if (trimmed.includes('の')) {
@@ -96,13 +100,13 @@ window.egovExt = window.egovExt || {};
       if (convertedParts.every(part => part !== '' && !isNaN(part))) {
         const main = convertedParts[0];
         const branches = convertedParts.slice(1).join('の');
-        return `(${main})の${branches}　`;
+        return `(${main})の${branches}${spaceSuffix}`;
       }
     }
 
     const arabic = ext.kanjiToArabic(trimmed);
     if (arabic) {
-      return `(${arabic})　`;
+      return `(${arabic})${spaceSuffix}`;
     }
 
     return originalText;
@@ -293,6 +297,20 @@ window.egovExt = window.egovExt || {};
           node.textContent = newVal;
         }
       });
+
+      // 号番号要素の末尾と直後の兄弟ノード（または次要素）との境界空白を正規化
+      // el の末尾に空白があるのに直後のテキストノード先頭にも空白がある場合、二重空白（(1)　　）を防止
+      const nextNode = el.nextSibling;
+      if (nextNode && nextNode.nodeType === Node.TEXT_NODE) {
+        if (el.textContent.endsWith('　') || el.textContent.endsWith(' ')) {
+          if (/^[　 ]+/.test(nextNode.nodeValue)) {
+            if (ext.saveOriginalHTML && nextNode.parentNode) {
+              ext.saveOriginalHTML(nextNode.parentNode);
+            }
+            nextNode.nodeValue = nextNode.nodeValue.replace(/^[　 ]+/, '');
+          }
+        }
+      }
     };
 
     if (targetContainer) {

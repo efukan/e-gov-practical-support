@@ -171,150 +171,206 @@ window.egovExt = window.egovExt || {};
   }
 
   /**
+   * 定義語抽出処理の進行中 Promise（重複起動防止・共有用）
+   * @type {Promise<void>|null}
+   */
+  ext.definitionExtractionPromise = null;
+
+  /**
+   * 定義語抽出が全パターン完走して成功したかどうかのフラグ
+   * @type {boolean}
+   */
+  ext.definitionExtractionCompleted = false;
+
+  /**
+   * 抽出完了時の法令ID
+   * @type {string}
+   */
+  ext.extractedLawId = '';
+
+  /**
    * e-Govの法令本文から定義語および定義文・出典番号を抽出し、メモリ上に保持する関数（非同期チャンク分割版）
    * @returns {Promise<void>}
    */
   ext.extractDefinitionsAsync = async function() {
-    ext.definitionMap.clear();
+    const currentLawId = ext.getLawIdFromUrl ? ext.getLawIdFromUrl(window.location.href) : '';
 
-    const addDefinition = (word, data) => {
-      if (!word) return;
-      if (word.length === 1 && (INVALID_DEFINITION_WORDS.has(word) || /^[0-9\uff10-\uff19a-zA-Z\uff41-\uff5a\uff21-\uff3a]$/.test(word))) {
-        return;
-      }
-      if (ITEM_MARKER_REGEX.test(word)) {
-        return;
-      }
-      // 同じ語が複数箇所で定義されている場合、最初（文書順で最も早い）の定義だけを保持する。
-      // 抽出は文書順に進むため、最初に登録されたものが最も早い出現になる。
-      if (!ext.definitionMap.has(word)) {
-        ext.definitionMap.set(word, data);
-      }
-    };
+    // 既に同一法令で全パターン抽出が完了している場合は再抽出不要
+    if (ext.definitionExtractionCompleted && ext.extractedLawId === currentLawId && ext.definitionMap.size > 0) {
+      return;
+    }
 
-    const container = ext.getLawContainer();
-    ext.log('definition container:', container.tagName, 'class:', container.className, 'id:', container.id);
+    // 既に抽出処理が走っている最中であれば、新規タスクを作らず既存の Promise を共有・待機する
+    if (ext.definitionExtractionPromise) {
+      return ext.definitionExtractionPromise;
+    }
 
-    // パターン1：インライン略称型
-    const inlineElements = ext.deepQuerySelectorAll(container, '._div_ParagraphSentence, .ParagraphSentence, ._div_ArticleTitle, .ArticleTitle, ._div_ItemSentence, .ItemSentence, ._div_Paragraph, .Paragraph, ._div_Item, .Item, p.sentence');
-    ext.log('found inline elements for Pattern 1:', inlineElements.length);
-    
-    const state1 = await ext.runTaskInChunksPromise('definitionExtract', inlineElements, (el) => {
-      const text = el.textContent;
-      if (!text) return;
-      
-      INLINE_DEFINITION_REGEX.lastIndex = 0;
-      let match;
-      while ((match = INLINE_DEFINITION_REGEX.exec(text)) !== null) {
-        const definedWord = match[1].replace(/[\s　]+/g, '');
-        if (definedWord) {
-          const contextEl = ext.deepClosest(el, '._div_Paragraph, .Paragraph, ._div_Item, .Item, .paragraph, .item') || el;
-          addDefinition(definedWord, {
-            source: getSourceClauseNumber(contextEl),
-            element: contextEl,
-            pattern: 1
-          });
+    ext.definitionExtractionCompleted = false;
+    ext.definitionExtractionPromise = (async () => {
+      try {
+        ext.definitionMap.clear();
+
+        const addDefinition = (word, data) => {
+          if (!word) return;
+          if (word.length === 1 && (INVALID_DEFINITION_WORDS.has(word) || /^[0-9\uff10-\uff19a-zA-Z\uff41-\uff5a\uff21-\uff3a]$/.test(word))) {
+            return;
+          }
+          if (ITEM_MARKER_REGEX.test(word)) {
+            return;
+          }
+          // 同じ語が複数箇所で定義されている場合、最初（文書順で最も早い）の定義だけを保持する。
+          if (!ext.definitionMap.has(word)) {
+            ext.definitionMap.set(word, data);
+          }
+        };
+
+        const container = ext.getLawContainer();
+        ext.log('definition container:', container.tagName, 'class:', container.className, 'id:', container.id);
+
+        // パターン1：インライン略称型 (読み取り専用走査なのでチャンクサイズ500に最適化)
+        const inlineElements = ext.deepQuerySelectorAll(container, '._div_ParagraphSentence, .ParagraphSentence, ._div_ArticleTitle, .ArticleTitle, ._div_ItemSentence, .ItemSentence, ._div_Paragraph, .Paragraph, ._div_Item, .Item, p.sentence');
+        ext.log('found inline elements for Pattern 1:', inlineElements.length);
+        
+        const state1 = await ext.runTaskInChunksPromise('definitionExtract', inlineElements, (el) => {
+          const text = el.textContent;
+          if (!text) return;
+          
+          INLINE_DEFINITION_REGEX.lastIndex = 0;
+          let match;
+          while ((match = INLINE_DEFINITION_REGEX.exec(text)) !== null) {
+            const definedWord = match[1].replace(/[\s　]+/g, '');
+            if (definedWord) {
+              const contextEl = ext.deepClosest(el, '._div_Paragraph, .Paragraph, ._div_Item, .Item, .paragraph, .item') || el;
+              addDefinition(definedWord, {
+                source: getSourceClauseNumber(contextEl),
+                element: contextEl,
+                pattern: 1
+              });
+            }
+          }
+        }, 500);
+
+        if (state1 && state1.cancelled) {
+          ext.definitionExtractionCompleted = false;
+          return;
         }
-      }
-    }, 200);
 
-    if (state1 && state1.cancelled) return;
+        // パターン2：項による明示定義型
+        const sentenceElements = ext.deepQuerySelectorAll(container, '._div_ParagraphSentence, .ParagraphSentence, ._div_Sentence, .Sentence, ._div_ArticleTitle, .ArticleTitle, p.sentence');
+        ext.log("Found sentence elements for Pattern 2:", sentenceElements.length);
+        
+        const state2 = await ext.runTaskInChunksPromise('definitionExtract', sentenceElements, (el) => {
+          const parentParagraph = ext.deepClosest(el, '._div_ParagraphSentence, .ParagraphSentence, ._div_Paragraph, .Paragraph, ._div_ArticleTitle, .ArticleTitle, .paragraph') || el;
+          if (!parentParagraph) return;
 
-    // パターン2：項による明示定義型
-    const sentenceElements = ext.deepQuerySelectorAll(container, '._div_ParagraphSentence, .ParagraphSentence, ._div_Sentence, .Sentence, ._div_ArticleTitle, .ArticleTitle, p.sentence');
-    ext.log("Found sentence elements for Pattern 2:", sentenceElements.length);
-    
-    const state2 = await ext.runTaskInChunksPromise('definitionExtract', sentenceElements, (el) => {
-      const parentParagraph = ext.deepClosest(el, '._div_ParagraphSentence, .ParagraphSentence, ._div_Paragraph, .Paragraph, ._div_ArticleTitle, .ArticleTitle, .paragraph') || el;
-      if (!parentParagraph) return;
+          const text = el.textContent;
+          if (!text) return;
 
-      const text = el.textContent;
-      if (!text) return;
+          CLAUSE_DEFINITION_REGEX.lastIndex = 0;
+          let match;
+          while ((match = CLAUSE_DEFINITION_REGEX.exec(text)) !== null) {
+            const definedWord = match[1].replace(/[\s　]+/g, '');
+            if (definedWord) {
+              addDefinition(definedWord, {
+                source: getSourceClauseNumber(parentParagraph),
+                element: parentParagraph,
+                pattern: 2
+              });
+            }
+          }
 
-      CLAUSE_DEFINITION_REGEX.lastIndex = 0;
-      let match;
-      while ((match = CLAUSE_DEFINITION_REGEX.exec(text)) !== null) {
-        const definedWord = match[1].replace(/[\s　]+/g, '');
-        if (definedWord) {
-          addDefinition(definedWord, {
-            source: getSourceClauseNumber(parentParagraph),
-            element: parentParagraph,
-            pattern: 2
-          });
+          CLAUSE_DEFINITION_NO_QUOTES_REGEX.lastIndex = 0;
+          while ((match = CLAUSE_DEFINITION_NO_QUOTES_REGEX.exec(text)) !== null) {
+            const definedWord = match[1].replace(/[\s　]+/g, '');
+            if (definedWord) {
+              addDefinition(definedWord, {
+                source: getSourceClauseNumber(parentParagraph),
+                element: parentParagraph,
+                pattern: 2
+              });
+            }
+          }
+        }, 500);
+
+        if (state2 && state2.cancelled) {
+          ext.definitionExtractionCompleted = false;
+          return;
         }
-      }
 
-      CLAUSE_DEFINITION_NO_QUOTES_REGEX.lastIndex = 0;
-      while ((match = CLAUSE_DEFINITION_NO_QUOTES_REGEX.exec(text)) !== null) {
-        const definedWord = match[1].replace(/[\s　]+/g, '');
-        if (definedWord) {
-          addDefinition(definedWord, {
-            source: getSourceClauseNumber(parentParagraph),
-            element: parentParagraph,
-            pattern: 2
-          });
+        // パターン3：号による列挙定義型
+        const itemElements = ext.deepQuerySelectorAll(container, '._div_ItemSentence, .ItemSentence, .item p.sentence');
+        ext.log("Found item elements for Pattern 3:", itemElements.length);
+        
+        const state3 = await ext.runTaskInChunksPromise('definitionExtract', itemElements, (el) => {
+          const text = el.textContent.trim();
+          if (!text) return;
+
+          const match = ITEM_LIST_DEFINITION_REGEX.exec(text);
+          if (match) {
+            const definedWord = match[1].replace(/[\s　]+/g, '');
+            if (definedWord) {
+              const parentItem = ext.deepClosest(el, '._div_Item, .Item, .item') || el;
+              addDefinition(definedWord, {
+                source: getSourceClauseNumber(parentItem),
+                element: parentItem,
+                pattern: 3
+              });
+            }
+          }
+        }, 500);
+
+        if (state3 && state3.cancelled) {
+          ext.definitionExtractionCompleted = false;
+          return;
         }
-      }
-    }, 200);
 
-    if (state2 && state2.cancelled) return;
+        // パターン4：e-Gov特有のカラム分割型（建築基準法第2条等）
+        // 子孫の p.sentence は不要なため親コンテナのみ走査して高速化
+        const itemSentences = ext.deepQuerySelectorAll(container, '._div_ItemSentence, .ItemSentence, ._div_Item, .Item, .item');
+        ext.log("Found item sentences for Pattern 4:", itemSentences.length);
+        
+        const state4 = await ext.runTaskInChunksPromise('definitionExtract', itemSentences, (is) => {
+          const col1 = is.querySelector(':scope > .Column[Num="1"], :scope > ._div_Column[Num="1"], :scope > .Column[num="1"], :scope > ._div_Column[num="1"], :scope > .column[num="1"], :scope > .column[Num="1"]');
+          const col2 = is.querySelector(':scope > .Column[Num="2"], :scope > ._div_Column[Num="2"], :scope > .Column[num="2"], :scope > ._div_Column[num="2"], :scope > .column[num="2"], :scope > .column[Num="2"]');
+          
+          let targetCol1 = col1;
+          let targetCol2 = col2;
+          if (!targetCol1 || !targetCol2) {
+            const cols = is.querySelectorAll(':scope > .column, :scope > .Column, :scope > ._div_Column');
+            if (cols.length >= 2) {
+              targetCol1 = targetCol1 || cols[0];
+              targetCol2 = targetCol2 || cols[1];
+            }
+          }
 
-    // パターン3：号による列挙定義型
-    const itemElements = ext.deepQuerySelectorAll(container, '._div_ItemSentence, .ItemSentence, .item p.sentence');
-    ext.log("Found item elements for Pattern 3:", itemElements.length);
-    
-    const state3 = await ext.runTaskInChunksPromise('definitionExtract', itemElements, (el) => {
-      const text = el.textContent.trim();
-      if (!text) return;
+          if (targetCol1 && targetCol2) {
+            const definedWord = targetCol1.textContent.replace(/[\s　]+/g, '');
+            const parentItem = ext.deepClosest(is, '._div_ItemSentence, .ItemSentence, ._div_Item, .Item, .item') || is;
+            if (definedWord && parentItem) {
+              addDefinition(definedWord, {
+                source: getSourceClauseNumber(parentItem),
+                element: parentItem,
+                pattern: 4
+              });
+            }
+          }
+        }, 500);
 
-      const match = ITEM_LIST_DEFINITION_REGEX.exec(text);
-      if (match) {
-        const definedWord = match[1].replace(/[\s　]+/g, '');
-        if (definedWord) {
-          const parentItem = ext.deepClosest(el, '._div_Item, .Item, .item') || el;
-          addDefinition(definedWord, {
-            source: getSourceClauseNumber(parentItem),
-            element: parentItem,
-            pattern: 3
-          });
+        if (state4 && state4.cancelled) {
+          ext.definitionExtractionCompleted = false;
+          return;
         }
+
+        // 全パターン正常完走時のみ完了フラグをセット
+        ext.definitionExtractionCompleted = true;
+        ext.extractedLawId = currentLawId;
+        ext.log("Extraction complete (async). Total terms extracted:", ext.definitionMap.size, Array.from(ext.definitionMap.keys()));
+      } finally {
+        ext.definitionExtractionPromise = null;
       }
-    }, 200);
+    })();
 
-    if (state3 && state3.cancelled) return;
-
-    // パターン4：e-Gov特有のカラム分割型
-    const itemSentences = ext.deepQuerySelectorAll(container, '._div_ItemSentence, .ItemSentence, .item, .item p.sentence');
-    ext.log("Found item sentences for Pattern 4:", itemSentences.length);
-    
-    await ext.runTaskInChunksPromise('definitionExtract', itemSentences, (is) => {
-      const col1 = is.querySelector(':scope > .Column[Num="1"], :scope > ._div_Column[Num="1"], :scope > .Column[num="1"], :scope > ._div_Column[num="1"], :scope > .column[num="1"], :scope > .column[Num="1"]');
-      const col2 = is.querySelector(':scope > .Column[Num="2"], :scope > ._div_Column[Num="2"], :scope > .Column[num="2"], :scope > ._div_Column[num="2"], :scope > .column[num="2"], :scope > .column[Num="2"]');
-      
-      let targetCol1 = col1;
-      let targetCol2 = col2;
-      if (!targetCol1 || !targetCol2) {
-        const cols = is.querySelectorAll(':scope > .column, :scope > .Column, :scope > ._div_Column');
-        if (cols.length >= 2) {
-          targetCol1 = targetCol1 || cols[0];
-          targetCol2 = targetCol2 || cols[1];
-        }
-      }
-
-      if (targetCol1 && targetCol2) {
-        const definedWord = targetCol1.textContent.replace(/[\s　]+/g, '');
-        const parentItem = ext.deepClosest(is, '._div_ItemSentence, .ItemSentence, ._div_Item, .Item, .item') || is;
-        if (definedWord && parentItem) {
-          addDefinition(definedWord, {
-            source: getSourceClauseNumber(parentItem),
-            element: parentItem,
-            pattern: 4
-          });
-        }
-      }
-    }, 200);
-
-    ext.log("Extraction complete (async). Total terms extracted:", ext.definitionMap.size, Array.from(ext.definitionMap.keys()));
+    return ext.definitionExtractionPromise;
   };
 
   /**
@@ -521,6 +577,9 @@ window.egovExt = window.egovExt || {};
    */
   ext.disableDefinitionHighlighting = function() {
     ext.cancelTask('definitionHighlight');
+    ext.cancelTask('definitionExtract');
+    ext.definitionExtractionCompleted = false;
+    ext.definitionExtractionPromise = null;
     if (ext.definitionTooltip) {
       ext.definitionTooltip.hide(true);
     }

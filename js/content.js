@@ -493,8 +493,8 @@ window.egovExt = window.egovExt || {};
   async function handleDynamicContent(forceReset = false) {
     if (!ext.settings.global) return;
 
-    // 進行中のすべての非同期チャンク処理タスクをキャンセル
-    ext.cancelAllTasks();
+    // 進行中のDOM書き換えチャンク処理タスクをキャンセル（読み取り専用の定義語抽出は継続）
+    ext.cancelAllTasks(['definitionExtract']);
 
     // 自分がDOMを書き換える間、一時的にObserverを止めて無限ループを防ぐ
     if (ext.globalDOMObserver) {
@@ -512,6 +512,9 @@ window.egovExt = window.egovExt || {};
     const lawIdChanged = currentLawId !== lastObservedLawId;
     if (lawIdChanged) {
       lastObservedLawId = currentLawId;
+      if (ext.cancelTask) ext.cancelTask('definitionExtract');
+      ext.definitionExtractionCompleted = false;
+      ext.definitionExtractionPromise = null;
     }
 
     ext.log("handleDynamicContent called. forceReset:", forceReset, "urlChanged:", urlChanged, "isLawPage:", isLawPage);
@@ -587,13 +590,9 @@ window.egovExt = window.egovExt || {};
     // 定義語ホバー辞書＆ハイライト
     if (ext.settings.definition && isLawPage && ext.extractDefinitionsAsync && ext.enableDefinitionHighlighting) {
       try {
-        const shouldExtract = forceReset || lawIdChanged || ext.definitionMap.size === 0;
+        const shouldExtract = forceReset || lawIdChanged || !ext.definitionExtractionCompleted || ext.definitionMap.size === 0;
         if (shouldExtract) {
           await ext.extractDefinitionsAsync();
-          
-          if (ext.activeTasks['definitionExtract'] && ext.activeTasks['definitionExtract'].cancelled) {
-            return;
-          }
         }
         ext.enableDefinitionHighlighting();
       } catch (e) {

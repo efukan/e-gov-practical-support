@@ -1030,8 +1030,23 @@ window.egovExt = window.egovExt || {};
       if (isHorizontalOn && ext.convertItemTitleToHorizontal) {
         it.textContent = ext.convertItemTitleToHorizontal(it.textContent);
       }
-      if (!it.textContent.endsWith('　') && !it.textContent.endsWith(' ')) {
-        it.appendChild(document.createTextNode('　'));
+      // 末尾の全角・半角スペースを整理し、厳密に1つの全角スペースで終わるように正規化
+      let itText = it.textContent.replace(/[　 ]+$/, '');
+      it.textContent = itText + '　';
+
+      // 直後の後続要素（ItemSentence等）の先頭にある余計な全角・半角スペースを除去して二重空白を防止
+      const nextElem = it.nextElementSibling;
+      if (nextElem) {
+        const nextWalker = document.createTreeWalker(nextElem, NodeFilter.SHOW_TEXT, null);
+        let firstTextNode = nextWalker.nextNode();
+        while (firstTextNode && /^[　 ]+/.test(firstTextNode.nodeValue)) {
+          firstTextNode.nodeValue = firstTextNode.nodeValue.replace(/^[　 ]+/, '');
+          if (!firstTextNode.nodeValue) {
+            const nextNode = nextWalker.nextNode();
+            firstTextNode.remove();
+            firstTextNode = nextNode;
+          }
+        }
       }
     });
 
@@ -1046,10 +1061,45 @@ window.egovExt = window.egovExt || {};
       });
       const next = col.nextElementSibling;
       if (next && next.matches('._div_Column, .Column, .column, [class*="Column"]')) {
-        const nextSibling = col.nextSibling;
-        if (!nextSibling || nextSibling.nodeType !== Node.TEXT_NODE || !nextSibling.nodeValue.includes('　')) {
-          col.insertAdjacentText('afterend', '　');
+        // 1. col の末尾にある全角・半角スペースを除去
+        const colWalker = document.createTreeWalker(col, NodeFilter.SHOW_TEXT, null);
+        let lastTextNode = null;
+        while (colWalker.nextNode()) {
+          lastTextNode = colWalker.currentNode;
         }
+        while (lastTextNode && /[　 ]+$/.test(lastTextNode.nodeValue)) {
+          lastTextNode.nodeValue = lastTextNode.nodeValue.replace(/[　 ]+$/, '');
+          if (!lastTextNode.nodeValue) {
+            const prev = colWalker.previousNode();
+            lastTextNode.remove();
+            lastTextNode = prev;
+          }
+        }
+
+        // 2. next の先頭にある全角・半角スペースを除去
+        const nextWalker = document.createTreeWalker(next, NodeFilter.SHOW_TEXT, null);
+        let firstTextNode = nextWalker.nextNode();
+        while (firstTextNode && /^[　 ]+/.test(firstTextNode.nodeValue)) {
+          firstTextNode.nodeValue = firstTextNode.nodeValue.replace(/^[　 ]+/, '');
+          if (!firstTextNode.nodeValue) {
+            const nextNode = nextWalker.nextNode();
+            firstTextNode.remove();
+            firstTextNode = nextNode;
+          }
+        }
+
+        // 3. col と next の間にある既存の余計な空白テキストノードを除去
+        let sib = col.nextSibling;
+        while (sib && sib !== next) {
+          const nextSib = sib.nextSibling;
+          if (sib.nodeType === Node.TEXT_NODE) {
+            sib.remove();
+          }
+          sib = nextSib;
+        }
+
+        // 4. カラム間に厳密に1つの全角スペースを挿入
+        col.insertAdjacentText('afterend', '　');
       }
     });
 
@@ -1059,6 +1109,16 @@ window.egovExt = window.egovExt || {};
       s.classList.add('egov-ext-inline');
       s.querySelectorAll('br').forEach(br => br.remove());
     });
+
+    // 6. 重複全角スペースの最終正規化（連続全角スペースを1つに集約）
+    container.normalize();
+    const finalWalker = document.createTreeWalker(container, NodeFilter.SHOW_TEXT, null);
+    while (finalWalker.nextNode()) {
+      const node = finalWalker.currentNode;
+      if (node.nodeValue.includes('　　')) {
+        node.nodeValue = node.nodeValue.replace(/　{2,}/g, '　');
+      }
+    }
   };
 
   /**

@@ -1430,13 +1430,35 @@ async function check(name, fn) {
       return false;
     }
 
-    // 3. テキスト全体で号番号・Column 1・Column 2 の間に全角スペースが含まれていること
+    // 3. テキスト全体で号番号・Column 1・Column 2 の間に厳密に1つの全角スペースが含まれていること
     const fullText = dummyContainer.textContent;
-    if (!fullText.includes('(1)　建築物　土地に定着する工作物のうち')) {
+    if (!fullText.includes('(1)　建築物　土地に定着する工作物のうち') || fullText.includes('　　')) {
       return false;
     }
 
-    return '定義語ポップアップでの号番号(1)化・Columnインライン化・全角スペース補完による変な改行の完全解消確認';
+    // 4. 実機e-Gov DOM構造（VueによりColumn 1末尾に既に全角スペースが存在するケース）でも2文字スペースにならないこと
+    const liveEGovContainer = document.createElement('div');
+    liveEGovContainer.className = 'egov-ext-tip-body';
+    liveEGovContainer.innerHTML = `
+      <div class="_div_Item">
+        <div class="_div_ItemTitle">(1)　</div>
+        <div class="_div_ItemSentence">
+          <div class="_div_Column" num="1">
+            <div class="_div_Sentence"><span class="egov-definition-word">建築物</span></div>　
+          </div>
+          <div class="_div_Column" num="2">
+            <div class="_div_Sentence">土地に定着する工作物のうち、屋根及び柱若しくは壁を有するもの...</div>
+          </div>
+        </div>
+      </div>
+    `;
+    ext.formatInlinePreview(liveEGovContainer);
+    const liveText = liveEGovContainer.textContent;
+    if (!liveText.includes('(1)　建築物　土地に定着する工作物のうち') || liveText.includes('建築物　　土地')) {
+      return false;
+    }
+
+    return '定義語ポップアップでの号番号(1)化・Columnインライン化・厳密な全角1文字スペース区切り（2文字スペース完全防止）確認';
   });
 
   console.log('\n==========================================');

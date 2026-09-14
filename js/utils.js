@@ -894,8 +894,13 @@ window.egovExt = window.egovExt || {};
     let correctionAttempts = 0;
     const maxCorrectionAttempts = 3;
 
+    if (ext._activeScrollTimers) {
+      ext._activeScrollTimers.forEach(t => clearTimeout(t));
+    }
+    ext._activeScrollTimers = [];
+
     function applyArrivalCorrection() {
-      if (!scrollTarget || !scrollTarget.getBoundingClientRect) return;
+      if (!scrollTarget || !scrollTarget.isConnected || !scrollTarget.getBoundingClientRect) return;
       const currentRect = scrollTarget.getBoundingClientRect();
       const currentOffset = ext.updateHeaderOffset ? ext.updateHeaderOffset() : 72;
       const diff = currentRect.top - currentOffset;
@@ -925,7 +930,8 @@ window.egovExt = window.egovExt || {};
         window.removeEventListener('scrollend', onScrollEnd);
       }
       applyArrivalCorrection();
-      setTimeout(applyArrivalCorrection, 120);
+      const t1 = setTimeout(applyArrivalCorrection, 120);
+      ext._activeScrollTimers.push(t1);
     };
 
     if (typeof window !== 'undefined' && window.addEventListener) {
@@ -934,61 +940,124 @@ window.egovExt = window.egovExt || {};
 
     // 2. タイマーによるセーフティネット（scrollend未対応環境や停止検知用）
     const checkDelay = Math.min(600, Math.max(250, Math.round(200 + Math.sqrt(distance) * 5)));
-    setTimeout(() => {
+    const t2 = setTimeout(() => {
       if (!scrollEndFired) {
         applyArrivalCorrection();
       }
     }, checkDelay);
+    ext._activeScrollTimers.push(t2);
 
     // 3. 非同期DOM変換（被引用ボタン挿入等）による微小ズレに対する最終ガード
-    setTimeout(applyArrivalCorrection, Math.max(checkDelay + 150, 450));
+    const t3 = setTimeout(applyArrivalCorrection, Math.max(checkDelay + 150, 450));
+    ext._activeScrollTimers.push(t3);
 
     // ハイライトアニメーションの付与（既存のアニメーションをリセットして再発火）
     scrollTarget.classList.remove('egov-ext-jump-target');
-    setTimeout(() => {
+    const t4 = setTimeout(() => {
       scrollTarget.classList.add('egov-ext-jump-target');
-      setTimeout(() => {
+      const t5 = setTimeout(() => {
         scrollTarget.classList.remove('egov-ext-jump-target');
       }, 2500);
+      ext._activeScrollTimers.push(t5);
     }, 10);
+    ext._activeScrollTimers.push(t4);
   };
 
   /**
-   * ポップアップ表示用にDOM要素（見出しと本文）をインライン化・成形する共通関数
-   * @param {HTMLElement} container - 成形対象のコンテナ要素
+   * 参照条文ポップアップや定義語ツールチップ用のDOMを整形する共通関数
+   * 条番号、項番号、号番号、各カラムをインライン配置し、余計な改行を除去して
+   * 原文法令通りの自然な横並び・全角スペース区切りレイアウトを構築する。
+   * @param {HTMLElement} container - ポップアップの本文要素
    */
   ext.formatInlinePreview = function(container) {
+    if (!container) return;
+
     // ポップアップ・プレビュー内に混入した引用ボタンなどの自作UI要素を確実に除去
     const unwantedElements = container.querySelectorAll('.egov-ext-citation-btn, [class*="citation-btn"]');
     unwantedElements.forEach(el => el.remove());
 
-    const titles = container.querySelectorAll('._div_ArticleTitle, .ArticleTitle, .paragraphtitle');
+    const isHorizontalOn = !ext.settings || ext.settings.horizontal !== false;
 
-    titles.forEach(t => {
+    // 0. 要素間の改行・インデントのみで構成された不要な空白テキストノードを除去
+    const walker = document.createTreeWalker(container, NodeFilter.SHOW_TEXT, null);
+    const toRemove = [];
+    const textNodes = [];
+    while (walker.nextNode()) {
+      const node = walker.currentNode;
+      if (/^[\r\n\t ]+$/.test(node.nodeValue)) {
+        toRemove.push(node);
+      } else {
+        textNodes.push(node);
+      }
+    }
+    toRemove.forEach(n => n.remove());
+
+    // 各テキストノードの先頭・末尾にある余計な改行やインデントを除去
+    textNodes.forEach(n => {
+      n.nodeValue = n.nodeValue.replace(/^[\r\n\t ]+/, '').replace(/[\r\n\t ]+$/, '');
+    });
+
+    // 1. 条タイトル (ArticleTitle) のインライン化
+    const articleTitles = container.querySelectorAll('._div_ArticleTitle, .ArticleTitle');
+    articleTitles.forEach(t => {
       t.classList.add('egov-ext-inline');
-      let hasInnerDiv = false;
       Array.from(t.children).forEach(child => {
-         if (child.tagName.toLowerCase() === 'div') {
-           child.classList.add('egov-ext-inline');
-           hasInnerDiv = true;
-         }
+        if (child.tagName.toLowerCase() === 'div') {
+          child.classList.add('egov-ext-inline');
+        }
       });
-      if (!hasInnerDiv) {
-        if (!t.textContent.includes('　')) {
-          const space = document.createElement('span');
-          space.textContent = '　';
-          t.appendChild(space);
+      if (!t.textContent.endsWith('　') && !t.textContent.endsWith(' ')) {
+        t.appendChild(document.createTextNode('　'));
+      }
+    });
+
+    // 2. 項番号 (ParagraphNum) のインライン化 & 算用数字変換
+    const paraNums = container.querySelectorAll('._div_ParagraphNum, .ParagraphNum, .paragraphtitle');
+    paraNums.forEach(pn => {
+      pn.classList.add('egov-ext-inline');
+      if (isHorizontalOn && ext.convertParagraphNumToHorizontal) {
+        pn.textContent = ext.convertParagraphNumToHorizontal(pn.textContent);
+      }
+      if (!pn.textContent.endsWith('　') && !pn.textContent.endsWith(' ')) {
+        pn.appendChild(document.createTextNode('　'));
+      }
+    });
+
+    // 3. 号番号 (ItemTitle) のインライン化 & 算用数字(1)化
+    const itemTitles = container.querySelectorAll('._div_ItemTitle, .ItemTitle, .itemtitle, .egov-ext-preview-item-title, [class*="ItemTitle"]');
+    itemTitles.forEach(it => {
+      it.classList.add('egov-ext-inline');
+      if (isHorizontalOn && ext.convertItemTitleToHorizontal) {
+        it.textContent = ext.convertItemTitleToHorizontal(it.textContent);
+      }
+      if (!it.textContent.endsWith('　') && !it.textContent.endsWith(' ')) {
+        it.appendChild(document.createTextNode('　'));
+      }
+    });
+
+    // 4. カラム (Column) のインライン化 & カラム間全角スペース補完
+    const columns = container.querySelectorAll('._div_Column, .Column, .column, [class*="Column"]');
+    columns.forEach(col => {
+      col.classList.add('egov-ext-inline');
+      Array.from(col.children).forEach(child => {
+        if (child.tagName.toLowerCase() === 'div') {
+          child.classList.add('egov-ext-inline');
+        }
+      });
+      const next = col.nextElementSibling;
+      if (next && next.matches('._div_Column, .Column, .column, [class*="Column"]')) {
+        const nextSibling = col.nextSibling;
+        if (!nextSibling || nextSibling.nodeType !== Node.TEXT_NODE || !nextSibling.nodeValue.includes('　')) {
+          col.insertAdjacentText('afterend', '　');
         }
       }
     });
 
-    const sentences = container.querySelectorAll('._div_ParagraphSentence, .ParagraphSentence, ._div_ItemSentence, .ItemSentence, ._div_Sentence, .Sentence, .sentence');
+    // 5. 段落・号・文コンテナのインライン化と余計な改行の除去
+    const sentences = container.querySelectorAll('._div_ParagraphSentence, .ParagraphSentence, ._div_ItemSentence, .ItemSentence, ._div_Sentence, .Sentence, .sentence, ._div_Item, .Item, .item');
     sentences.forEach(s => {
-      const text = s.textContent.trim();
-      if (!/^[0-9０-９]/.test(text)) {
-        s.classList.add('egov-ext-inline');
-        s.querySelectorAll('br').forEach(br => br.remove());
-      }
+      s.classList.add('egov-ext-inline');
+      s.querySelectorAll('br').forEach(br => br.remove());
     });
   };
 

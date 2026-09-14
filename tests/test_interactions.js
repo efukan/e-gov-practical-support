@@ -1343,6 +1343,102 @@ async function check(name, fn) {
     return '略称リンクの条項パス正確分離・正式法令名優先表示・タイトル二重化の完全防止確認';
   });
 
+  console.log('\n--- 9. 号番号の算用数字(1)化およびポップアップレイアウト（改行・スペース崩れ防止）の検証 ---');
+
+  await check('他法令プレビュー: 算用数字(horizontal)機能有効時の号番号(1)化および項番号変換検証', async () => {
+    const { ext } = await createTestEnv('<div class="LawBody"></div>');
+    ext.settings.horizontal = true;
+
+    const content = {
+      LawTitle: '建築基準法',
+      ArticleTitle: '第五十二条',
+      Paragraph: [
+        {
+          ParagraphNum: '二',
+          ParagraphSentence: {
+            Sentence: [{ '#text': '前項の規定にかかわらず...' }]
+          },
+          Item: [
+            {
+              ItemTitle: '一',
+              ItemSentence: {
+                Sentence: [{ '#text': '第一号本文' }]
+              }
+            },
+            {
+              ItemTitle: '二',
+              ItemSentence: {
+                Sentence: [{ '#text': '第二号本文' }]
+              }
+            }
+          ]
+        }
+      ]
+    };
+
+    const dom = ext.renderArticlePreview(content, [], '建築基準法', '第５２条第２項', 'https://laws.e-gov.go.jp', 'Mp-At_52-Pr_2');
+    if (!dom) return false;
+
+    // 項番号が "２　" に変換されていること
+    const paraNumEl = dom.querySelector('.egov-ext-preview-paragraph-num');
+    if (!paraNumEl || !paraNumEl.textContent.includes('２')) {
+      return false;
+    }
+
+    // 各号番号が "(1)　", "(2)　" に変換されていること
+    const itemTitleEls = dom.querySelectorAll('.egov-ext-preview-item-title');
+    if (itemTitleEls.length !== 2) return false;
+    if (!itemTitleEls[0].textContent.includes('(1)')) return false;
+    if (!itemTitleEls[1].textContent.includes('(2)')) return false;
+
+    return '他法令プレビュー内での項番号「２」および号番号「(1)」「(2)」への正常変換確認';
+  });
+
+  await check('formatInlinePreview: 定義語ポップアップ等の号・Column・文のインライン化および全角スペース補完検証', async () => {
+    const { ext } = await createTestEnv('<div class="LawBody"></div>');
+    ext.settings.horizontal = true;
+
+    // 建築基準法第2条第1号（定義語「建築物」の典型構造）
+    const dummyContainer = document.createElement('div');
+    dummyContainer.className = 'egov-ext-tip-body';
+    dummyContainer.innerHTML = `
+      <div class="_div_Item">
+        <div class="_div_ItemTitle">一</div>
+        <div class="_div_ItemSentence">
+          <div class="_div_Column" num="1">
+            <div class="_div_Sentence">建築物</div>
+          </div>
+          <div class="_div_Column" num="2">
+            <div class="_div_Sentence">土地に定着する工作物のうち、屋根及び柱若しくは壁を有するもの...</div>
+          </div>
+        </div>
+      </div>
+    `;
+
+    ext.formatInlinePreview(dummyContainer);
+
+    // 1. ItemTitle が (1) に変換され、インラインクラスが付与されていること
+    const itemTitle = dummyContainer.querySelector('._div_ItemTitle');
+    if (!itemTitle || !itemTitle.textContent.includes('(1)') || !itemTitle.classList.contains('egov-ext-inline')) {
+      return false;
+    }
+
+    // 2. Column 要素がインライン化されていること
+    const columns = dummyContainer.querySelectorAll('._div_Column');
+    if (columns.length !== 2) return false;
+    if (!columns[0].classList.contains('egov-ext-inline') || !columns[1].classList.contains('egov-ext-inline')) {
+      return false;
+    }
+
+    // 3. テキスト全体で号番号・Column 1・Column 2 の間に全角スペースが含まれていること
+    const fullText = dummyContainer.textContent;
+    if (!fullText.includes('(1)　建築物　土地に定着する工作物のうち')) {
+      return false;
+    }
+
+    return '定義語ポップアップでの号番号(1)化・Columnインライン化・全角スペース補完による変な改行の完全解消確認';
+  });
+
   console.log('\n==========================================');
   if (failures === 0) {
     console.log('🎉 全ての相互作用・順序・重複検証テストに成功しました！');

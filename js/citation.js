@@ -1322,8 +1322,12 @@ window.egovExt = window.egovExt || {};
 
         if (p.ParagraphNum && p.ParagraphNum.trim()) {
           const numSpan = document.createElement('span');
-          numSpan.className = 'egov-ext-preview-paragraph-num';
-          numSpan.textContent = `${p.ParagraphNum} `;
+          numSpan.className = 'egov-ext-preview-paragraph-num ParagraphNum';
+          let numText = p.ParagraphNum.trim();
+          if (ext.settings && ext.settings.horizontal && ext.convertParagraphNumToHorizontal) {
+            numText = ext.convertParagraphNumToHorizontal(numText).trim();
+          }
+          numSpan.textContent = `${numText}　`;
           pDiv.appendChild(numSpan);
         }
 
@@ -1350,8 +1354,12 @@ window.egovExt = window.egovExt || {};
 
             if (it.ItemTitle) {
               const itTitle = document.createElement('span');
-              itTitle.className = 'egov-ext-preview-item-title';
-              itTitle.textContent = `${it.ItemTitle} `;
+              itTitle.className = 'egov-ext-preview-item-title ItemTitle';
+              let titleText = it.ItemTitle.trim();
+              if (ext.settings && ext.settings.horizontal && ext.convertItemTitleToHorizontal) {
+                titleText = ext.convertItemTitleToHorizontal(titleText).trim();
+              }
+              itTitle.textContent = `${titleText}　`;
               itemDiv.appendChild(itTitle);
             }
 

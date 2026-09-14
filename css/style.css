@@ -211,6 +211,31 @@
   padding-bottom: 4px !important;
 }
 
+/* ポップアップ内では、号番号・カラム・文ブロックをインライン配置して元の法令の自然な横並び・折り返しを再現 */
+.egov-ext-tip-body ._div_ItemTitle,
+.egov-ext-tip-body .ItemTitle,
+.egov-ext-tip-body .itemtitle,
+.egov-ext-tip-body ._div_ItemSentence,
+.egov-ext-tip-body .ItemSentence,
+.egov-ext-tip-body ._div_Column,
+.egov-ext-tip-body .Column,
+.egov-ext-tip-body .column,
+.egov-ext-tip-body ._div_Sentence,
+.egov-ext-tip-body .Sentence,
+.egov-ext-tip-body .sentence {
+  display: inline !important;
+  margin: 0 !important;
+  padding: 0 !important;
+}
+
+/* 複数の項や号が並ぶ場合のみ適度な下余白を設ける */
+.egov-ext-tip-body ._div_Paragraph + ._div_Paragraph,
+.egov-ext-tip-body .Paragraph + .Paragraph,
+.egov-ext-tip-body ._div_Item + ._div_Item,
+.egov-ext-tip-body .Item + .Item {
+  margin-top: 6px !important;
+}
+
 /* タイトルや先頭段落をブロックではなくインラインとして流し込む */
 .egov-ext-tip .egov-ext-inline {
   display: inline !important;

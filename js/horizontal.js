@@ -270,10 +270,10 @@ window.egovExt = window.egovExt || {};
     // 2. 号の見出しの変換
     let itemTitles = [];
     containers.forEach(c => {
-      if (targetContainer && targetContainer.matches && targetContainer.matches('.ItemTitle, ._div_ItemTitle, .itemtitle')) {
+      if (targetContainer && targetContainer.matches && targetContainer.matches('.ItemTitle, ._div_ItemTitle, .itemtitle, .egov-ext-preview-item-title')) {
         itemTitles.push(targetContainer);
       }
-      const titles = Array.from(ext.deepQuerySelectorAll(c, '.ItemTitle, ._div_ItemTitle, .itemtitle'));
+      const titles = Array.from(ext.deepQuerySelectorAll(c, '.ItemTitle, ._div_ItemTitle, .itemtitle, .egov-ext-preview-item-title'));
       itemTitles = itemTitles.concat(titles);
     });
 
@@ -304,12 +304,12 @@ window.egovExt = window.egovExt || {};
     // 3. 古い法令などの項番号見出しの変換
     let paragraphNums = [];
     containers.forEach(c => {
-      if (targetContainer && targetContainer.matches && targetContainer.matches('.ParagraphNum, ._div_ParagraphNum, .paragraphtitle')) {
+      if (targetContainer && targetContainer.matches && targetContainer.matches('.ParagraphNum, ._div_ParagraphNum, .paragraphtitle, .egov-ext-preview-paragraph-num')) {
         if (!targetContainer.textContent.includes('条')) {
           paragraphNums.push(targetContainer);
         }
       }
-      const nums = ext.deepQuerySelectorAll(c, '.ParagraphNum, ._div_ParagraphNum, .paragraphtitle');
+      const nums = ext.deepQuerySelectorAll(c, '.ParagraphNum, ._div_ParagraphNum, .paragraphtitle, .egov-ext-preview-paragraph-num');
       const filteredNums = Array.from(nums).filter(el => !el.textContent.includes('条'));
       paragraphNums = paragraphNums.concat(filteredNums);
     });
@@ -365,5 +365,8 @@ window.egovExt = window.egovExt || {};
       });
     }
   };
+
+  ext.convertItemTitleToHorizontal = convertItemTitleToHorizontal;
+  ext.convertParagraphNumToHorizontal = convertParagraphNumToHorizontal;
 
 })(window.egovExt);

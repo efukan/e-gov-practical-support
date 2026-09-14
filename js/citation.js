@@ -662,6 +662,32 @@ window.egovExt = window.egovExt || {};
   /**
    * XMLの条文ノード（<Article> または <Paragraph>）を
    * renderArticlePreview が受け取れる Content 構造化オブジェクトに変換する
+  /**
+   * XMLコンテナノード（ParagraphSentence, ItemSentence等）から Sentence / Column 構造を抽出する
+   * @param {Element} containerNode
+   * @returns {Object|null}
+   */
+  function extractSentenceContainerFromXml(containerNode) {
+    if (!containerNode) return null;
+    const colNodes = containerNode.querySelectorAll(':scope > Column');
+    if (colNodes.length > 0) {
+      return {
+        Column: Array.from(colNodes).map(colNode => ({
+          Sentence: Array.from(colNode.querySelectorAll('Sentence')).map(s => ({
+            '#text': s.textContent
+          }))
+        }))
+      };
+    }
+    return {
+      Sentence: Array.from(containerNode.querySelectorAll('Sentence')).map(s => ({
+        '#text': s.textContent
+      }))
+    };
+  }
+
+  /**
+   * e-Gov 公式 XML API の特定ノード（Article / Paragraph）を SelectInyoLawTextData 相当の JSON オブジェクトに変換
    * @param {Element} node
    * @returns {Object|null}
    */
@@ -674,15 +700,12 @@ window.egovExt = window.egovExt || {};
     // 単文法令（Paragraph直接型）の場合
     if (node.tagName.toLowerCase() === 'paragraph') {
       const pSentenceNode = node.querySelector(':scope > ParagraphSentence');
-      const sentences = pSentenceNode
-        ? Array.from(pSentenceNode.querySelectorAll(':scope > Sentence')).map(s => ({ '#text': s.textContent }))
-        : [];
       return {
         LawTitle: lawTitle,
         Paragraph: [
           {
             ParagraphNum: '',
-            ParagraphSentence: { Sentence: sentences }
+            ParagraphSentence: extractSentenceContainerFromXml(pSentenceNode) || { Sentence: [] }
           }
         ]
       };
@@ -712,11 +735,7 @@ window.egovExt = window.egovExt || {};
 
         const pSentenceNode = pNode.querySelector(':scope > ParagraphSentence');
         if (pSentenceNode) {
-          pObj.ParagraphSentence = {
-            Sentence: Array.from(pSentenceNode.querySelectorAll(':scope > Sentence')).map(s => ({
-              '#text': s.textContent
-            }))
-          };
+          pObj.ParagraphSentence = extractSentenceContainerFromXml(pSentenceNode);
         }
 
         // Item（号）
@@ -729,11 +748,7 @@ window.egovExt = window.egovExt || {};
 
             const itSentence = itNode.querySelector(':scope > ItemSentence');
             if (itSentence) {
-              itObj.ItemSentence = {
-                Sentence: Array.from(itSentence.querySelectorAll(':scope > Sentence')).map(s => ({
-                  '#text': s.textContent
-                }))
-              };
+              itObj.ItemSentence = extractSentenceContainerFromXml(itSentence);
             }
 
             // Subitem1（イ、ロ、ハ...）
@@ -746,11 +761,7 @@ window.egovExt = window.egovExt || {};
 
                 const s1Sentence = sub1Node.querySelector(':scope > Subitem1Sentence');
                 if (s1Sentence) {
-                  sub1Obj.Subitem1Sentence = {
-                    Sentence: Array.from(s1Sentence.querySelectorAll(':scope > Sentence')).map(s => ({
-                      '#text': s.textContent
-                    }))
-                  };
+                  sub1Obj.Subitem1Sentence = extractSentenceContainerFromXml(s1Sentence);
                 }
 
                 // Subitem2（（１）、（２）...）
@@ -763,11 +774,7 @@ window.egovExt = window.egovExt || {};
 
                     const s2Sentence = sub2Node.querySelector(':scope > Subitem2Sentence');
                     if (s2Sentence) {
-                      sub2Obj.Subitem2Sentence = {
-                        Sentence: Array.from(s2Sentence.querySelectorAll(':scope > Sentence')).map(s => ({
-                          '#text': s.textContent
-                        }))
-                      };
+                      sub2Obj.Subitem2Sentence = extractSentenceContainerFromXml(s2Sentence);
                     }
                     return sub2Obj;
                   });
@@ -1153,6 +1160,21 @@ window.egovExt = window.egovExt || {};
       return frag;
     }
 
+    // Column構造（表形式・二段組等の複数列）に対応（例: 建築基準法第52条第1項各号など）
+    if (sentenceContainer.Column) {
+      const cols = Array.isArray(sentenceContainer.Column)
+        ? sentenceContainer.Column
+        : [sentenceContainer.Column];
+      cols.forEach((col, idx) => {
+        if (!col) return;
+        if (idx > 0) {
+          frag.appendChild(document.createTextNode('\u3000'));
+        }
+        frag.appendChild(parseSentenceToDOM(col, terms));
+      });
+      return frag;
+    }
+
     const sentences = Array.isArray(sentenceContainer.Sentence)
       ? sentenceContainer.Sentence
       : (sentenceContainer.Sentence ? [sentenceContainer.Sentence] : (Array.isArray(sentenceContainer) ? sentenceContainer : []));
@@ -1189,7 +1211,8 @@ window.egovExt = window.egovExt || {};
     const container = document.createElement('div');
     container.className = 'egov-ext-preview-container';
 
-    const finalLawName = lawName || (content && content.LawTitle) || '';
+    // 法令名: APIからの正式名称があればそれを最優先（略称「法」「令」等ではなく正式法令名を表示）
+    let finalLawName = (content && content.LawTitle) || lawName || '';
 
     // ヘッダー
     const header = document.createElement('div');
@@ -1197,6 +1220,14 @@ window.egovExt = window.egovExt || {};
 
     const titleWrap = document.createElement('div');
     titleWrap.className = 'egov-ext-tip-header-title';
+
+    // lawName にすでに path が末尾に含まれている場合の重複除去
+    if (path) {
+      const cleanPath = path.trim();
+      if (finalLawName.endsWith(cleanPath)) {
+        finalLawName = finalLawName.slice(0, -cleanPath.length).trim();
+      }
+    }
 
     const lawTitleEl = document.createElement('span');
     lawTitleEl.className = 'egov-ext-preview-lawname';
@@ -1399,7 +1430,13 @@ window.egovExt = window.egovExt || {};
 
     const titleWrap = document.createElement('div');
     titleWrap.className = 'egov-ext-tip-header-title';
-    titleWrap.textContent = `${lawName} ${path}`.trim();
+
+    let cleanLawName = (lawName || '').trim();
+    const cleanPath = (path || '').trim();
+    if (cleanPath && cleanLawName.endsWith(cleanPath)) {
+      cleanLawName = cleanLawName.slice(0, -cleanPath.length).trim();
+    }
+    titleWrap.textContent = cleanPath ? `${cleanLawName} ${cleanPath}`.trim() : cleanLawName;
     header.appendChild(titleWrap);
 
     if (targetUrl && ext.createTipActionButton) {
@@ -1463,6 +1500,7 @@ window.egovExt = window.egovExt || {};
   ext.renderArticlePreview = renderArticlePreview;
   ext.findTargetArticle = findTargetArticle;
   ext.findTargetArticleNodeInXml = findTargetArticleNodeInXml;
+  ext.xmlNodeToContent = xmlNodeToContent;
 
   // テスト検証用に内部関数をエクスポート
   if (typeof process !== 'undefined' && process.env && process.env.NODE_ENV === 'test') {

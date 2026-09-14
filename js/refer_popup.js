@@ -194,7 +194,8 @@ window.egovExt = window.egovExt || {};
 
     // 1. "民法第七百九条", "特定非営利活動促進法（平成１０年法律第７号）第２条第２項" のように法令名（＋法令番号括弧）と条番号が結合している場合
     // 全角数字「０-９」および枝番号「の」、法令番号括弧（（平成...号））に対応
-    const fullMatch = rawText.match(/^(.+?(?:法|令|規則|府令|省令|憲法|条約|条例|布告|規程)(?:（[^）]*）|\([^)]*\))?)\s*(第[0-9０-９一二三四五六七八九十百千万]+条.*)?$/);
+    // "法第５２条第１項" や "令第２条" のように「法」「令」等1文字から始まる略称表記にも対応
+    const fullMatch = rawText.match(/^((?:.+?)?(?:法|令|規則|府令|省令|憲法|条約|条例|布告|規程)(?:（[^）]*）|\([^)]*\))?)\s*(第[0-9０-９一二三四五六七八九十百千万]+条.*)?$/);
     if (fullMatch && (fullMatch[2] || fullMatch[1])) {
       result = {
         lawName: fullMatch[1].trim(),
@@ -218,6 +219,14 @@ window.egovExt = window.egovExt || {};
     // path が空かつ objectId が指定されている場合、objectId から条・項・号を自動補完
     if (!result.path && objectId) {
       result.path = formatPathFromObjectId(objectId);
+    }
+
+    // 安全ガード: lawName の末尾に path が重複して含まれている場合、重複を除去
+    if (result.path && result.lawName) {
+      const cleanPath = result.path.trim();
+      if (result.lawName.endsWith(cleanPath)) {
+        result.lawName = result.lawName.slice(0, -cleanPath.length).trim();
+      }
     }
 
     if (a && typeof a === 'object') {

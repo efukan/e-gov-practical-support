@@ -1211,6 +1211,138 @@ async function check(name, fn) {
     return '指定項（第2項）への視覚的ハイライトクラスの正確な付与確認';
   });
 
+  console.log('\n--- 8. 号本文の表示（Column構造対応）および他法令ヘッダー重複防止の検証 ---');
+
+  await check('parseSentenceToDOM & renderArticlePreview: Column構造（複数列）を持つ号本文の抽出・連結検証', async () => {
+    const { ext } = await createTestEnv('<div class="LawBody"></div>');
+    // 建築基準法第52条第1項第1号（Column構造の典型例）
+    const content = {
+      LawTitle: '建築基準法',
+      ArticleTitle: '第五十二条',
+      Paragraph: [
+        {
+          ParagraphNum: '',
+          ParagraphSentence: {
+            Sentence: [{ '#text': '延べ面積の敷地面積に対する割合（容積率）は、次の各号に掲げる区分に従い...' }]
+          },
+          Item: [
+            {
+              ItemTitle: '一',
+              ItemSentence: {
+                Column: [
+                  {
+                    Sentence: [{ '#text': '第一種低層住居専用地域等の建築物' }]
+                  },
+                  {
+                    Sentence: [{ '#text': '十分の五から十分の二十までの数値' }]
+                  }
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    };
+
+    const dom = ext.renderArticlePreview(content, [], '法', '第５２条第１項', 'https://laws.e-gov.go.jp', 'Mp-At_52-Pr_1');
+    if (!dom) return false;
+
+    const itemEl = dom.querySelector('.egov-ext-preview-item');
+    if (!itemEl) return false;
+
+    const text = itemEl.textContent;
+    // 号タイトル "一" と、Column 1 および Column 2 のテキストが全て含まれていること
+    if (!text.includes('一') || !text.includes('第一種低層住居専用地域等の建築物') || !text.includes('十分の五から十分の二十までの数値')) {
+      return false;
+    }
+    // 列間に全角スペースが含まれていること
+    if (!text.includes('\u3000')) {
+      return false;
+    }
+
+    return '建築基準法第52条第1項パターン（Column構造の号本文）の全角スペース連結・テキスト正常描画確認';
+  });
+
+  await check('xmlNodeToContent: <Column> を含むXMLノードからの構造化抽出とプレビュー描画検証', async () => {
+    const { ext } = await createTestEnv('<div class="LawBody"></div>');
+    const mockXmlStr = `
+      <Article Num="2">
+        <ArticleTitle>第二条</ArticleTitle>
+        <Paragraph Num="1">
+          <ParagraphNum/>
+          <ParagraphSentence>
+            <Sentence>算定方法は次の各号による。</Sentence>
+          </ParagraphSentence>
+          <Item Num="1">
+            <ItemTitle>一</ItemTitle>
+            <ItemSentence>
+              <Column Num="1"><Sentence>敷地面積</Sentence></Column>
+              <Column Num="2"><Sentence>敷地の水平投影面積による。</Sentence></Column>
+            </ItemSentence>
+          </Item>
+        </Paragraph>
+      </Article>
+    `;
+    const { DOMParser } = require('jsdom').JSDOM ? new (require('jsdom').JSDOM)().window : window;
+    const xmlDoc = new DOMParser().parseFromString(mockXmlStr, 'text/xml');
+    const articleNode = xmlDoc.querySelector('Article');
+
+    const fnXmlToContent = ext.xmlNodeToContent || (ext._testCitation && ext._testCitation.xmlNodeToContent);
+    const content = fnXmlToContent(articleNode);
+    if (!content || !content.Paragraph || !content.Paragraph[0].Item) return false;
+
+    const itemObj = content.Paragraph[0].Item[0];
+    if (!itemObj.ItemSentence || !itemObj.ItemSentence.Column || itemObj.ItemSentence.Column.length !== 2) {
+      return false;
+    }
+
+    const dom = ext.renderArticlePreview(content, [], '建築基準法施行令', '第二条第１項', 'https://laws.e-gov.go.jp', 'Mp-At_2-Pr_1');
+    if (!dom) return false;
+
+    const itemText = dom.querySelector('.egov-ext-preview-item').textContent;
+    if (!itemText.includes('敷地面積') || !itemText.includes('敷地の水平投影面積による。')) {
+      return false;
+    }
+
+    return 'XMLフォールバック時における <Column> ノードの構造化抽出およびプレビュー描画完全確認';
+  });
+
+  await check('他法令プレビューヘッダー: 略称リンク（法第〇条）のパース、正式法令名優先および重複防止検証', async () => {
+    const { ext } = await createTestEnv('<div class="LawBody"></div>');
+    // 1. "法第５２条第１項" のパース
+    const dummyLink = { textContent: '法第５２条第１項' };
+    const parsed = ext.parseLawLinkText(dummyLink, '325AC0000000201', 'Mp-At_52-Pr_1');
+    if (!parsed || parsed.lawName !== '法' || parsed.path !== '第５２条第１項') {
+      return false;
+    }
+
+    // 2. renderArticlePreview での正式法令名（content.LawTitle）優先
+    const content = {
+      LawTitle: '建築基準法',
+      ArticleTitle: '第五十二条',
+      Paragraph: [{ ParagraphNum: '', ParagraphSentence: { Sentence: [{ '#text': '本文' }] } }]
+    };
+    const dom = ext.renderArticlePreview(content, [], parsed.lawName, parsed.path, 'https://laws.e-gov.go.jp', 'Mp-At_52-Pr_1');
+    const headerTitle = dom.querySelector('.egov-ext-tip-header-title').textContent;
+
+    // "建築基準法 第５２条第１項" となり、"法第５２条第１項第５２条第１項" や二重表示にならないこと
+    if (!headerTitle.includes('建築基準法') || headerTitle.includes('法第５２条第１項第５２条第１項')) {
+      return false;
+    }
+    if (headerTitle !== '建築基準法 第５２条第１項') {
+      return false;
+    }
+
+    // 3. 万が一 lawName に path が結合したまま渡された場合でも重複除去されること
+    const domFallback = ext.renderArticlePreview({ ArticleTitle: '第五十二条' }, [], '法第５２条第１項', '第５２条第１項', 'https://laws.e-gov.go.jp');
+    const fallbackTitle = domFallback.querySelector('.egov-ext-tip-header-title').textContent;
+    if (fallbackTitle !== '法 第５２条第１項') {
+      return false;
+    }
+
+    return '略称リンクの条項パス正確分離・正式法令名優先表示・タイトル二重化の完全防止確認';
+  });
+
   console.log('\n==========================================');
   if (failures === 0) {
     console.log('🎉 全ての相互作用・順序・重複検証テストに成功しました！');

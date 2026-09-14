@@ -8,8 +8,7 @@
     "storage"
   ],
   "host_permissions": [
-    "*://laws.e-gov.go.jp/*",
-    "*://elaws.e-gov.go.jp/*"
+    "*://laws.e-gov.go.jp/*"
   ],
   "action": {
     "default_popup": "popup.html",
@@ -28,8 +27,7 @@
   "content_scripts": [
     {
       "matches": [
-        "*://laws.e-gov.go.jp/*",
-        "*://elaws.e-gov.go.jp/*"
+        "*://laws.e-gov.go.jp/*"
       ],
       "css": [
         "css/style.css"

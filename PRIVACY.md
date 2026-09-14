@@ -22,7 +22,7 @@ English version follows the Japanese version. (日本語版の後に英語版が
     *   **同期の仕組み**: 設定データはブラウザ公式の同期ストレージ機能（`chrome.storage.sync`）を通じて、利用者がログインしているブラウザ提供会社（Google社等）の安全なインフラを介して他の端末へ同期されます。同期されるのは機能のオン／オフ等の設定情報のみであり、閲覧した法令テキストや個人情報が含まれることはありません。当開発元を含む第三者がこれにアクセス・収集することはありません。ブラウザの同期機能をオフにしている場合は、端末内にのみ保存されます。
 
 ### 3. 法令データの処理および外部通信について
-本拡張機能は、ユーザーが閲覧している e-Gov 法令検索（`laws.e-gov.go.jp` および `elaws.e-gov.go.jp`）のウェブページ上で動作します。
+本拡張機能は、ユーザーが閲覧している e-Gov 法令検索（`laws.e-gov.go.jp`）のウェブページ上で動作します。
 
 *   **端末内での処理**:
     表示されている法令文書のテキスト解析（漢数字の算用数字への変換、括弧書きの薄字化、接続詞の色分け、定義語の抽出・ハイライト、同一法令内の条文プレビュー生成、目次ハイライト、条文ジャンプ検索など）はすべてローカル（利用者の端末内）で実行されます。閲覧した法令の内容や入力テキストが、当開発元を含む第三者のサーバーへ送信・保存されることはありません。
@@ -52,7 +52,7 @@ The Extension uses the following permissions and APIs. These are used solely to 
     *   **Sync Mechanism**: Settings data is synchronized using the browser's official sync storage (`chrome.storage.sync`) via Google's secure infrastructure across devices logged into the same account. Only functional preference toggles are synchronized; no legal document text or personal data is included. No third party, including the developer, has access to or collects this data. If browser synchronization is disabled, settings are stored locally on the device only.
 
 ### 3. Processing of Legal Document Data and Network Requests
-The Extension operates on the official e-Gov Law Search webpages (`laws.e-gov.go.jp` and `elaws.e-gov.go.jp`).
+The Extension operates on the official e-Gov Law Search webpages (`laws.e-gov.go.jp`).
 
 *   **Local Processing**:
     Text analysis and layout enhancements of displayed legal documents (such as converting kanji numbers to Arabic digits, dimming parentheses, conjunction syntax highlighting, extracting definitions, table of contents highlighting, article jump search, and previewing articles within the same statute) are executed entirely locally within the user's browser. Browsed legal text and input queries are never uploaded or saved to any server.

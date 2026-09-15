@@ -26,7 +26,7 @@
   --tip-bg: #ffffff;
   --tip-fg: #1f2328;
   --tip-muted: #5b6470;
-  --tip-border: rgba(16, 24, 40, 0.08);
+  --tip-border: rgba(16, 24, 40, 0.15);
   --tip-accent: #1042a4;
   --tip-max-w: 460px;
 
@@ -37,18 +37,20 @@
   box-sizing: border-box;
   max-width: var(--tip-max-w);
   /* 矢印（::after）を枠外に描くため、ここでは overflow を付けない。
-     スクロールは内側の .egov-ext-tip-scroll が担当する。 */
-  padding: 12px 14px;
+     スクロールは内側の .egov-ext-tip-scroll が担当する。
+     上部パディングをタイトにして矢印直下にヘッダーが直結するようにし、
+     背後条文への無駄な白い被り・隙間を解消する。 */
+  padding: 6px 14px 10px;
   border: 1px solid var(--tip-border);
   border-radius: 12px;
   background: var(--tip-bg);
   color: var(--tip-fg);
 
-  /* 多層シャドウで、本文から浮いて見えるようにする */
+  /* 全方向アンビエント影＋多層シャドウで、背後条文（白地）から綺麗に浮き立たせる */
   box-shadow:
-    0 0 0 1px rgba(16, 24, 40, 0.04),
-    0 8px 16px -4px rgba(16, 24, 40, 0.10),
-    0 20px 32px -8px rgba(16, 24, 40, 0.14);
+    0 1px 3px rgba(16, 24, 40, 0.10),
+    0 6px 16px -2px rgba(16, 24, 40, 0.12),
+    0 16px 32px -4px rgba(16, 24, 40, 0.16);
 
   font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
                "Hiragino Sans", "Noto Sans JP", "Yu Gothic UI", sans-serif;
@@ -93,12 +95,12 @@
   transform: translateX(-50%) rotate(45deg);
 }
 .egov-ext-tip:not(.is-flipped)::after {
-  top: -6px;
+  top: -5px;
   border-left: 1px solid var(--tip-border);
   border-top: 1px solid var(--tip-border);
 }
 .egov-ext-tip.is-flipped::after {
-  bottom: -6px;
+  bottom: -5px;
   border-right: 1px solid var(--tip-border);
   border-bottom: 1px solid var(--tip-border);
 }
@@ -142,8 +144,8 @@
   justify-content: space-between !important;
   align-items: center !important;
   gap: 8px !important;
-  margin: 0 0 8px !important;
-  padding-bottom: 6px;
+  margin: 0 0 6px !important;
+  padding-bottom: 5px;
   border-bottom: 1px solid var(--tip-border);
   color: var(--tip-accent);
   font-size: 11.5px;

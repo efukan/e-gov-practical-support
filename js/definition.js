@@ -91,20 +91,32 @@ window.egovExt = window.egovExt || {};
       const titleEl = article.querySelector('.ArticleTitle, ._div_ArticleTitle');
       if (titleEl) {
         const text = titleEl.textContent.trim();
-        const match = text.match(/^(第[一二三四五六七八九十百千万]+条)/);
+        const match = text.match(/^(第[一二三四五六七八九十百千万0-9０-９]+条(?:の[一二三四五六七八九十百千万0-9０-９]+)*)/);
         articleTitle = match ? match[1] : text.split(/\s|　/)[0];
       } else {
         const pTitles = article.querySelectorAll('.paragraphtitle');
         for (let i = 0; i < pTitles.length; i++) {
           const text = pTitles[i].textContent.trim();
           if (text.includes('条')) {
-            const match = text.match(/^(第[一二三四五六七八九十百千万]+条)/);
+            const match = text.match(/^(第[一二三四五六七八九十百千万0-9０-９]+条(?:の[一二三四五六七八九十百千万0-9０-９]+)*)/);
             articleTitle = match ? match[1] : text.split(/\s|　/)[0];
             break;
           }
         }
       }
     }
+
+    // IDからのフォールバック（DOMにタイトルが無い場合や枝番の補完）
+    if (!articleTitle && id) {
+      const atM = id.match(/(?:^|[-_])At_([0-9]+(?:_[0-9]+)*)/);
+      if (atM) {
+        const atNums = atM[1].split('_');
+        const main = '第' + atNums[0] + '条';
+        const sub = atNums.slice(1).length ? 'の' + atNums.slice(1).join('の') : '';
+        articleTitle = main + sub;
+      }
+    }
+
     if (articleTitle) {
       clauseParts.push(articleTitle);
     }
@@ -607,9 +619,14 @@ window.egovExt = window.egovExt || {};
 
         const frag = document.createDocumentFragment();
 
+        let sourceText = def.source || '定義語';
+        if (ext.settings.horizontal && ext.convertLawTextToHorizontal) {
+          sourceText = ext.convertLawTextToHorizontal(sourceText);
+        }
+
         const header = document.createElement('div');
         header.className = 'egov-ext-tip-header';
-        header.textContent = def.source || '定義語';
+        header.textContent = sourceText;
         frag.appendChild(header);
 
         const body = document.createElement('div');
@@ -622,11 +639,24 @@ window.egovExt = window.egovExt || {};
         ext.formatInlinePreview(clone);
         body.appendChild(clone);
 
-
         frag.appendChild(body);
+
+        // 横書き設定が有効ならポップアップDOM全体（body）にも横書き変換を適用
+        if (ext.settings.horizontal && ext.applyHorizontalConversion) {
+          ext.applyHorizontalConversion(body);
+        }
+
         return frag;
       }
     });
+  }
+
+  // テスト用に内部関数をエクスポート
+  if (typeof process !== 'undefined' && process.env && process.env.NODE_ENV === 'test') {
+    ext._testDefinition = {
+      getSourceClauseNumber,
+      setupDefinitionTooltipEvents
+    };
   }
 
 })(window.egovExt);

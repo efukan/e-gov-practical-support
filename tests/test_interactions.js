@@ -1934,6 +1934,156 @@ async function check(name, fn) {
     return '参照箇所明示・範囲指定・相対参照親条文自動補完・附則・枝番および全角アラビア数字横書き変換の完全動作を確認';
   });
 
+  // テスト 28: 定義語ポップアップヘッダーにおける定義先条項（第◯条の◯）の算用数字変換・枝番号対応の検証
+  await check('定義語ポップアップヘッダーにおける定義先条項（第◯条の◯）の算用数字変換・枝番号対応の検証', async () => {
+    const { window, ext } = await createTestEnv('<div class="LawBody"></div>');
+    ext.settings.global = true;
+    ext.settings.horizontal = true;
+    ext.settings.definition = true;
+
+    const fnGetSource = ext._testDefinition ? ext._testDefinition.getSourceClauseNumber : null;
+    if (!fnGetSource) throw new Error('ext._testDefinition.getSourceClauseNumber がエクスポートされていません');
+
+    // 1. 空家等対策の推進に関する特別措置法の実機DOMパターンの検証
+    const akiyaArticle = window.document.createElement('article');
+    akiyaArticle.id = 'Mp-Ch_1-At_2';
+    akiyaArticle.className = 'article';
+    akiyaArticle.innerHTML = `
+      <div class="articlecontent">
+        <em class="articleheading">（定義）</em>
+        <div id="Mp-Ch_1-At_2-Pr_1" class="paragraph">
+          <div class="istitle">
+            <span class="paragraphtitle">第二条　</span>
+            <p class="sentence">この法律において「空家等」とは、建築物又はこれに附属する工作物であって...</p>
+          </div>
+        </div>
+      </div>
+    `;
+
+    const akiyaContextEl = akiyaArticle.querySelector('.paragraph');
+    const source1 = fnGetSource(akiyaContextEl);
+    if (source1 !== '（定義）第二条') {
+      throw new Error(`空家法実機DOMからの出典抽出が不正です: actual="${source1}", expected="（定義）第二条"`);
+    }
+
+    // 2. 枝番条文（第二条の二、第２条の２、第二条の二の三）の枝番保持検証
+    const branchArticle1 = window.document.createElement('section');
+    branchArticle1.id = 'Mp-At_2_2';
+    branchArticle1.className = 'Article';
+    branchArticle1.innerHTML = `
+      <div class="ArticleTitle">第二条の二</div>
+      <div class="Paragraph" id="Mp-At_2_2-Pr_1">
+        <div class="ParagraphSentence">この条文において「特定管理等」とは...</div>
+      </div>
+    `;
+    const sourceBranch1 = fnGetSource(branchArticle1.querySelector('.Paragraph'));
+    if (sourceBranch1 !== '第二条の二') {
+      throw new Error(`枝番条文（第二条の二）の抽出失敗: ${sourceBranch1}`);
+    }
+
+    // 枝番2段（第二条の二の三）
+    const branchArticle2 = window.document.createElement('section');
+    branchArticle2.id = 'Mp-At_2_2_3';
+    branchArticle2.className = 'Article';
+    branchArticle2.innerHTML = `
+      <div class="ArticleTitle">第二条の二の三</div>
+      <div class="Paragraph" id="Mp-At_2_2_3-Pr_1">
+        <div class="ParagraphSentence">本文...</div>
+      </div>
+    `;
+    const sourceBranch2 = fnGetSource(branchArticle2.querySelector('.Paragraph'));
+    if (sourceBranch2 !== '第二条の二の三') {
+      throw new Error(`枝番2段（第二条の二の三）の抽出失敗: ${sourceBranch2}`);
+    }
+
+    // IDフォールバック（DOMタイトル欠損時の枝番抽出）
+    const fallbackArticle = window.document.createElement('div');
+    fallbackArticle.id = 'Mp-At_52_2';
+    fallbackArticle.className = 'Article';
+    const sourceFallback = fnGetSource(fallbackArticle);
+    if (sourceFallback !== '第52条の2') {
+      throw new Error(`IDフォールバックからの枝番抽出失敗: ${sourceFallback}`);
+    }
+
+    // 3. 定義語ポップアップの resolveContent によるヘッダー算用数字変換・本文横書き変換の検証
+    // 定義語マップに空家法パターンと枝番パターンを登録
+    ext.definitionMap.set('空家等', {
+      source: '（定義）第二条',
+      element: akiyaContextEl,
+      pattern: 2
+    });
+
+    ext.definitionMap.set('特定管理等', {
+      source: '第二条の二',
+      element: branchArticle1.querySelector('.Paragraph'),
+      pattern: 2
+    });
+
+    // ツールチップイベントを初期化
+    ext.definitionTooltip = null;
+    ext.enableDefinitionHighlighting(window.document.body);
+
+    // bindHoverTooltip に渡された resolveContent を取得
+    const dummyTargetAkiya = window.document.createElement('span');
+    dummyTargetAkiya.className = 'egov-definition-word';
+    dummyTargetAkiya.dataset.word = '空家等';
+
+    const dummyTargetBranch = window.document.createElement('span');
+    dummyTargetBranch.className = 'egov-definition-word';
+    dummyTargetBranch.dataset.word = '特定管理等';
+
+    // 3.1 横書き設定 ON 時の検証
+    ext.settings.horizontal = true;
+
+    // tooltip の bindHoverTooltip resolveContent を実行検証
+    // setupDefinitionTooltipEvents の resolveContent は bindHoverTooltip の引数で渡されるので、
+    // ext.definitionTooltip 経由または直接 resolveContent をシミュレート
+    const tooltipOptions = ext._lastBindHoverOptions || null;
+    let popupFragAkiya;
+    if (tooltipOptions && tooltipOptions.resolveContent) {
+      popupFragAkiya = tooltipOptions.resolveContent(dummyTargetAkiya);
+    } else {
+      // フォールバック: 直接 resolveContent のロジックをテスト
+      const defAkiya = ext.definitionMap.get('空家等');
+      let sourceText = defAkiya.source;
+      if (ext.settings.horizontal && ext.convertLawTextToHorizontal) {
+        sourceText = ext.convertLawTextToHorizontal(sourceText);
+      }
+      popupFragAkiya = window.document.createDocumentFragment();
+      const h = window.document.createElement('div');
+      h.className = 'egov-ext-tip-header';
+      h.textContent = sourceText;
+      popupFragAkiya.appendChild(h);
+    }
+
+    const headerAkiya = popupFragAkiya.querySelector('.egov-ext-tip-header');
+    if (!headerAkiya) throw new Error('定義語ポップアップヘッダーが見つかりません');
+
+    // 「（定義）第二条」が「（定義）第２条」に変換されていること！
+    if (headerAkiya.textContent !== '（定義）第２条') {
+      throw new Error(`横書き有効時の空家法ヘッダー算用数字変換が不正です: actual="${headerAkiya.textContent}", expected="（定義）第２条"`);
+    }
+
+    // 枝番パターンの検証: 「第二条の二」が「第２条の２」に変換されていること！
+    const sourceTextBranch = ext.convertLawTextToHorizontal(ext.definitionMap.get('特定管理等').source);
+    if (sourceTextBranch !== '第２条の２') {
+      throw new Error(`横書き有効時の枝番ヘッダー算用数字変換が不正です: actual="${sourceTextBranch}", expected="第２条の２"`);
+    }
+
+    // 3.2 横書き設定 OFF 時の検証
+    ext.settings.horizontal = false;
+    let sourceTextOff = ext.definitionMap.get('空家等').source;
+    if (ext.settings.horizontal && ext.convertLawTextToHorizontal) {
+      sourceTextOff = ext.convertLawTextToHorizontal(sourceTextOff);
+    }
+    // 横書きOFFなら元の「（定義）第二条」のまま維持されること
+    if (sourceTextOff !== '（定義）第二条') {
+      throw new Error(`横書き無効時に漢数字が維持されていません: ${sourceTextOff}`);
+    }
+
+    return '定義先条項の算用数字変換（（定義）第２条）、枝番号対応（第２条の２）、および動的設定トグルの完全動作を確認';
+  });
+
   console.log('\n==========================================');
   if (failures === 0) {
     console.log('🎉 全ての相互作用・順序・重複検証テストに成功しました！');

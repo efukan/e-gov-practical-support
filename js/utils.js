@@ -1003,7 +1003,7 @@ window.egovExt = window.egovExt || {};
       }
     });
 
-    // 1. 条タイトル (ArticleTitle) のインライン化
+    // 1. 条タイトル (ArticleTitle) のインライン化 & 直後第1項 (Paragraph) のインライン化
     const articleTitles = container.querySelectorAll('._div_ArticleTitle, .ArticleTitle');
     articleTitles.forEach(t => {
       t.classList.add('egov-ext-inline');
@@ -1012,20 +1012,81 @@ window.egovExt = window.egovExt || {};
           child.classList.add('egov-ext-inline');
         }
       });
-      if (!t.textContent.endsWith('　') && !t.textContent.endsWith(' ')) {
-        t.appendChild(document.createTextNode('　'));
+      // 末尾を整理し、厳密に1つの全角スペースで終わるように正規化
+      let tText = t.textContent.replace(/[　 ]+$/, '');
+      if (isHorizontalOn && ext.convertLawTextToHorizontal) {
+        tText = ext.convertLawTextToHorizontal(tText);
+      }
+      t.textContent = tText + '　';
+
+      // 条タイトルの直後にある第1項（Paragraph）をインライン化して横並びにする
+      let nextPara = t.nextElementSibling;
+      while (nextPara && !nextPara.matches('._div_Paragraph, .Paragraph, .paragraph')) {
+        if (nextPara.matches('._div_ArticleTitle, .ArticleTitle')) break;
+        nextPara = nextPara.nextElementSibling;
+      }
+      if (!nextPara) {
+        const parentArticle = t.closest('._div_Article, .Article, article');
+        if (parentArticle) {
+          nextPara = parentArticle.querySelector('._div_Paragraph, .Paragraph, .paragraph');
+        }
+      }
+      if (nextPara) {
+        nextPara.classList.add('egov-ext-inline');
+        Array.from(nextPara.children).forEach(child => {
+          if (child.tagName.toLowerCase() === 'div') {
+            child.classList.add('egov-ext-inline');
+          }
+        });
+        // nextPara の先頭にある余計な全角・半角スペースを除去して二重空白を防止
+        const nextTextNodes = [];
+        const nextWalker = document.createTreeWalker(nextPara, NodeFilter.SHOW_TEXT, null);
+        while (nextWalker.nextNode()) {
+          nextTextNodes.push(nextWalker.currentNode);
+        }
+        for (let i = 0; i < nextTextNodes.length; i++) {
+          const tNode = nextTextNodes[i];
+          tNode.nodeValue = tNode.nodeValue.replace(/^[　 \t\r\n]+/, '');
+          if (!tNode.nodeValue) {
+            tNode.remove();
+          } else {
+            break;
+          }
+        }
       }
     });
 
-    // 2. 項番号 (ParagraphNum) のインライン化 & 算用数字変換
+    // 2. 項番号 (ParagraphNum) / 条タイトル (paragraphtitle) のインライン化 & 算用数字変換
     const paraNums = container.querySelectorAll('._div_ParagraphNum, .ParagraphNum, .paragraphtitle');
     paraNums.forEach(pn => {
       pn.classList.add('egov-ext-inline');
-      if (isHorizontalOn && ext.convertParagraphNumToHorizontal) {
-        pn.textContent = ext.convertParagraphNumToHorizontal(pn.textContent);
+      if (isHorizontalOn) {
+        if (/第[一二三四五六七八九十百千0-9０-９]+条/.test(pn.textContent) && ext.convertLawTextToHorizontal) {
+          pn.textContent = ext.convertLawTextToHorizontal(pn.textContent);
+        } else if (ext.convertParagraphNumToHorizontal) {
+          pn.textContent = ext.convertParagraphNumToHorizontal(pn.textContent);
+        }
       }
-      if (!pn.textContent.endsWith('　') && !pn.textContent.endsWith(' ')) {
-        pn.appendChild(document.createTextNode('　'));
+      let pnText = pn.textContent.replace(/[　 ]+$/, '');
+      pn.textContent = pnText + '　';
+
+      // 直後の後続要素（sentence等）の先頭にある余計な全角・半角スペースを除去して二重空白を防止
+      const nextElem = pn.nextElementSibling;
+      if (nextElem) {
+        const nextTextNodes = [];
+        const nextWalker = document.createTreeWalker(nextElem, NodeFilter.SHOW_TEXT, null);
+        while (nextWalker.nextNode()) {
+          nextTextNodes.push(nextWalker.currentNode);
+        }
+        for (let i = 0; i < nextTextNodes.length; i++) {
+          const tNode = nextTextNodes[i];
+          tNode.nodeValue = tNode.nodeValue.replace(/^[　 \t\r\n]+/, '');
+          if (!tNode.nodeValue) {
+            tNode.remove();
+          } else {
+            break;
+          }
+        }
       }
     });
 

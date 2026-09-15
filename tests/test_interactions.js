@@ -1661,6 +1661,121 @@ async function check(name, fn) {
     return '空テキストノード混在時のカラム末尾空白完全除去およびクロス要素境界二重空白（　　）の根絶を確認';
   });
 
+  // テスト 26: 参照条文プレビューにおける第1項の条番号直後全角1文字空けインライン配置および第2項以降独立行表示の検証
+  await check('参照条文プレビューにおける第1項の条番号直後全角1文字空けインライン配置および第2項以降独立行表示の検証', async () => {
+    const { window, ext } = await createTestEnv('<div class="LawBody"></div>');
+    ext.settings.horizontal = true;
+
+    // 1. 他法令プレビュー（renderArticlePreview）の検証
+    const mockContent = {
+      LawTitle: '建築基準法',
+      ArticleCaption: '（建築物の建築等に関する申請及び確認）',
+      ArticleTitle: '第六条',
+      Paragraph: [
+        {
+          ParagraphNum: '',
+          ParagraphSentence: {
+            Sentence: [{ '#text': '建築主は、第１号若しくは第２号に掲げる建築物を建築しようとする場合...' }]
+          }
+        },
+        {
+          ParagraphNum: '２',
+          ParagraphSentence: {
+            Sentence: [{ '#text': '前項の規定による確認の申請書には、設計図書を添附しなければならない。' }]
+          }
+        }
+      ]
+    };
+
+    const previewDOM = ext._testCitation.renderArticlePreview(mockContent, ['第六条', '第６条'], '建築基準法', '第6条第1項');
+
+    // 見出しの検証
+    const captionEl = previewDOM.querySelector('.egov-ext-preview-caption');
+    if (!captionEl || !captionEl.textContent.includes('申請及び確認')) {
+      throw new Error(`見出しが正しく生成されていません: ${captionEl?.textContent}`);
+    }
+
+    // 第1項と第2項の段落要素を取得
+    const paragraphs = previewDOM.querySelectorAll('.egov-ext-preview-paragraph');
+    if (paragraphs.length !== 2) {
+      throw new Error(`段落数が2件ではありません: ${paragraphs.length}`);
+    }
+
+    // 第1項の検証: 先頭に条番号（第６条）がインライン配置され、全角1文字空けて本文が続くこと
+    const p1 = paragraphs[0];
+    const p1Title = p1.querySelector('.egov-ext-preview-title');
+    if (!p1Title) {
+      throw new Error('第1項の中に .egov-ext-preview-title が存在しません');
+    }
+    if (p1Title.tagName.toLowerCase() !== 'span') {
+      throw new Error(`第1項の条番号タグが span ではありません: ${p1Title.tagName}`);
+    }
+    if (!p1Title.textContent.includes('第６条') && !p1Title.textContent.includes('第六条')) {
+      throw new Error(`第1項の条番号テキストが不正です: ${p1Title.textContent}`);
+    }
+
+    const p1Text = p1.textContent;
+    // 「第６条　建築主は、…」と全角スペース1個でインライン連結されていること
+    if (!p1Text.startsWith('第６条　建築主は、') && !p1Text.startsWith('第六条　建築主は、')) {
+      throw new Error(`第1項の先頭テキストが法令形式（条番号＋全角スペース＋本文）になっていません: ${JSON.stringify(p1Text.slice(0, 30))}`);
+    }
+
+    // 第2項の検証: 条番号は含まれず、項番号「２　」から始まる独立行であること
+    const p2 = paragraphs[1];
+    if (p2.querySelector('.egov-ext-preview-title')) {
+      throw new Error('第2項に誤って条番号が含まれています');
+    }
+    const p2Text = p2.textContent;
+    if (!p2Text.startsWith('２　前項の規定')) {
+      throw new Error(`第2項のテキストが項番号から始まっていません: ${JSON.stringify(p2Text.slice(0, 30))}`);
+    }
+
+    // 2. formatInlinePreview（旧様式法令の参照条文ポップアップ）の検証
+    const tipContainer = window.document.createElement('div');
+    tipContainer.className = 'egov-ext-tip-body';
+    tipContainer.innerHTML = `
+      <div class="_div_ArticleCaption">（建築基準適合判定資格者検定の基準）</div>
+      <div class="_div_ArticleTitle"><span>第三条</span></div>
+      <div class="_div_Paragraph" id="Mp-At_3-Pr_1">
+        <div class="_div_ParagraphSentence">
+          <div class="_div_Sentence">法第五条の規定による建築基準適合判定資格者検定は、...</div>
+        </div>
+      </div>
+      <div class="_div_Paragraph" id="Mp-At_3-Pr_2">
+        <div class="_div_ParagraphNum">２</div>
+        <div class="_div_ParagraphSentence">
+          <div class="_div_Sentence">前項の考査は、...</div>
+        </div>
+      </div>
+    `;
+
+    ext.formatInlinePreview(tipContainer);
+
+    const artTitle = tipContainer.querySelector('._div_ArticleTitle');
+    const firstPara = tipContainer.querySelector('#Mp-At_3-Pr_1');
+    const secondPara = tipContainer.querySelector('#Mp-At_3-Pr_2');
+
+    // _div_ArticleTitle と 第1項 _div_Paragraph に egov-ext-inline が付与されていること
+    if (!artTitle.classList.contains('egov-ext-inline')) {
+      throw new Error('_div_ArticleTitle に egov-ext-inline が付与されていません');
+    }
+    if (!firstPara.classList.contains('egov-ext-inline')) {
+      throw new Error('第1項 _div_Paragraph に egov-ext-inline が付与されていません');
+    }
+    // 第2項には egov-ext-inline が付与されずブロックのままであること
+    if (secondPara.classList.contains('egov-ext-inline')) {
+      throw new Error('第2項 _div_Paragraph に誤って egov-ext-inline が付与されています');
+    }
+
+    // テキスト全体で「第３条　法第五条の規定による」または「第三条　法第五条」とインライン連結されていること
+    const fullText = tipContainer.textContent;
+    if (!fullText.includes('第３条　法第五条') && !fullText.includes('第３条　法第５条') && !fullText.includes('第三条　法第五条')) {
+      throw new Error(`旧様式参照プレビューの成形テキストが不正です: ${JSON.stringify(fullText.slice(0, 40))}`);
+    }
+
+    return '他法令・旧様式双方で第1項の条番号直後全角1文字空けインライン配置および第2項独立行表示を確認';
+  });
+
   console.log('\n==========================================');
   if (failures === 0) {
     console.log('🎉 全ての相互作用・順序・重複検証テストに成功しました！');

@@ -386,5 +386,6 @@ window.egovExt = window.egovExt || {};
 
   ext.convertItemTitleToHorizontal = convertItemTitleToHorizontal;
   ext.convertParagraphNumToHorizontal = convertParagraphNumToHorizontal;
+  ext.convertLawTextToHorizontal = convertLawTextToHorizontal;
 
 })(window.egovExt);

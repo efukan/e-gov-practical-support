@@ -1272,12 +1272,10 @@ window.egovExt = window.egovExt || {};
         body.appendChild(caption);
       }
 
-      // 条番号（ArticleTitle）
-      if (content.ArticleTitle) {
-        const title = document.createElement('div');
-        title.className = 'egov-ext-preview-title';
-        title.textContent = content.ArticleTitle;
-        body.appendChild(title);
+      // 条番号（ArticleTitle）テキストの取得と横書き変換
+      let titleText = (content.ArticleTitle || '').trim();
+      if (titleText && ext.settings && ext.settings.horizontal && ext.convertLawTextToHorizontal) {
+        titleText = ext.convertLawTextToHorizontal(titleText);
       }
 
       // 目的の項番号・号番号を特定（指定されている場合）
@@ -1307,6 +1305,14 @@ window.egovExt = window.egovExt || {};
         ? content.Paragraph
         : (content.Paragraph ? [content.Paragraph] : (content.ParagraphSentence ? [content] : []));
 
+      // 項がない場合はフォールバックとして条番号のみをブロック配置
+      if (paragraphs.length === 0 && titleText) {
+        const title = document.createElement('div');
+        title.className = 'egov-ext-preview-title';
+        title.textContent = titleText;
+        body.appendChild(title);
+      }
+
       for (let pIdx = 0; pIdx < paragraphs.length; pIdx++) {
         const p = paragraphs[pIdx];
         const pDiv = document.createElement('div');
@@ -1318,6 +1324,15 @@ window.egovExt = window.egovExt || {};
         const isTargetPr = targetPrNum && (normPNum === targetPrNum || (targetPrNum === '1' && pIdx === 0 && !normPNum));
         if (isTargetPr) {
           pDiv.classList.add('egov-ext-preview-paragraph--target');
+        }
+
+        // 第1項（pIdx === 0）かつ条番号が存在する場合、法令の正式表示に従い第1項先頭に条番号を全角1文字空けてインライン配置
+        if (pIdx === 0 && titleText) {
+          const titleSpan = document.createElement('span');
+          titleSpan.className = 'egov-ext-preview-title';
+          titleSpan.textContent = titleText;
+          pDiv.appendChild(titleSpan);
+          pDiv.appendChild(document.createTextNode('　'));
         }
 
         if (p.ParagraphNum && p.ParagraphNum.trim()) {

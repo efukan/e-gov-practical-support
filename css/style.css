@@ -718,6 +718,9 @@ body.egov-fastrender-enabled .main-content {
 .egov-ext-preview-title {
   font-weight: 700 !important;
   color: var(--tip-fg) !important;
+}
+
+div.egov-ext-preview-title {
   margin-bottom: 4px !important;
 }
 

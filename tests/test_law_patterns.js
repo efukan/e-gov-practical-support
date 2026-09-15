@@ -567,7 +567,7 @@ async function check(name, fn) {
       const caption = dom.querySelector('.egov-ext-preview-caption');
       const body = dom.querySelector('.egov-ext-preview-sentence');
 
-      if (!title || title.textContent !== '第十条') throw new Error(`タイトル不一致: ${title?.textContent}`);
+      if (!title || (title.textContent !== '第十条' && title.textContent !== '第１０条')) throw new Error(`タイトル不一致: ${title?.textContent}`);
       if (!caption || !caption.textContent.includes('住民')) throw new Error(`見出し不一致: ${caption?.textContent}`);
       if (!body || !body.textContent.includes('市町村の区域内に住所を有する者')) throw new Error(`本文不一致: ${body?.textContent}`);
 

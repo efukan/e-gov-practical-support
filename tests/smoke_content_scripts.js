@@ -511,7 +511,7 @@ check('定義語の抽出とハイライト', async () => true);
       if (!xmlApiCalled) throw new Error('XML API が呼ばれなかった');
       if (!dom) throw new Error('プレビューDOMが生成されなかった');
       const title = dom.querySelector('.egov-ext-preview-title');
-      if (!title || title.textContent !== '第十条') throw new Error(`タイトル不一致: ${title?.textContent}`);
+      if (!title || (title.textContent !== '第十条' && title.textContent !== '第１０条')) throw new Error(`タイトル不一致: ${title?.textContent}`);
       return 'XMLフォールバック成功（isHTML救済）';
     } finally {
       global.fetch = originalGlobalFetch;

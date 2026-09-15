@@ -1776,6 +1776,164 @@ async function check(name, fn) {
     return '他法令・旧様式双方で第1項の条番号直後全角1文字空けインライン配置および第2項独立行表示を確認';
   });
 
+  // テスト 27: 同一法令内参照ポップアップヘッダーにおける参照箇所（条・項・号）の明示・範囲指定・附則・枝番および横書き全角数字変換の総合検証
+  await check('同一法令内参照ポップアップヘッダーにおける参照箇所（条・項・号）の明示・範囲指定・附則・枝番および横書き全角数字変換の検証', async () => {
+    const { window, ext } = await createTestEnv('<div class="LawBody"></div>');
+    ext.settings.global = true;
+    ext.settings.horizontal = true;
+
+    const fnFormat = ext._testReferPopup.formatPathFromObjectId;
+    const fnResolve = ext._testReferPopup.resolveReferenceClausePath;
+    const fnBuild = ext._testReferPopup.buildPreviewContent;
+
+    // 1. formatPathFromObjectId の単体検証
+    if (fnFormat('Mp-Ch_7-At_131-Pr_1-It_4') !== '第131条第1項第4号') {
+      throw new Error(`At_131-Pr_1-It_4 のパース失敗: ${fnFormat('Mp-Ch_7-At_131-Pr_1-It_4')}`);
+    }
+    if (fnFormat('Mp-At_52_2-Pr_1') !== '第52条の2第1項') {
+      throw new Error(`枝番条文のパース失敗: ${fnFormat('Mp-At_52_2-Pr_1')}`);
+    }
+    if (fnFormat('Mp-At_1-Pr_1_2-It_3_4') !== '第1条第1項の2第3号の4') {
+      throw new Error(`項・号枝番のパース失敗: ${fnFormat('Mp-At_1-Pr_1_2-It_3_4')}`);
+    }
+    if (fnFormat('325AC0100000214-Sp-At_3') !== '附則第3条') {
+      throw new Error(`附則条文のパース失敗: ${fnFormat('325AC0100000214-Sp-At_3')}`);
+    }
+    if (fnFormat('Sp-Pr_2') !== '附則第2項') {
+      throw new Error(`附則項のパース失敗: ${fnFormat('Sp-Pr_2')}`);
+    }
+    if (fnFormat('AppdxTable_1') !== '別表第1') {
+      throw new Error(`別表のパース失敗: ${fnFormat('AppdxTable_1')}`);
+    }
+    if (fnFormat('AppdxTable_2_3') !== '別表第2の3') {
+      throw new Error(`別表枝番のパース失敗: ${fnFormat('AppdxTable_2_3')}`);
+    }
+
+    // 2. resolveReferenceClausePath の単体検証
+    // 2.1 完全表記
+    const p1 = fnResolve(null, { textContent: '第百三十一条第一項第四号' }, 'Mp-Ch_7-At_131-Pr_1-It_4');
+    if (p1 !== '第百三十一条第一項第四号') {
+      throw new Error(`完全表記の解決失敗: ${p1}`);
+    }
+    // 2.2 相対参照（号のみ）-> 親条文が自動補完されること
+    const p2 = fnResolve(null, { textContent: '第十一号' }, 'Mp-Ch_11-At_153-Pr_1-It_11');
+    if (p2 !== '第153条第1項第11号') {
+      throw new Error(`相対参照（号のみ）の親条文自動補完失敗: ${p2}`);
+    }
+    // 2.3 相対参照（前条）
+    const p3 = fnResolve(null, { textContent: '前条' }, 'Mp-At_20');
+    if (p3 !== '第20条') {
+      throw new Error(`相対参照（前条）の親条文解決失敗: ${p3}`);
+    }
+    // 2.4 範囲指定（条）-> リンクテキストの範囲表現が尊重されること
+    const p4 = fnResolve(null, { textContent: '第二十七条から第二十九条まで' }, 'Mp-At_27');
+    if (p4 !== '第二十七条から第二十九条まで') {
+      throw new Error(`範囲指定（条）の解決失敗: ${p4}`);
+    }
+    // 2.5 範囲指定（項のみ）-> IDの条番号と合体して補完されること
+    const p5 = fnResolve(null, { textContent: '第一項から第三項まで' }, 'Mp-Ch_7-At_131-Pr_1');
+    if (p5 !== '第131条第一項から第三項まで') {
+      throw new Error(`範囲指定（項のみ）の条番号補完失敗: ${p5}`);
+    }
+
+    // 3. buildPreviewContent によるポップアップヘッダー生成と横書き変換の統合検証
+    const dummyTargetEl = window.document.createElement('div');
+    dummyTargetEl.className = 'Article';
+    dummyTargetEl.id = 'Mp-Ch_7-At_131-Pr_1-It_4';
+    dummyTargetEl.innerHTML = `
+      <div class="ArticleTitle">第百三十一条</div>
+      <div class="Paragraph">
+        <div class="ParagraphSentence">第四号本文...</div>
+      </div>
+    `;
+
+    // 3.1 文化財保護法「第百三十一条第一項第四号」ホバー時のシミュレーション
+    const dummyLinkA = window.document.createElement('a');
+    dummyLinkA.textContent = '第百三十一条第一項第四号';
+    dummyLinkA.href = '#Mp-Ch_7-At_131-Pr_1-It_4';
+
+    const popupDOM = fnBuild(dummyTargetEl, dummyLinkA, 'Mp-Ch_7-At_131-Pr_1-It_4');
+    if (!popupDOM) throw new Error('popupDOM の生成に失敗');
+
+    const headerTitleEl = popupDOM.querySelector('.egov-ext-tip-header-title');
+    if (!headerTitleEl) throw new Error('ヘッダータイトル要素が見つかりません');
+
+    // 初期状態（横書き変換前）: 参照条文（第百三十一条第一項第四号）
+    if (!headerTitleEl.textContent.includes('参照条文（第百三十一条第一項第四号）')) {
+      throw new Error(`横書き変換前のヘッダータイトルが不正です: ${headerTitleEl.textContent}`);
+    }
+
+    // 横書き変換適用
+    ext.applyHorizontalConversion(popupDOM);
+
+    // 横書き変換後: 参照条文（第１３１条第１項第４号）と全角アラビア数字になっていること！
+    if (headerTitleEl.textContent !== '参照条文（第１３１条第１項第４号）') {
+      throw new Error(`横書き変換後のヘッダータイトルが法令形式（全角アラビア数字）になっていません: ${headerTitleEl.textContent}`);
+    }
+
+    // ジャンプボタンが存在すること
+    const jumpBtn = popupDOM.querySelector('.egov-ext-tip-action-btn');
+    if (!jumpBtn || !jumpBtn.textContent.includes('ジャンプ')) {
+      throw new Error('ポップアップヘッダーにジャンプボタンが存在しません');
+    }
+
+    // 3.2 範囲指定リンク（第二十七条から第二十九条まで）のヘッダー表示検証
+    const dummyLinkRange = window.document.createElement('a');
+    dummyLinkRange.textContent = '第二十七条から第二十九条まで';
+    dummyLinkRange.href = '#Mp-At_27';
+
+    const rangeTargetEl = window.document.createElement('div');
+    rangeTargetEl.className = 'Article';
+    rangeTargetEl.id = 'Mp-At_27';
+    rangeTargetEl.innerHTML = '<div class="ArticleTitle">第二十七条</div>';
+
+    const rangePopupDOM = fnBuild(rangeTargetEl, dummyLinkRange, 'Mp-At_27');
+    ext.applyHorizontalConversion(rangePopupDOM);
+    const rangeHeaderTitle = rangePopupDOM.querySelector('.egov-ext-tip-header-title').textContent;
+
+    if (rangeHeaderTitle !== '参照条文（第２７条から第２９条まで）') {
+      throw new Error(`範囲指定ヘッダータイトルが不正です: ${rangeHeaderTitle}`);
+    }
+
+    // 3.3 相対参照リンク（第十一号）の親条文自動補完ヘッダー表示検証
+    const dummyLinkRel = window.document.createElement('a');
+    dummyLinkRel.textContent = '第十一号';
+    dummyLinkRel.href = '#Mp-Ch_11-At_153-Pr_1-It_11';
+
+    const relTargetEl = window.document.createElement('div');
+    relTargetEl.className = 'Item';
+    relTargetEl.id = 'Mp-Ch_11-At_153-Pr_1-It_11';
+    relTargetEl.innerHTML = '<div class="ItemTitle">十一</div>';
+
+    const relPopupDOM = fnBuild(relTargetEl, dummyLinkRel, 'Mp-Ch_11-At_153-Pr_1-It_11');
+    ext.applyHorizontalConversion(relPopupDOM);
+    const relHeaderTitle = relPopupDOM.querySelector('.egov-ext-tip-header-title').textContent;
+
+    if (relHeaderTitle !== '参照条文（第１５３条第１項第１１号）') {
+      throw new Error(`相対参照補完ヘッダータイトルが不正です: ${relHeaderTitle}`);
+    }
+
+    // 3.4 附則リンクのヘッダー表示検証
+    const dummyLinkSp = window.document.createElement('a');
+    dummyLinkSp.textContent = '附則第三条';
+    dummyLinkSp.href = '#325AC0100000214-Sp-At_3';
+
+    const spTargetEl = window.document.createElement('div');
+    spTargetEl.className = 'Article';
+    spTargetEl.id = '325AC0100000214-Sp-At_3';
+    spTargetEl.innerHTML = '<div class="ArticleTitle">第三条</div>';
+
+    const spPopupDOM = fnBuild(spTargetEl, dummyLinkSp, '325AC0100000214-Sp-At_3');
+    ext.applyHorizontalConversion(spPopupDOM);
+    const spHeaderTitle = spPopupDOM.querySelector('.egov-ext-tip-header-title').textContent;
+
+    if (spHeaderTitle !== '参照条文（附則第３条）') {
+      throw new Error(`附則ヘッダータイトルが不正です: ${spHeaderTitle}`);
+    }
+
+    return '参照箇所明示・範囲指定・相対参照親条文自動補完・附則・枝番および全角アラビア数字横書き変換の完全動作を確認';
+  });
+
   console.log('\n==========================================');
   if (failures === 0) {
     console.log('🎉 全ての相互作用・順序・重複検証テストに成功しました！');

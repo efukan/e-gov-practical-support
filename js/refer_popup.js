@@ -51,15 +51,138 @@ window.egovExt = window.egovExt || {};
   }
 
   /**
+   * objectId から条・項・号の表示用パス（例: "第2条第2項", "附則第3条", "別表第1"）を生成する
+   * @param {string} objectId
+   * @returns {string}
+   */
+  function formatPathFromObjectId(objectId) {
+    if (!objectId) return '';
+    const cleanId = objectId.replace(/^#/, '');
+    const parts = [];
+
+    // 附則（Sp）の判定
+    const isSp = /(?:^|[-_])Sp(?:[-_]|$)/.test(cleanId);
+    if (isSp) {
+      parts.push('附則');
+    }
+
+    // 別表（AppdxTable）の判定
+    const appdxM = cleanId.match(/(?:^|[-_])AppdxTable_([0-9]+(?:_[0-9]+)*)/);
+    if (appdxM) {
+      const nums = appdxM[1].split('_');
+      const main = '別表第' + nums[0];
+      const sub = nums.slice(1).length ? 'の' + nums.slice(1).join('の') : '';
+      parts.push(main + sub);
+    }
+
+    // 条番号（At_...）の判定
+    const atM = cleanId.match(/(?:^|[-_])At_([0-9]+(?:_[0-9]+)*)/);
+    if (atM) {
+      const atNums = atM[1].split('_');
+      const main = '第' + atNums[0] + '条';
+      const sub = atNums.slice(1).length ? 'の' + atNums.slice(1).join('の') : '';
+      parts.push(main + sub);
+    }
+
+    // 項番号（Pr_...）の判定
+    const prM = cleanId.match(/(?:^|[-_])Pr_([0-9]+(?:_[0-9]+)*)/);
+    if (prM) {
+      const prNums = prM[1].split('_');
+      const main = '第' + prNums[0] + '項';
+      const sub = prNums.slice(1).length ? 'の' + prNums.slice(1).join('の') : '';
+      parts.push(main + sub);
+    }
+
+    // 号番号（It_...）の判定
+    const itM = cleanId.match(/(?:^|[-_])It_([0-9]+(?:_[0-9]+)*)/);
+    if (itM) {
+      const itNums = itM[1].split('_');
+      const main = '第' + itNums[0] + '号';
+      const sub = itNums.slice(1).length ? 'の' + itNums.slice(1).join('の') : '';
+      parts.push(main + sub);
+    }
+
+    return parts.join('');
+  }
+
+  /**
+   * 同一法令内リンクから参照箇所の表示文字列（例: "第131条第1項第4号", "第27条から第29条まで"）を解決する
+   * @param {HTMLElement} targetEl
+   * @param {HTMLAnchorElement} [linkEl]
+   * @param {string} [targetId]
+   * @returns {string}
+   */
+  function resolveReferenceClausePath(targetEl, linkEl, targetId) {
+    const resolvedId = targetId || (targetEl ? (targetEl.id || targetEl.getAttribute('name') || '') : '');
+    const idPath = formatPathFromObjectId(resolvedId);
+    const rawText = (linkEl ? (linkEl.textContent || '') : '').trim();
+
+    // 1. リンクテキストがない場合はIDからのパスをそのまま使用
+    if (!rawText) {
+      return idPath;
+    }
+
+    // 2. 範囲指定（「〜から〜まで」など）
+    const hasRange = /(?:から|至る).*まで/.test(rawText) || /[～〜-]/.test(rawText);
+    if (hasRange) {
+      // 範囲指定かつ条番号を含んでいる場合（例: 「第二十七条から第二十九条まで」「第２７条から第２９条まで」）
+      if (/第[0-9０-９一二三四五六七八九十百千万]+条/.test(rawText)) {
+        return rawText;
+      }
+      // 条番号を含まない範囲指定（例: 「第一項から第三項まで」「第１号から第３号まで」）
+      // IDから親条番号（第◯条）を先頭に補完する
+      if (idPath) {
+        const atMatch = idPath.match(/(?:附則)?第[0-9]+条(?:の[0-9]+)*/);
+        if (atMatch) {
+          return atMatch[0] + rawText;
+        }
+      }
+      return rawText;
+    }
+
+    // 3. 「前条」「次条」「同条」「前項」「次項」「同項」「前号」「次号」「同号」などの相対指定
+    // または親条文を含まない単独の「第◯項」「第◯号」の場合
+    // 例: 「第十一号」「第三項」「前項」など -> IDからの完全パス（第153条第1項第11号等）を優先
+    const isRelativeOrPartial = /^(前条|次条|同条|前項|次項|同項|前号|次号|同号)/.test(rawText) ||
+      (/^第[0-9０-９一二三四五六七八九十百千万]+(?:項|号)/.test(rawText) && !/第[0-9０-９一二三四五六七八九十百千万]+条/.test(rawText));
+
+    if (isRelativeOrPartial) {
+      return idPath || rawText;
+    }
+
+    // 4. リンクテキスト自体が条文を含む完全な表記（例: 「第百三十一条第一項第四号」「第２条第２項」）
+    // リンクテキストを優先（リンク元の文脈表現を尊重）
+    if (/^第[0-9０-９一二三四五六七八九十百千万]+条/.test(rawText) || /^附則/.test(rawText) || /^別表/.test(rawText)) {
+      return rawText;
+    }
+
+    // 5. 法令名が前置されている場合（例: 「文化財保護法第１３１条第１項」）
+    const lawClauseMatch = rawText.match(/(第[0-9０-９一二三四五六七八九十百千万]+条.*)$/);
+    if (lawClauseMatch) {
+      return lawClauseMatch[1];
+    }
+
+    // 6. フォールバック: IDからのパス、それも無ければリンクテキスト
+    return idPath || rawText;
+  }
+
+  /**
    * 参照先要素からプレビュー用のDOMを組み立てる。
    *
    * 参照先が `<a name="...">` のアンカーの場合、それ自体には中身が無いため、
    * 次の条見出しや章見出しが現れるまでの兄弟要素をかき集める。
    *
    * @param {HTMLElement} targetEl - 参照先要素
+   * @param {HTMLAnchorElement} [linkEl] - リンク要素
+   * @param {string} [targetId] - リンク先のハッシュID
    * @returns {HTMLElement} プレビュー内容を格納したDIV
    */
-  function buildPreviewContent(targetEl) {
+  function buildPreviewContent(targetEl, linkEl, targetId) {
+    if (!targetEl) return null;
+
+    const resolvedTargetId = targetId || targetEl.id || targetEl.getAttribute('name') || '';
+    const clausePath = resolveReferenceClausePath(targetEl, linkEl, resolvedTargetId);
+
     let clone;
 
     if (targetEl.tagName.toLowerCase() === 'a' && targetEl.hasAttribute('name')) {
@@ -95,24 +218,24 @@ window.egovExt = window.egovExt || {};
     const container = document.createElement('div');
     container.className = 'egov-ext-preview-container';
 
-    // ヘッダー（参照条文 ＋ ジャンプボタン）
+    // ヘッダー（参照条文 ＋ 参照箇所 ＋ ジャンプボタン）
     const header = document.createElement('div');
     header.className = 'egov-ext-tip-header';
 
     const titleWrap = document.createElement('div');
     titleWrap.className = 'egov-ext-tip-header-title';
-    titleWrap.textContent = '参照条文';
+    titleWrap.textContent = clausePath ? `参照条文（${clausePath}）` : '参照条文';
     header.appendChild(titleWrap);
 
     // ジャンプボタン
     if (ext.createTipActionButton) {
-      const targetId = targetEl.id || targetEl.getAttribute('name') || '';
+      const btnTargetId = targetEl.id || targetEl.getAttribute('name') || '';
 
       const jumpBtn = ext.createTipActionButton({
         icon: 'jump',
         label: 'ジャンプ',
         title: 'この条文の場所へ移動',
-        targetId: targetId,
+        targetId: btnTargetId,
         onClick: () => {
           if (ext.referenceTooltip) {
             ext.referenceTooltip.hide(0);
@@ -150,32 +273,6 @@ window.egovExt = window.egovExt || {};
    * @type {WeakMap<HTMLAnchorElement, {lawName: string, path: string}>}
    */
   const parsedLawLinkCache = new WeakMap();
-
-  /**
-   * objectId から条・項・号の表示用パス（例: "第2条第2項"）を生成する
-   * @param {string} objectId
-   * @returns {string}
-   */
-  function formatPathFromObjectId(objectId) {
-    if (!objectId) return '';
-    const parts = [];
-    const atM = objectId.match(/(?:^|[-_])At_([0-9]+(?:_[0-9]+)*)/);
-    if (atM) {
-      const atNums = atM[1].split('_');
-      const main = '第' + atNums[0] + '条';
-      const sub = atNums.slice(1).length ? 'の' + atNums.slice(1).join('の') : '';
-      parts.push(main + sub);
-    }
-    const prM = objectId.match(/(?:^|[-_])Pr_([0-9]+)/);
-    if (prM) {
-      parts.push('第' + prM[1] + '項');
-    }
-    const itM = objectId.match(/(?:^|[-_])It_([0-9]+)/);
-    if (itM) {
-      parts.push('第' + itM[1] + '号');
-    }
-    return parts.join('');
-  }
 
   /**
    * リンク要素および前後のテキストから法令名と条番号パスを抽出する
@@ -343,7 +440,7 @@ window.egovExt = window.egovExt || {};
         // 1. 同一法令内のリンク（内部リンク）: 現在のページのDOMから即時生成
         if (isInternalLink(a, targetEl)) {
           if (!targetEl) return null;
-          const content = buildPreviewContent(targetEl);
+          const content = buildPreviewContent(targetEl, a, targetId);
           if (ext.settings.horizontal && ext.applyHorizontalConversion) {
             ext.applyHorizontalConversion(content);
           }
@@ -383,6 +480,8 @@ window.egovExt = window.egovExt || {};
     ext._testReferPopup = {
       isInternalLink,
       buildPreviewContent,
+      formatPathFromObjectId,
+      resolveReferenceClausePath,
       parseLawLinkText,
       findPrecedingLawName,
       fetchAndPopulateExternalPreview

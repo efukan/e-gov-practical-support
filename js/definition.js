@@ -122,7 +122,7 @@ window.egovExt = window.egovExt || {};
     }
     
     let paragraphNum = '';
-    const prMatch = id.match(/-Pr_(\d+)/);
+    const prMatch = id.match(/(?:^|[-_])Pr_(\d+)/);
     if (prMatch) {
       const num = parseInt(prMatch[1], 10);
       const hasItem = id.includes('-It_');
@@ -143,39 +143,64 @@ window.egovExt = window.egovExt || {};
       clauseParts.push('第' + fullWidthNum + '項');
     }
     
-    let itemTitle = '';
-    const itMatch = id.match(/-It_(\d+)/);
+    let itemClause = '';
+    const itMatch = id.match(/(?:^|[-_])It_([0-9]+(?:_[0-9]+)*)/);
     if (itMatch) {
+      let rawItemText = '';
       const item = ext.deepClosest(element, '._div_ItemSentence, .ItemSentence, ._div_Item, .Item, .item');
       if (item) {
         const titleEl = item.querySelector('.ItemTitle, ._div_ItemTitle, .itemtitle');
         if (titleEl && titleEl.textContent.trim()) {
-          itemTitle = titleEl.textContent.trim();
+          rawItemText = titleEl.textContent.trim();
         } else {
           const boldEl = item.querySelector('span[style*="font-weight: bold"], b, strong');
           if (boldEl && boldEl.textContent.trim() && /^[一二三四五六七八九十百]+$/.test(boldEl.textContent.trim())) {
-            itemTitle = boldEl.textContent.trim();
+            rawItemText = boldEl.textContent.trim();
           } else {
             const match = item.textContent.trim().match(/^([一二三四五六七八九十百]+)/);
             if (match) {
-              itemTitle = match[1];
+              rawItemText = match[1];
             }
           }
         }
       }
-      
-      if (!itemTitle) {
-        const kanjiNums = ['','一','二','三','四','五','六','七','八','九','十','十一','十二','十三','十四','十五','十六','十七','十八','十九','二十'];
-        const num = parseInt(itMatch[1], 10);
-        if (num < kanjiNums.length) {
-          itemTitle = kanjiNums[num];
-        } else {
-          itemTitle = String(num);
+
+      let mainNum = '';
+      let subNums = [];
+
+      if (rawItemText) {
+        // カッコや第・号の混入をクリーンアップ（例: "(3)" -> "3", "（３）" -> "３", "(3)の2" -> "3の2"）
+        let clean = rawItemText.trim()
+          .replace(/^[（(第\s]+/, '')
+          .replace(/[)）号\s]+$/, '')
+          .replace(/[)）]/g, '');
+
+        const parts = clean.split('の').map(p => p.trim()).filter(Boolean);
+        if (parts.length > 0) {
+          mainNum = parts[0];
+          subNums = parts.slice(1);
         }
       }
+
+      // DOMテキストから取得できなかった場合のIDフォールバック
+      if (!mainNum) {
+        const itNums = itMatch[1].split('_');
+        const kanjiNums = ['','一','二','三','四','五','六','七','八','九','十','十一','十二','十三','十四','十五','十六','十七','十八','十九','二十'];
+        const num = parseInt(itNums[0], 10);
+        mainNum = (num < kanjiNums.length) ? kanjiNums[num] : String(num);
+        subNums = itNums.slice(1).map(n => {
+          const sNum = parseInt(n, 10);
+          return (sNum < kanjiNums.length) ? kanjiNums[sNum] : String(sNum);
+        });
+      }
+
+      if (mainNum) {
+        const sub = subNums.length ? 'の' + subNums.join('の') : '';
+        itemClause = '第' + mainNum + '号' + sub;
+      }
     }
-    if (itemTitle) {
-      clauseParts.push('第' + itemTitle + '号');
+    if (itemClause) {
+      clauseParts.push(itemClause);
     }
     
     const clausePath = clauseParts.join('');

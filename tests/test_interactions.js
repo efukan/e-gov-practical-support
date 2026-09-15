@@ -2070,7 +2070,44 @@ async function check(name, fn) {
       throw new Error(`横書き有効時の枝番ヘッダー算用数字変換が不正です: actual="${sourceTextBranch}", expected="第２条の２"`);
     }
 
-    // 3.2 横書き設定 OFF 時の検証
+    // 3.3 号番号のカッコ除去・第◯号正規化（文化財保護法パターン）の検証
+    // 横書き変換で (3) になった号見出しから「第(3)号」ではなく「第３号」と正規化されること！
+    const bunkazaiArticle = window.document.createElement('div');
+    bunkazaiArticle.id = 'Mp-At_2';
+    bunkazaiArticle.className = 'Article';
+    bunkazaiArticle.innerHTML = `
+      <div class="ArticleCaption">（文化財の定義）</div>
+      <div class="ArticleTitle">第二条</div>
+      <div id="Mp-At_2-Pr_1" class="Paragraph">
+        <div class="ParagraphNum"></div>
+        <div class="ParagraphSentence">この法律で「文化財」とは、次に掲げるものをいう。</div>
+        <div id="Mp-At_2-Pr_1-It_3" class="Item">
+          <div class="ItemTitle">(3)　</div>
+          <div class="ItemSentence">衣食住...（以下「民俗文化財」という。）</div>
+        </div>
+        <div id="Mp-At_2-Pr_1-It_3_2" class="Item">
+          <div class="ItemTitle">(3)の2　</div>
+          <div class="ItemSentence">生業...（以下「無形民俗文化財」という。）</div>
+        </div>
+      </div>
+    `;
+    window.document.body.appendChild(bunkazaiArticle);
+
+    const item3 = bunkazaiArticle.querySelector('#Mp-At_2-Pr_1-It_3');
+    const sourceItem3 = fnGetSource(item3);
+    const formattedItem3 = ext.convertLawTextToHorizontal(sourceItem3);
+    if (formattedItem3 !== '（文化財の定義）第２条第１項第３号') {
+      throw new Error(`号番号のカッコ除去失敗: actual="${formattedItem3}", expected="（文化財の定義）第２条第１項第３号"`);
+    }
+
+    const item3_2 = bunkazaiArticle.querySelector('#Mp-At_2-Pr_1-It_3_2');
+    const sourceItem3_2 = fnGetSource(item3_2);
+    const formattedItem3_2 = ext.convertLawTextToHorizontal(sourceItem3_2);
+    if (formattedItem3_2 !== '（文化財の定義）第２条第１項第３号の２') {
+      throw new Error(`号番号枝番の正規化失敗: actual="${formattedItem3_2}", expected="（文化財の定義）第２条第１項第３号の２"`);
+    }
+
+    // 3.4 横書き設定 OFF 時の検証
     ext.settings.horizontal = false;
     let sourceTextOff = ext.definitionMap.get('空家等').source;
     if (ext.settings.horizontal && ext.convertLawTextToHorizontal) {
@@ -2081,8 +2118,10 @@ async function check(name, fn) {
       throw new Error(`横書き無効時に漢数字が維持されていません: ${sourceTextOff}`);
     }
 
-    return '定義先条項の算用数字変換（（定義）第２条）、枝番号対応（第２条の２）、および動的設定トグルの完全動作を確認';
+    bunkazaiArticle.remove();
+    return '定義先条項の算用数字変換（（定義）第２条）、枝番号対応（第２条の２）、号番号カッコ除去正規化（第３号、第３号の２）、および動的設定トグルの完全動作を確認';
   });
+
 
   console.log('\n==========================================');
   if (failures === 0) {

@@ -33,7 +33,7 @@
   --tip-muted: #5b6470;
   --tip-border: rgba(16, 24, 40, 0.15);
   --tip-accent: #1042a4;
-  --tip-max-w: 490px;
+  --tip-max-w: 480px;
 
   position: absolute;
   top: 0;
@@ -43,9 +43,9 @@
   max-width: var(--tip-max-w) !important;
   /* 矢印（::after）を枠外に描くため、ここでは overflow を付けない。
      スクロールは内側の .egov-ext-tip-scroll が担当する。
-     上下左右に適度なホワイトスペース（左右20px, 上14px, 下16px）を確保し、
-     端っこギリギリの窮屈感を解消しつつ、矢印侵入（約4.5px）による文字干渉も完全に防止する。 */
-  padding: 14px 20px 16px !important;
+     上品で端正なホワイトスペース（左右16px, 上10px, 下12px）を確保し、
+     間延び感を解消しつつ、矢印侵入（約4.5px）による文字干渉も完全に防止する。 */
+  padding: 10px 16px 12px !important;
   border: 1px solid var(--tip-border) !important;
   border-radius: 12px !important;
   background: var(--tip-bg) !important;
@@ -60,7 +60,7 @@
   font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
                "Hiragino Sans", "Noto Sans JP", "Yu Gothic UI", sans-serif !important;
   font-size: 13px !important;
-  line-height: 1.72 !important;
+  line-height: 1.70 !important;
   text-align: left !important;
 
   /* 出現アニメーション。レイアウトを起こさない opacity / transform のみを使う */
@@ -159,7 +159,7 @@
 /* バリアント: 引用元条文プレビュー（フライアウト） */
 .laws .egov-ext-tip--preview,
 .egov-ext-tip--preview {
-  --tip-max-w: 470px !important;
+  --tip-max-w: 460px !important;
   --tip-accent: #1042a4;
   z-index: 2147483645 !important;
 }
@@ -171,8 +171,8 @@
   justify-content: space-between !important;
   align-items: center !important;
   gap: 8px !important;
-  margin: 0 0 8px !important;
-  padding-bottom: 7px !important;
+  margin: 0 0 5px !important;
+  padding-bottom: 4px !important;
   border-bottom: 1px solid var(--tip-border) !important;
   color: var(--tip-accent) !important;
   font-size: 11.5px !important;

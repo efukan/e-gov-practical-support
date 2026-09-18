@@ -416,10 +416,27 @@ window.egovExt = window.egovExt || {};
   }
 
   /**
+   * 参照条文プレビューを無効化（非表示・破棄）する。
+   */
+  ext.disablePopup = function() {
+    if (ext.referenceTooltip) {
+      ext.referenceTooltip.hide(true);
+      if (ext.referenceTooltip.destroy) {
+        ext.referenceTooltip.destroy();
+      }
+      ext.referenceTooltip = null;
+    }
+  };
+
+  /**
    * 参照条文プレビューを有効化する。
+   * 条文ページ以外（検索結果やトップページ等）では有効化しない。
    */
   ext.enablePopup = function() {
-    if (!ext.settings.global || !ext.settings.popup) return;
+    if (!ext.settings.global || !ext.settings.popup || !(ext.checkIfLawPage && ext.checkIfLawPage())) {
+      ext.disablePopup();
+      return;
+    }
     if (ext.referenceTooltip) return;
 
     ext.referenceTooltip = ext.createTooltip({ variant: 'reference' });
@@ -427,7 +444,7 @@ window.egovExt = window.egovExt || {};
     ext.bindHoverTooltip({
       selector: 'a[href*="#"], a[href*="/law/"], a[href*="lawId="]',
       tooltip: ext.referenceTooltip,
-      isEnabled: () => !!(ext.settings.global && ext.settings.popup),
+      isEnabled: () => !!(ext.settings.global && ext.settings.popup && ext.checkIfLawPage && ext.checkIfLawPage()),
       resolveContent: (a) => {
         // 左カラム（サイドバー、目次）や被引用一覧ツールチップ内のリンクはプレビューしない
         if (ext.deepClosest(a, ext.SIDEBAR_SELECTOR) || ext.deepClosest(a, '.egov-ext-tip--citation')) return null;

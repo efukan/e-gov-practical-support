@@ -114,6 +114,7 @@ window.egovExt = window.egovExt || {};
       ext.restoreAllOriginalHTML();
       if (ext.removeJumpSearch) ext.removeJumpSearch();
       if (ext.disableCitations) ext.disableCitations();
+      if (ext.disablePopup) ext.disablePopup();
       if (ext.scrollSpyObserver) {
         ext.scrollSpyObserver.disconnect();
         ext.scrollSpyObserver = null;
@@ -486,6 +487,34 @@ window.egovExt = window.egovExt || {};
   }
 
   /**
+   * 非条文ページ（検索結果一覧やトップページ等）に遷移した際、
+   * すべての自作UI・ポップアップ・加工スタイルを完全に停止・破棄するクリーンアップ関数
+   */
+  function cleanupNonLawPage() {
+    document.body.classList.remove('egov-fastrender-enabled');
+    ext.updateStatusBadge();
+    if (ext.removeJumpSearch) ext.removeJumpSearch();
+    if (ext.disablePopup) ext.disablePopup();
+    if (ext.referenceTooltip) ext.referenceTooltip.hide(true);
+    if (ext.definitionTooltip) ext.definitionTooltip.hide(true);
+    if (ext.citationTooltip) ext.citationTooltip.hide(true);
+    if (ext.disableDefinitionHighlighting) ext.disableDefinitionHighlighting();
+    if (ext.disableConjunctionHighlight) ext.disableConjunctionHighlight();
+    if (ext.disableDimParentheses) ext.disableDimParentheses();
+    if (ext.removeHorizontalConversion) ext.removeHorizontalConversion();
+    if (ext.disableCitations) ext.disableCitations();
+    if (ext.scrollSpyObserver) {
+      ext.scrollSpyObserver.disconnect();
+      ext.scrollSpyObserver = null;
+    }
+    if (ext.scrollSpyRafId) {
+      (typeof cancelAnimationFrame !== 'undefined' ? cancelAnimationFrame : clearTimeout)(ext.scrollSpyRafId);
+      ext.scrollSpyRafId = null;
+    }
+    ext.restoreAllOriginalHTML();
+  }
+
+  /**
    * 画面が書き換わった後に、各機能を再度適用し直すためのオーケストレーション関数
    * @param {boolean} [forceReset=false] - 既存の適用を一度クリアしてリセット適用するかどうか
    * @returns {Promise<void>}
@@ -519,7 +548,15 @@ window.egovExt = window.egovExt || {};
 
     ext.log("handleDynamicContent called. forceReset:", forceReset, "urlChanged:", urlChanged, "isLawPage:", isLawPage);
 
-    // 設定変更などで強制リセットが必要な場合のみ、元の状態に一度戻す
+    // 条文ページ以外（検索結果 /result やトップページ等）の場合は各種機能を完全停止・クリーンアップして終了
+    if (!isLawPage) {
+      cleanupNonLawPage();
+      if (ext.globalDOMObserver) {
+        ext.reconnectDOMObserver();
+      }
+      return;
+    }
+
     if (forceReset) {
       try {
         if (ext.disableDefinitionHighlighting) ext.disableDefinitionHighlighting();
@@ -628,12 +665,14 @@ window.egovExt = window.egovExt || {};
     }
 
     // 参照ポップアップ
-    if (ext.settings.popup && ext.enablePopup) {
+    if (ext.settings.popup && isLawPage && ext.enablePopup) {
       try {
         ext.enablePopup();
       } catch (e) {
         console.error("egov-ext: Error enabling popup:", e);
       }
+    } else {
+      if (ext.disablePopup) ext.disablePopup();
     }
 
     // 被引用（引用元）表示機能
@@ -670,6 +709,7 @@ window.egovExt = window.egovExt || {};
    */
   function handleNewTabClick(e) {
     if (!ext.settings.global || !ext.settings.newtab) return;
+    if (!ext.checkIfLawPage || !ext.checkIfLawPage()) return; // 条文ページ以外（検索結果一覧等）ではクリックを横取りしない
     
     const link = ext.getComposedTarget(e, 'a');
     if (!link || !link.hasAttribute('href')) return;
@@ -706,6 +746,39 @@ window.egovExt = window.egovExt || {};
     }
   });
 
+  // SPA（Vue Router）のページ遷移（popstate, pushState, replaceState）を検知して即時追従
+  if (typeof window !== 'undefined') {
+    window.addEventListener('popstate', () => {
+      handleDynamicContent(true);
+    });
+    window.addEventListener('hashchange', () => {
+      handleDynamicContent(false);
+    });
+
+    try {
+      if (typeof history !== 'undefined') {
+        const originalPushState = history.pushState;
+        if (originalPushState && !history._egovPatched) {
+          history.pushState = function(...args) {
+            const result = originalPushState.apply(this, args);
+            handleDynamicContent(true);
+            return result;
+          };
+          history._egovPatched = true;
+        }
+        const originalReplaceState = history.replaceState;
+        if (originalReplaceState && !history._egovPatchedReplace) {
+          history.replaceState = function(...args) {
+            const result = originalReplaceState.apply(this, args);
+            handleDynamicContent(true);
+            return result;
+          };
+          history._egovPatchedReplace = true;
+        }
+      }
+    } catch (e) {}
+  }
+
   // 実行開始のトリガー
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', init);
@@ -715,8 +788,12 @@ window.egovExt = window.egovExt || {};
 
   // テスト用内部オブジェクトの公開
   ext._testContent = {
-    isSelfGeneratedElement
+    isSelfGeneratedElement,
+    cleanupNonLawPage,
+    handleDynamicContent,
+    handleNewTabClick
   };
 
 })(window.egovExt);
+
 

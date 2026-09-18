@@ -303,7 +303,7 @@ window.egovExt = window.egovExt || {};
     ext.bindHoverTooltip({
       selector: '.egov-ext-citation-btn',
       tooltip: ext.citationTooltip,
-      isEnabled: () => !!(ext.settings.global && ext.settings.citation),
+      isEnabled: () => !!(ext.settings.global && ext.settings.citation && (!ext.checkIfLawPage || ext.checkIfLawPage())),
       resolveContent: (btn) => {
         const articleEl = btn.closest(ARTICLE_SELECTOR);
         if (!articleEl || !articleEl.id) return null;

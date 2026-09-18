@@ -15,8 +15,9 @@ const ROOT = path.resolve(__dirname, '..');
 const manifest = JSON.parse(fs.readFileSync(path.join(ROOT, 'manifest.json'), 'utf8'));
 const scripts = manifest.content_scripts[0].js;
 
-async function createTestEnv(html) {
-  const dom = new JSDOM(html, { url: 'https://laws.e-gov.go.jp/law/415AC0000000057', pretendToBeVisual: true });
+async function createTestEnv(html, options = {}) {
+  const pageUrl = options.url || 'https://laws.e-gov.go.jp/law/415AC0000000057';
+  const dom = new JSDOM(html, { url: pageUrl, pretendToBeVisual: true });
   const { window } = dom;
 
   const storage = {};
@@ -2117,9 +2118,117 @@ async function check(name, fn) {
     if (sourceTextOff !== '（定義）第二条') {
       throw new Error(`横書き無効時に漢数字が維持されていません: ${sourceTextOff}`);
     }
-
     bunkazaiArticle.remove();
     return '定義先条項の算用数字変換（（定義）第２条）、枝番号対応（第２条の２）、号番号カッコ除去正規化（第３号、第３号の２）、および動的設定トグルの完全動作を確認';
+  });
+
+  console.log('\n--- 10. 非条文ページ（/result やトップページ等）における機能完全停止・クリーンアップの検証 ---');
+
+  await check('非条文ページ（/result や /）における判定・ホバー抑止・自作UI非表示およびSPA遷移クリーンアップの検証', async () => {
+    // 1. URL判定テスト: /result および /（トップページ）では checkIfLawPage が確実に false を返すこと
+    const { window: winResult, ext: extResult } = await createTestEnv('<div class="result-list"><a href="/law/325AC0000000201">建築基準法</a></div>', {
+      url: 'https://laws.e-gov.go.jp/result?keyword=建築'
+    });
+    if (extResult.checkIfLawPage() !== false) {
+      throw new Error('/result において checkIfLawPage が false を返しませんでした');
+    }
+
+    const { window: winTop, ext: extTop } = await createTestEnv('<div class="home-container"><a href="/law/325AC0000000201">新着法令</a></div>', {
+      url: 'https://laws.e-gov.go.jp/'
+    });
+    if (extTop.checkIfLawPage() !== false) {
+      throw new Error('トップページ（/）において checkIfLawPage が false を返しませんでした');
+    }
+
+    // 2. 検索結果ページ（/result）において、参照ポップアップが一切有効化されない（ホバーしても開かない）こと
+    extResult.settings.global = true;
+    extResult.settings.popup = true;
+    extResult.enablePopup(); // /result で呼び出し試行
+
+    const lawLink = winResult.document.querySelector('a[href*="/law/"]');
+    if (!lawLink) throw new Error('テスト用法令リンクが見つかりません');
+
+    // 参照ツールチップインスタンスが存在しないか、存在しても isEnabled が false を返すこと
+    if (extResult.referenceTooltip) {
+      const isEnabled = extResult.referenceTooltip && extResult.checkIfLawPage();
+      if (isEnabled) {
+        throw new Error('/result において参照ツールチップが有効と判定されています');
+      }
+    }
+
+    // 3. /result においてステータスバッジやジャンプ検索窓がDOMに生成されないこと
+    extResult.updateStatusBadge();
+    if (winResult.document.getElementById('egov-ext-status-badge')) {
+      throw new Error('/result においてステータスバッジが表示されてしまっています');
+    }
+    if (winResult.document.getElementById('egov-ext-header-container')) {
+      throw new Error('/result においてヘッダーコンテナが残存しています');
+    }
+
+    extResult.setupJumpSearch();
+    if (winResult.document.getElementById('egov-ext-jump-container')) {
+      throw new Error('/result において条文ジャンプ検索ボックスが表示されてしまっています');
+    }
+
+    // 4. /result におけるリンククリックが「別タブで開く」ハンドラによって横取り（preventDefault）されないこと
+    let prevented = false;
+    const fakeClickEvent = {
+      target: lawLink,
+      preventDefault: () => { prevented = true; },
+      stopPropagation: () => {}
+    };
+    if (extResult._testContent && extResult._testContent.handleNewTabClick) {
+      extResult._testContent.handleNewTabClick(fakeClickEvent);
+      if (prevented) {
+        throw new Error('/result において法令リンククリックが別タブ機能に横取りされました');
+      }
+    }
+
+    // 5. SPA遷移（条文ページ → /result への画面遷移）時の自動クリーンアップ検証
+    const { window: winLaw, ext: extLaw } = await createTestEnv('<div class="LawBody"><div class="Article" id="Mp-At_1"><div class="ArticleTitle">第一条</div></div></div>', {
+      url: 'https://laws.e-gov.go.jp/law/325AC0000000201'
+    });
+    extLaw.settings.global = true;
+    extLaw.settings.jump = true;
+    extLaw.settings.popup = true;
+
+    // 条文ページで初期化（バッジ・ジャンプ検索窓が生成される）
+    extLaw.updateStatusBadge();
+    extLaw.setupJumpSearch();
+    extLaw.enablePopup();
+
+    if (!winLaw.document.getElementById('egov-ext-status-badge')) {
+      throw new Error('条文ページでステータスバッジが生成されていません');
+    }
+    if (!winLaw.document.getElementById('egov-ext-jump-container')) {
+      throw new Error('条文ページでジャンプ検索ボックスが生成されていません');
+    }
+
+    // SPA遷移をシミュレート: URLを /result に変更し、クリーンアップを実行
+    try {
+      winLaw.history.pushState({}, '', '/result');
+    } catch (e) {
+      // jsdom fallback
+      delete winLaw.location;
+      winLaw.location = new URL('https://laws.e-gov.go.jp/result');
+    }
+
+    if (extLaw._testContent && extLaw._testContent.cleanupNonLawPage) {
+      extLaw._testContent.cleanupNonLawPage();
+    }
+
+    // /result に遷移した後、バッジもジャンプ検索も綺麗に消滅していること
+    if (winLaw.document.getElementById('egov-ext-status-badge')) {
+      throw new Error('SPAで/result遷移後もステータスバッジが残存しています');
+    }
+    if (winLaw.document.getElementById('egov-ext-jump-container')) {
+      throw new Error('SPAで/result遷移後もジャンプ検索ボックスが残存しています');
+    }
+    if (winLaw.document.getElementById('egov-ext-header-container')) {
+      throw new Error('SPAで/result遷移後もヘッダーコンテナが残存しています');
+    }
+
+    return '非条文ページ（/result, /）における判定・ホバー抑止・自作UI非表示およびSPA遷移クリーンアップの完全動作を確認';
   });
 
 

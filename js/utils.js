@@ -539,15 +539,33 @@ window.egovExt = window.egovExt || {};
   };
 
   /**
-   * 現在表示されているページが法令本文表示ページであるかをDOM構造から判定する関数
+   * 現在表示されているページが法令本文表示ページであるかを判定する関数。
+   * トップページや検索結果一覧（/result）など、条文表示以外のページは確実に false を返す。
    * @returns {boolean} 法令表示ページの場合は true、それ以外は false
    */
   ext.checkIfLawPage = function() {
-    const isUrlMatch = window.location.pathname.includes('/law/') || window.location.pathname.includes('/document');
+    const pathname = window.location.pathname || '';
+
+    // 1. トップページや検索結果一覧（/result）など、明確に非条文ページであるURLは即座に除外
+    if (pathname === '/' || pathname === '' || pathname === '/result' || pathname.startsWith('/result/') || pathname.startsWith('/result?')) {
+      return false;
+    }
+
+    // 2. URLに /law/ または /document/ が含まれている場合は条文ページ
+    const isUrlMatch = pathname.includes('/law/') || pathname.includes('/document');
     if (isUrlMatch) return true;
 
-    // URL判定から漏れた場合でも、DOMに法令本文を示す主要クラスが存在していれば法令ページとみなす
-    const hasLawDOM = ext.deepQuerySelectorAll(document.body, '.LawBody, .provisiontext, ._div_ParagraphSentence, .ParagraphSentence, ._div_ArticleTitle, .ArticleTitle, article.law, article.article, p.sentence');
+    // 3. クエリパラメータに lawId / lawid が含まれている場合も条文ページ
+    try {
+      const searchParams = new URLSearchParams(window.location.search);
+      if (searchParams.has('lawId') || searchParams.has('lawid')) {
+        return true;
+      }
+    } catch (e) {}
+
+    // 4. URL判定から漏れた場合でも、DOMに法令本文を示す主要クラスが存在していれば法令ページとみなす
+    // （※p.sentence は検索結果一覧等にも紛れ込むため除外し、条文構造固有の要素に限定）
+    const hasLawDOM = ext.deepQuerySelectorAll(document.body, '.LawBody, .provisiontext, article.law, ._div_Article, .Article, ._div_ParagraphSentence, .ParagraphSentence, ._div_ArticleTitle, .ArticleTitle');
     return hasLawDOM.length > 0;
   };
 
@@ -708,12 +726,12 @@ window.egovExt = window.egovExt || {};
       existing.remove();
     }
     
-    if (!ext.settings.global) {
+    // グローバル無効または非条文ページ（検索結果やトップページ等）の場合はバッジを表示せずコンテナを整理する
+    const isLawPage = ext.checkIfLawPage();
+    if (!ext.settings.global || !isLawPage) {
       ext.checkAndRemoveHeaderContainer();
       return;
     }
-
-    const isLawPage = ext.checkIfLawPage();
     
     const badge = document.createElement('div');
     badge.id = 'egov-ext-status-badge';
@@ -723,13 +741,11 @@ window.egovExt = window.egovExt || {};
     dot.style.width = '8px';
     dot.style.height = '8px';
     dot.style.borderRadius = '50%';
-    dot.style.background = isLawPage ? '#4caf50' : '#ff9800'; // 法令ページは緑、その他はオレンジ
+    dot.style.background = '#4caf50'; // 稼働中は緑
     dot.style.display = 'inline-block';
     
     badge.appendChild(dot);
-    
-    const label = isLawPage ? 'e-Gov法令ひもとき: 稼働中' : 'e-Gov法令ひもとき: 有効';
-    badge.appendChild(document.createTextNode(label));
+    badge.appendChild(document.createTextNode('e-Gov法令ひもとき: 稼働中'));
     
     const headerContainer = ext.getOrCreateHeaderContainer();
     if (headerContainer.firstChild) {

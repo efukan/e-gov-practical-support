@@ -637,7 +637,7 @@ window.egovExt = window.egovExt || {};
     ext.bindHoverTooltip({
       selector: '.egov-definition-word',
       tooltip: ext.definitionTooltip,
-      isEnabled: () => !!(ext.settings.global && ext.settings.definition),
+      isEnabled: () => !!(ext.settings.global && ext.settings.definition && (!ext.checkIfLawPage || ext.checkIfLawPage())),
       resolveContent: (target) => {
         const def = ext.definitionMap.get(target.dataset.word);
         if (!def || !def.element) return null;

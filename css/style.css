@@ -28,7 +28,7 @@
   --tip-muted: #5b6470;
   --tip-border: rgba(16, 24, 40, 0.15);
   --tip-accent: #1042a4;
-  --tip-max-w: 460px;
+  --tip-max-w: 490px;
 
   position: absolute;
   top: 0;
@@ -38,9 +38,9 @@
   max-width: var(--tip-max-w);
   /* 矢印（::after）を枠外に描くため、ここでは overflow を付けない。
      スクロールは内側の .egov-ext-tip-scroll が担当する。
-     上部パディングをタイトにして矢印直下にヘッダーが直結するようにし、
-     背後条文への無駄な白い被り・隙間を解消する。 */
-  padding: 9px 14px 10px;
+     上下左右に適度なホワイトスペース（左右20px, 上14px, 下16px）を確保し、
+     端っこギリギリの窮屈感を解消しつつ、矢印侵入（約4.5px）による文字干渉も完全に防止する。 */
+  padding: 14px 20px 16px;
   border: 1px solid var(--tip-border);
   border-radius: 12px;
   background: var(--tip-bg);
@@ -55,7 +55,7 @@
   font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
                "Hiragino Sans", "Noto Sans JP", "Yu Gothic UI", sans-serif;
   font-size: 13px;
-  line-height: 1.65;
+  line-height: 1.72;
   text-align: left;
 
   /* 出現アニメーション。レイアウトを起こさない opacity / transform のみを使う */
@@ -124,6 +124,7 @@
   overscroll-behavior: contain;
   scrollbar-width: thin;
   scrollbar-color: rgba(16, 24, 40, 0.22) transparent;
+  padding-right: 2px;
 }
 .egov-ext-tip-scroll::-webkit-scrollbar { width: 8px; }
 .egov-ext-tip-scroll::-webkit-scrollbar-track { background: transparent; }
@@ -139,7 +140,7 @@
 
 /* バリアント: 引用元条文プレビュー（フライアウト） */
 .egov-ext-tip--preview {
-  --tip-max-w: 440px;
+  --tip-max-w: 470px;
   --tip-accent: #1042a4;
   z-index: 2147483645 !important;
 }
@@ -150,8 +151,8 @@
   justify-content: space-between !important;
   align-items: center !important;
   gap: 8px !important;
-  margin: 0 0 6px !important;
-  padding-bottom: 5px;
+  margin: 0 0 8px !important;
+  padding-bottom: 7px;
   border-bottom: 1px solid var(--tip-border);
   color: var(--tip-accent);
   font-size: 11.5px;
@@ -174,7 +175,7 @@
   align-items: center !important;
   gap: 3px !important;
   flex-shrink: 0 !important;
-  padding: 2px 7px !important;
+  padding: 3px 8px !important;
   background: rgba(16, 66, 164, 0.08) !important;
   color: var(--tip-accent, #1042a4) !important;
   border: 1px solid rgba(16, 66, 164, 0.22) !important;
@@ -211,7 +212,7 @@
 .egov-ext-tip-body .ParagraphSentence,
 .egov-ext-tip-body ._div_ItemSentence,
 .egov-ext-tip-body .ItemSentence {
-  padding-bottom: 6px !important;
+  padding-bottom: 7px !important;
 }
 .egov-ext-tip-body ._div_ArticleCaption,
 .egov-ext-tip-body .ArticleCaption {
@@ -241,7 +242,7 @@
 .egov-ext-tip-body .Paragraph + .Paragraph,
 .egov-ext-tip-body ._div_Item + ._div_Item,
 .egov-ext-tip-body .Item + .Item {
-  margin-top: 6px !important;
+  margin-top: 8px !important;
 }
 
 /* タイトルや先頭段落をブロックではなくインラインとして流し込む */
@@ -656,7 +657,7 @@ body.egov-fastrender-enabled .main-content {
 }
 
 .egov-ext-citation-list li {
-  margin-bottom: 6px !important;
+  margin-bottom: 7px !important;
   padding: 0 !important;
   list-style: none !important;
 }
@@ -669,8 +670,8 @@ body.egov-fastrender-enabled .main-content {
   display: flex !important;
   flex-direction: column !important;
   text-decoration: none !important;
-  padding: 6px 8px !important;
-  border-radius: 4px !important;
+  padding: 7px 11px !important;
+  border-radius: 6px !important;
   background-color: #f7f9fc !important;
   transition: background-color 0.2s ease !important;
   color: #333 !important;

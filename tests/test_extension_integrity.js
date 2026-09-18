@@ -99,6 +99,21 @@ async function main() {
     }
   });
 
+  runTest('manifest.json と package.json のバージョン番号完全一致および popup.html バージョンタグ整合性', () => {
+    const pkg = JSON.parse(fs.readFileSync(path.join(ROOT_DIR, 'package.json'), 'utf8'));
+    assert.strictEqual(manifest.version, pkg.version, `manifest.version (${manifest.version}) と package.json version (${pkg.version}) が一致すること`);
+
+    // セマンティックバージョニング形式 (X.Y.Z) 検証
+    assert(/^\d+\.\d+\.\d+$/.test(manifest.version), `バージョン (${manifest.version}) がセマンティックバージョニング形式であること`);
+
+    // popup.html の version-tag 検証
+    const popupHtml = fs.readFileSync(path.join(ROOT_DIR, 'popup.html'), 'utf8');
+    const versionMatch = popupHtml.match(/<span class="version-tag">(.*?)<\/span>/);
+    assert(versionMatch, 'popup.html に version-tag が存在する');
+    const [major, minor] = manifest.version.split('.');
+    assert.strictEqual(versionMatch[1], `v${major}.${minor}`, `popup.html の version-tag (${versionMatch[1]}) が v${major}.${minor} と一致すること`);
+  });
+
   // =============================================================================
   // 2. 設定UI & ストレージ同期テスト
   // =============================================================================

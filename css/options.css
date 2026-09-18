@@ -1,5 +1,6 @@
-/* Material 3 Light Theme - Options Styles */
+/* Material 3 Theme Variables - Light & Dark */
 :root {
+  color-scheme: light dark;
   --md-sys-color-background: #F8F9FA;
   --md-sys-color-surface: #FFFFFF;
   --md-sys-color-surface-hover: #F8F9FC;
@@ -10,6 +11,85 @@
   --md-sys-color-outline-hover: #C5C6C9;
   --md-sys-color-text-main: #1F1F1F;
   --md-sys-color-text-muted: #5F6368;
+  --md-sys-color-text-sub: #5F6368;
+
+  /* コンポーネント用トークン */
+  --md-comp-badge-bg: rgba(11, 87, 208, 0.08);
+  --md-comp-icon-bg: rgba(0, 0, 0, 0.02);
+  --md-comp-icon-hover-bg: rgba(11, 87, 208, 0.08);
+  --md-comp-switch-track-off: #E1E2E5;
+  --md-comp-switch-border-off: #75777A;
+  --md-comp-switch-thumb-off: #75777A;
+  --md-comp-disabled-bg: rgba(0, 0, 0, 0.01);
+  --md-comp-disabled-border: rgba(0, 0, 0, 0.05);
+
+  --md-comp-color-area-border: rgba(0, 0, 0, 0.08);
+  --md-comp-color-preview-bg: rgba(0, 0, 0, 0.02);
+  --md-comp-color-preview-border: rgba(0, 0, 0, 0.04);
+  --md-comp-custom-label-border: #cbd5e1;
+  --md-comp-swatch-active-border: #ffffff;
+}
+
+/* Material 3 Dark Theme - OS/ブラウザ設定に自動追従 */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --md-sys-color-background: #191c20;
+    --md-sys-color-surface: #22262b;
+    --md-sys-color-surface-hover: #2b3036;
+    --md-sys-color-primary: #a8c7fa;
+    --md-sys-color-primary-hover: #c2e7ff;
+    --md-sys-color-on-primary: #042c6c;
+    --md-sys-color-outline: #383c44;
+    --md-sys-color-outline-hover: #4f535c;
+    --md-sys-color-text-main: #e2e2e6;
+    --md-sys-color-text-muted: #9aa0a6;
+    --md-sys-color-text-sub: #9aa0a6;
+
+    --md-comp-badge-bg: rgba(168, 199, 250, 0.15);
+    --md-comp-icon-bg: rgba(255, 255, 255, 0.06);
+    --md-comp-icon-hover-bg: rgba(168, 199, 250, 0.12);
+    --md-comp-switch-track-off: #363a40;
+    --md-comp-switch-border-off: #8e9198;
+    --md-comp-switch-thumb-off: #8e9198;
+    --md-comp-disabled-bg: rgba(255, 255, 255, 0.02);
+    --md-comp-disabled-border: rgba(255, 255, 255, 0.05);
+
+    --md-comp-color-area-border: rgba(255, 255, 255, 0.12);
+    --md-comp-color-preview-bg: rgba(255, 255, 255, 0.05);
+    --md-comp-color-preview-border: rgba(255, 255, 255, 0.08);
+    --md-comp-custom-label-border: #4f535c;
+    --md-comp-swatch-active-border: #191c20;
+  }
+}
+
+/* 明示的テーマ指定時（テスト・検証用セレクタ） */
+:root[data-theme="dark"] {
+  --md-sys-color-background: #191c20;
+  --md-sys-color-surface: #22262b;
+  --md-sys-color-surface-hover: #2b3036;
+  --md-sys-color-primary: #a8c7fa;
+  --md-sys-color-primary-hover: #c2e7ff;
+  --md-sys-color-on-primary: #042c6c;
+  --md-sys-color-outline: #383c44;
+  --md-sys-color-outline-hover: #4f535c;
+  --md-sys-color-text-main: #e2e2e6;
+  --md-sys-color-text-muted: #9aa0a6;
+  --md-sys-color-text-sub: #9aa0a6;
+
+  --md-comp-badge-bg: rgba(168, 199, 250, 0.15);
+  --md-comp-icon-bg: rgba(255, 255, 255, 0.06);
+  --md-comp-icon-hover-bg: rgba(168, 199, 250, 0.12);
+  --md-comp-switch-track-off: #363a40;
+  --md-comp-switch-border-off: #8e9198;
+  --md-comp-switch-thumb-off: #8e9198;
+  --md-comp-disabled-bg: rgba(255, 255, 255, 0.02);
+  --md-comp-disabled-border: rgba(255, 255, 255, 0.05);
+
+  --md-comp-color-area-border: rgba(255, 255, 255, 0.12);
+  --md-comp-color-preview-bg: rgba(255, 255, 255, 0.05);
+  --md-comp-color-preview-border: rgba(255, 255, 255, 0.08);
+  --md-comp-custom-label-border: #4f535c;
+  --md-comp-swatch-active-border: #191c20;
 }
 
 body {
@@ -76,7 +156,7 @@ body * {
 
 .badge {
   font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", "Hiragino Sans", "Noto Sans JP", "Yu Gothic UI", Roboto, sans-serif;
-  background-color: rgba(11, 87, 208, 0.08);
+  background-color: var(--md-comp-badge-bg);
   color: var(--md-sys-color-primary);
   font-size: 10px;
   font-weight: 800;
@@ -104,7 +184,7 @@ body * {
 }
 
 .global-card .card-icon-container {
-  background-color: rgba(11, 87, 208, 0.08);
+  background-color: var(--md-comp-badge-bg);
   color: var(--md-sys-color-primary);
   border: none;
 }
@@ -180,7 +260,7 @@ body * {
   width: 32px;
   height: 32px;
   border-radius: 6px;
-  background-color: rgba(0, 0, 0, 0.02);
+  background-color: var(--md-comp-icon-bg);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -192,7 +272,7 @@ body * {
 
 .setting-card:hover .card-icon-container {
   color: var(--md-sys-color-primary);
-  background-color: rgba(11, 87, 208, 0.08);
+  background-color: var(--md-comp-icon-hover-bg);
 }
 
 .card-icon-container svg {
@@ -242,8 +322,8 @@ body * {
   left: 0;
   right: 0;
   bottom: 0;
-  background-color: #E1E2E5;
-  border: 2px solid #75777A;
+  background-color: var(--md-comp-switch-track-off);
+  border: 2px solid var(--md-comp-switch-border-off);
   transition: background-color 0.2s, border-color 0.2s;
   border-radius: 100px;
 }
@@ -256,7 +336,7 @@ body * {
   left: 5px;
   top: 50%;
   transform: translateY(-50%);
-  background-color: #75777A;
+  background-color: var(--md-comp-switch-thumb-off);
   transition: left 0.2s cubic-bezier(0.2, 0, 0, 1),
               width 0.2s cubic-bezier(0.2, 0, 0, 1),
               height 0.2s cubic-bezier(0.2, 0, 0, 1),
@@ -277,11 +357,21 @@ body * {
   width: 18px;
   left: 20px;
   background-color: var(--md-sys-color-on-primary);
-  /* M3仕様のチェックマークを表示 */
+  /* M3仕様のチェックマークを表示（ライトテーマ: 濃紺） */
   background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="%231042a4" stroke-width="4.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>');
   background-repeat: no-repeat;
   background-position: center;
   background-size: 11px 11px;
+}
+
+/* ダークモード時のONスイッチ・チェックマーク（ライトブルー） */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .switch input:checked + .slider::before {
+    background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="%23a8c7fa" stroke-width="4.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>');
+  }
+}
+:root[data-theme="dark"] .switch input:checked + .slider::before {
+  background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="%23a8c7fa" stroke-width="4.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>');
 }
 
 /* 押下（アクティブ）時の挙動 (M3つまみストレッチ) */
@@ -306,15 +396,15 @@ body * {
 body.global-off .setting-card {
   opacity: 0.45;
   pointer-events: none;
-  background-color: rgba(0, 0, 0, 0.01);
-  border-color: rgba(0, 0, 0, 0.05);
+  background-color: var(--md-comp-disabled-bg);
+  border-color: var(--md-comp-disabled-border);
 }
 
 /* 定義語カラー設定エリア */
 .color-setting-area {
   margin-top: 10px;
   padding-top: 8px;
-  border-top: 1px dashed rgba(0, 0, 0, 0.08);
+  border-top: 1px dashed var(--md-comp-color-area-border);
 }
 
 .color-setting-header {
@@ -353,7 +443,7 @@ body.global-off .setting-card {
 }
 
 .def-color-swatch.active {
-  border-color: #ffffff;
+  border-color: var(--md-comp-swatch-active-border);
   box-shadow: 0 0 0 2px var(--md-sys-color-primary), 0 2px 5px rgba(0, 0, 0, 0.2);
   transform: scale(1.15);
 }
@@ -365,7 +455,7 @@ body.global-off .setting-card {
   width: 22px;
   height: 22px;
   border-radius: 50%;
-  border: 1px dashed #cbd5e1;
+  border: 1px dashed var(--md-comp-custom-label-border);
   cursor: pointer;
   position: relative;
   transition: border-color 0.15s ease;
@@ -393,10 +483,10 @@ body.global-off .setting-card {
   margin-top: 8px;
   font-size: 12px;
   color: var(--md-sys-color-text-sub);
-  background: rgba(0, 0, 0, 0.02);
+  background: var(--md-comp-color-preview-bg);
   padding: 6px 10px;
   border-radius: 6px;
-  border: 1px solid rgba(0, 0, 0, 0.04);
+  border: 1px solid var(--md-comp-color-preview-border);
 }
 
 .def-preview-word {

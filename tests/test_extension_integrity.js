@@ -352,9 +352,49 @@ async function main() {
 
 
   // =============================================================================
-  // 4. 印刷スタイル (@media print) 検証
+  // 4. ダークモード整合性検証 (Material 3 Dark Theme)
   // =============================================================================
-  console.log('\n--- 4. 印刷スタイル (@media print) ---');
+  console.log('\n--- 4. ダークモード整合性検証 (Material 3 Dark Theme) ---');
+
+  runTest('popup.html および options.html の head に <meta name="color-scheme" content="light dark"> が設定されていること', () => {
+    const popupHtml = fs.readFileSync(path.join(ROOT_DIR, 'popup.html'), 'utf8');
+    const optionsHtml = fs.readFileSync(path.join(ROOT_DIR, 'options.html'), 'utf8');
+
+    assert(popupHtml.includes('<meta name="color-scheme" content="light dark">'), 'popup.html に color-scheme meta が存在する');
+    assert(optionsHtml.includes('<meta name="color-scheme" content="light dark">'), 'options.html に color-scheme meta が存在する');
+  });
+
+  runTest('css/popup.css および css/options.css に color-scheme 宣言およびダークモードメディアクエリが定義されていること', () => {
+    const popupCss = fs.readFileSync(path.join(ROOT_DIR, 'css', 'popup.css'), 'utf8');
+    const optionsCss = fs.readFileSync(path.join(ROOT_DIR, 'css', 'options.css'), 'utf8');
+
+    // color-scheme: light dark
+    assert(popupCss.includes('color-scheme: light dark;'), 'css/popup.css に color-scheme: light dark 宣言が存在する');
+    assert(optionsCss.includes('color-scheme: light dark;'), 'css/options.css に color-scheme: light dark 宣言が存在する');
+
+    // @media (prefers-color-scheme: dark)
+    assert(popupCss.includes('@media (prefers-color-scheme: dark)'), 'css/popup.css に prefers-color-scheme: dark が存在する');
+    assert(optionsCss.includes('@media (prefers-color-scheme: dark)'), 'css/options.css に prefers-color-scheme: dark が存在する');
+
+    // テスト・手動用セレクタ :root[data-theme="dark"]
+    assert(popupCss.includes(':root[data-theme="dark"]'), 'css/popup.css に :root[data-theme="dark"] が存在する');
+    assert(optionsCss.includes(':root[data-theme="dark"]'), 'css/options.css に :root[data-theme="dark"] が存在する');
+
+    // ダークトークン (#191c20, #22262b, #a8c7fa)
+    assert(popupCss.includes('--md-sys-color-background: #191c20;'), 'css/popup.css にダーク背景色 #191c20 が存在する');
+    assert(popupCss.includes('--md-sys-color-primary: #a8c7fa;'), 'css/popup.css にダークアクセント #a8c7fa が存在する');
+    assert(optionsCss.includes('--md-sys-color-background: #191c20;'), 'css/options.css にダーク背景色 #191c20 が存在する');
+    assert(optionsCss.includes('--md-sys-color-primary: #a8c7fa;'), 'css/options.css にダークアクセント #a8c7fa が存在する');
+
+    // M3スイッチのダーク用チェックマーク反転 (ライトブルー #a8c7fa)
+    assert(popupCss.includes('stroke="%23a8c7fa"'), 'css/popup.css のスイッチチェックマークにダーク反転色 %23a8c7fa が定義されている');
+    assert(optionsCss.includes('stroke="%23a8c7fa"'), 'css/options.css のスイッチチェックマークにダーク反転色 %23a8c7fa が定義されている');
+  });
+
+  // =============================================================================
+  // 5. 印刷スタイル (@media print) 検証
+  // =============================================================================
+  console.log('\n--- 5. 印刷スタイル (@media print) ---');
 
   runTest('@media print 内で自作UI要素が完全非表示 (display: none !important) になっていること', () => {
     const styleCss = fs.readFileSync(path.join(ROOT_DIR, 'css', 'style.css'), 'utf8');
@@ -383,9 +423,9 @@ async function main() {
   });
 
   // =============================================================================
-  // 5. 配布ZIPパッケージ健全性検証
+  // 6. 配布ZIPパッケージ健全性検証
   // =============================================================================
-  console.log('\n--- 5. 配布ZIPパッケージ健全性 ---');
+  console.log('\n--- 6. 配布ZIPパッケージ健全性 ---');
 
   const zipPath = path.join(ROOT_DIR, 'e-gov-layout-changes.zip');
 

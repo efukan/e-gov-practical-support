@@ -139,37 +139,63 @@ async function main() {
   const settingKeys = Object.keys(defaultSettings);
   const toggleKeys = settingKeys.filter(k => k !== 'definitionColor');
 
-  runTest('DEFAULT_SETTINGS に全12設定キー（11機能トグル＋定義語カラー）が定義されていること', () => {
+  runTest('DEFAULT_SETTINGS に全12設定キー（11機能トグル＋定義語カラー）が定義され、全機能が初期状態で全て ON (true) であること', () => {
     const expectedKeys = ['global', 'scrollspy', 'popup', 'definition', 'newtab', 'dim', 'jump', 'horizontal', 'conjunction', 'fastrender', 'citation', 'definitionColor'];
     assert.strictEqual(settingKeys.length, expectedKeys.length);
     expectedKeys.forEach(k => assert(settingKeys.includes(k), `キー '${k}' が DEFAULT_SETTINGS に存在する`));
+    
+    // 初回インストール時にすべての機能トグルが ON (true) であることを厳密に検証
+    toggleKeys.forEach(k => {
+      assert.strictEqual(defaultSettings[k], true, `機能トグル '${k}' のデフォルト値は true (ON) であること`);
+    });
+
     assert.strictEqual(defaultSettings.definitionColor, '#00695c', 'デフォルトの定義語カラーは緑系ティール深緑(#00695c)である');
   });
 
-  runTest('popup.html に 全機能トグルに対応するチェックボックスが存在すること', () => {
+  runTest('popup.html に 全機能トグルに対応するチェックボックスが存在し、全て初期状態で checked であること', () => {
     const dom = new JSDOM(popupHtml);
     const doc = dom.window.document;
     toggleKeys.forEach(key => {
       const el = doc.getElementById(`feature-${key}`);
       assert(el, `popup.html に #feature-${key} が存在する`);
       assert.strictEqual(el.type, 'checkbox', `#feature-${key} は checkbox である`);
+      assert(el.hasAttribute('checked'), `popup.html の #feature-${key} には checked 属性が付与されていること`);
     });
     const openOptions = doc.getElementById('open-options');
     assert(openOptions, 'popup.html に #open-options ボタンが存在する');
   });
 
-  runTest('options.html に 全機能トグルおよび定義語カラー設定UIが存在すること', () => {
+  runTest('options.html に 全機能トグルおよび定義語カラー設定UIが存在し、全て初期状態で checked であること', () => {
     const dom = new JSDOM(optionsHtml);
     const doc = dom.window.document;
     toggleKeys.forEach(key => {
       const el = doc.getElementById(`feature-${key}`);
       assert(el, `options.html に #feature-${key} が存在する`);
       assert.strictEqual(el.type, 'checkbox', `#feature-${key} は checkbox である`);
+      assert(el.hasAttribute('checked'), `options.html の #feature-${key} には checked 属性が付与されていること`);
     });
     const colorPicker = doc.getElementById('def-color-picker');
     assert(colorPicker, 'options.html に #def-color-picker が存在する');
     const swatches = doc.querySelectorAll('.def-color-swatch');
     assert(swatches.length >= 5, 'options.html に 5個以上のカラースウォッチが存在する');
+  });
+
+  await runAsyncTest('初回インストール時（storage未設定時）に loadSettings() が全機能 ON (true) を返すこと', async () => {
+    const dom = new JSDOM('<!DOCTYPE html><html><body></body></html>', { runScripts: 'dangerously' });
+    const window = dom.window;
+    window.chrome = {
+      storage: {
+        sync: {
+          get: async () => ({}) // 空ストレージ（初回インストール状態）
+        }
+      }
+    };
+    window.eval(settingsJs);
+    const loaded = await window.egovExt.loadSettings();
+    toggleKeys.forEach(k => {
+      assert.strictEqual(loaded[k], true, `初回読み込み時に機能 '${k}' が true (ON) であること`);
+    });
+    assert.strictEqual(loaded.definitionColor, '#00695c', '初回読み込み時の定義語カラーが #00695c であること');
   });
 
   await runAsyncTest('initSettingsUI による設定読み込みとトグル変更時のメッセージ通知 (broadcast)', async () => {

@@ -2231,6 +2231,123 @@ async function check(name, fn) {
     return '非条文ページ（/result, /）における判定・ホバー抑止・自作UI非表示およびSPA遷移クリーンアップの完全動作を確認';
   });
 
+  console.log('\n--- 11. 法令番号の括弧（元号〜号）の薄字化除外および通常注記の薄字化維持の検証 ---');
+
+  await check('法令番号の括弧（元号〜号）の薄字化除外および通常注記・体言止め注記の薄字化維持の検証', async () => {
+    const html = `
+      <div class="LawBody">
+        <div class="Article" id="Mp-At_1">
+          <div class="Paragraph" id="Mp-At_1-Pr_1">
+            <div class="ParagraphSentence">
+              <span id="target1">特定非営利活動促進法（平成１０年法律第７号）第２条第２項に規定する特定非営利活動法人（以下「ＮＰＯ法人」という。）をいう。</span>
+            </div>
+          </div>
+          <div class="Paragraph" id="Mp-At_1-Pr_2">
+            <div class="ParagraphSentence">
+              <span id="target2">基準（第五号に掲げるもの）に適合する建築物（これに附属する門若しくは塀を含む。）の敷地</span>
+            </div>
+          </div>
+          <div class="Paragraph" id="Mp-At_1-Pr_3">
+            <div class="ParagraphSentence">
+              <span id="target3">地方自治法（昭和二十二年法律第六十七号）第十条及び施行令（平成四年政令第二百三十号の二）第１条による。</span>
+            </div>
+          </div>
+          <div class="Paragraph" id="Mp-At_1-Pr_4">
+            <div class="ParagraphSentence">
+              <span id="target4">地方公共団体（地方自治法（昭和二十二年法律第六十七号）第十条に規定するものに限る。）の指定</span>
+            </div>
+          </div>
+          <div class="Paragraph" id="Mp-At_1-Pr_5">
+            <div class="ParagraphSentence">
+              <span id="target5">民事訴訟法（平成八年法律第百九号）<a href="#test">第百三十条</a>に規定する手続</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    `;
+
+    const { window, ext } = await createTestEnv(html);
+    ext.settings.dim = true;
+    ext.enableDimParentheses();
+
+    const t1 = window.document.getElementById('target1');
+    const t2 = window.document.getElementById('target2');
+    const t3 = window.document.getElementById('target3');
+    const t4 = window.document.getElementById('target4');
+    const t5 = window.document.getElementById('target5');
+
+    // 1. target1: 法令番号（平成１０年法律第７号）は薄字化・虹色カッコから除外され、注記（以下「ＮＰＯ法人」という。）は薄字化されること
+    const t1Brackets = t1.querySelectorAll('.egov-ext-bracket');
+    const t1Dimmed = t1.querySelectorAll('.egov-ext-dimmed-text');
+    if (t1Brackets.length !== 2) {
+      throw new Error(`target1 のカッコ数が想定と異なります: ${t1Brackets.length} (期待値: 2)`);
+    }
+    if (t1Dimmed.length !== 1 || !t1Dimmed[0].textContent.includes('以下「ＮＰＯ法人」という。')) {
+      throw new Error(`target1 の薄字化テキストが想定と異なります: ${t1Dimmed[0]?.textContent}`);
+    }
+    // 法令番号がプレーンテキストとして残っていること
+    if (t1.innerHTML.includes('egov-ext-bracket">（</span>平成１０年法律第７号') ||
+        t1.innerHTML.includes('egov-ext-dimmed-text">平成１０年法律第７号')) {
+      throw new Error('target1 で法令番号（平成１０年法律第７号）が誤って薄字化または虹色カッコ化されています');
+    }
+    if (!t1.textContent.includes('特定非営利活動促進法（平成１０年法律第７号）第２条第２項')) {
+      throw new Error('target1 のテキスト内容が破壊されています');
+    }
+
+    // 2. target2: 体言止め注記（第五号に掲げるもの）および句点付き注記（これに附属する門若しくは塀を含む。）の双方が正常に薄字化されること
+    const t2Brackets = t2.querySelectorAll('.egov-ext-bracket');
+    const t2Dimmed = t2.querySelectorAll('.egov-ext-dimmed-text');
+    if (t2Brackets.length !== 4) {
+      throw new Error(`target2 のカッコ数が想定と異なります: ${t2Brackets.length} (期待値: 4)`);
+    }
+    if (t2Dimmed.length !== 2) {
+      throw new Error(`target2 の薄字化要素数が想定と異なります: ${t2Dimmed.length} (期待値: 2)`);
+    }
+    if (!t2Dimmed[0].textContent.includes('号に掲げるもの')) {
+      throw new Error(`target2 の体言止め注記が薄字化されていません: ${t2Dimmed[0]?.textContent}`);
+    }
+    if (!t2Dimmed[1].textContent.includes('これに附属する門若しくは塀を含む。')) {
+      throw new Error(`target2 の句点付き注記が薄字化されていません: ${t2Dimmed[1]?.textContent}`);
+    }
+
+    // 3. target3: 昭和の法律（昭和二十二年法律第六十七号）および枝番号付き政令（平成四年政令第二百三十号の二）がいずれも除外されること
+    const t3Brackets = t3.querySelectorAll('.egov-ext-bracket');
+    const t3Dimmed = t3.querySelectorAll('.egov-ext-dimmed-text');
+    if (t3Brackets.length !== 0 || t3Dimmed.length !== 0) {
+      throw new Error(`target3 で法令番号が薄字化されています: brackets=${t3Brackets.length}, dimmed=${t3Dimmed.length}`);
+    }
+    if (!t3.textContent.includes('地方自治法') || !t3.textContent.includes('法律第') || !t3.textContent.includes('施行令')) {
+      throw new Error('target3 のテキスト内容が破壊されています: ' + t3.textContent);
+    }
+
+    // 4. target4: 注記括弧内の法令番号括弧
+    // 外側の注記（地方自治法...に限る。）は level-1、内部の法令番号は地の文として維持（level-2 を発生させない）
+    const t4Brackets = t4.querySelectorAll('.egov-ext-bracket');
+    const t4Dimmed = t4.querySelectorAll('.egov-ext-dimmed-text');
+    if (t4Brackets.length !== 2) {
+      throw new Error(`target4 のカッコ数が想定と異なります: ${t4Brackets.length} (期待値: 2)`);
+    }
+    if (t4Dimmed.length !== 1 || (!t4Dimmed[0].textContent.includes('昭和二十二年法律第六十七号') && !t4Dimmed[0].textContent.includes('昭和２２年法律第６７号'))) {
+      throw new Error(`target4 の薄字化内容が想定と異なります: ${t4Dimmed[0]?.textContent}`);
+    }
+    // level-2 のブラケットが存在しないこと
+    if (t4.querySelector('.egov-ext-bracket-level-2')) {
+      throw new Error('target4 の内部法令番号が誤って level-2 虹色カッコ化されています');
+    }
+
+    // 5. target5: aタグで分割されたテキストノードにおける法令番号括弧の除外
+    const t5Brackets = t5.querySelectorAll('.egov-ext-bracket');
+    const t5Dimmed = t5.querySelectorAll('.egov-ext-dimmed-text');
+    if (t5Brackets.length !== 0 || t5Dimmed.length !== 0) {
+      throw new Error(`target5 で法令番号が薄字化されています: brackets=${t5Brackets.length}, dimmed=${t5Dimmed.length}`);
+    }
+    const aLink = t5.querySelector('a');
+    if (!aLink || (!aLink.textContent.includes('１３０') && !aLink.textContent.includes('百三十')) || aLink.getAttribute('href') !== '#test') {
+      throw new Error('target5 の aタグ構造が破壊されています: ' + aLink?.outerHTML);
+    }
+
+    return '法令番号括弧の薄字化除外、通常注記・体言止め注記の薄字化維持、枝番号・ネスト・aタグ共存の完全動作を確認';
+  });
 
   console.log('\n==========================================');
   if (failures === 0) {

@@ -6,8 +6,15 @@ FIREFOX_ADDONS.md
 PROMOTION_GUIDE.md
 node_modules/
 assets/
-scripts/
+# scripts/ は実験用の使い捨てスクリプト置き場（ローカルパスを含むため非公開）。
+# ただし package.json の npm scripts から呼ぶ4本だけは公開する。
+scripts/*
+!scripts/generate_icons.js
+!scripts/generate_promo.js
+!scripts/generate_edge_assets.js
+!scripts/package_firefox.js
 *.zip
+.firefox_package_tmp/
 .DS_Store
 
 # tests/ 配下は npm test で実行する5本のみを追跡する。

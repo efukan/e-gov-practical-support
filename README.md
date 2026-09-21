@@ -122,19 +122,24 @@ npm test
 * `tests/test_interactions.js` — 機能間の実行順序入れ替え、多重実行（冪等性）、設定トグル復元サイクル、自作UI保護
 * `tests/test_extension_integrity.js` — i18n多言語リソース整合性、設定UI同期、キーボードA11y、印刷スタイル保護、配布ZIP整合性
 
-### アセットの再生成
-
-`icons/icon.svg` や `assets/*.svg` を更新した場合は、以下のコマンドで各種PNGを一括再生成できます。
+### アセットの再生成とパッケージング
 
 ```bash
-# 拡張機能アイコンの再生成 (16, 48, 128, 360px)
+# 拡張機能アイコンの再生成 (16, 48, 128, 360px)。icons/icon.svg から生成
 npm run generate-icons
 
-# プロモーションバナーの再生成 (小タイル 440x280, マーキー 1400x560, noteカバー 1280x670)
-npm run generate-promos
-
 # 配布・提出用ZIPパッケージの生成
-npm run package
+npm run package           # Chrome / Edge 用
+npm run package:firefox   # Firefox 用（manifest.firefox.json を manifest.json として同梱）
+npm run package:all       # 上記2つをまとめて実行
+```
+
+以下のコマンドはストア掲載用の画像を生成するものです。元になるデザインデータ（`assets/*.svg`）は
+リポジトリに含めていないため、clone した環境では「Input SVG file not found」で停止します。
+
+```bash
+npm run generate-promos        # プロモーションバナー (440x280, 1400x560, 1280x670)
+npm run generate-edge-assets   # Microsoft Edge アドオンストア用ロゴ (300x300)
 ```
 
 ### 変更履歴

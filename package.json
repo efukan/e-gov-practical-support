@@ -15,7 +15,7 @@
     "package:all": "npm run package && npm run package:firefox"
   },
   "keywords": [],
-  "author": "",
+  "author": "efukan",
   "license": "MIT",
   "type": "commonjs",
   "devDependencies": {

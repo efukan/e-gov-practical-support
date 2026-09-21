@@ -2,6 +2,7 @@
 .archive/
 CHROMEWEBSTORE.md
 EDGE_ADDONS.md
+FIREFOX_ADDONS.md
 PROMOTION_GUIDE.md
 node_modules/
 assets/

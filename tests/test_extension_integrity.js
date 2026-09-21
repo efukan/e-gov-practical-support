@@ -526,6 +526,61 @@ async function main() {
     });
   });
 
+  // =============================================================================
+  // 6. Firefox アドオン互換性およびパッケージ健全性テスト
+  // =============================================================================
+  console.log('\n--- 6. Firefox アドオン互換性およびパッケージ健全性 ---');
+
+  const firefoxManifestPath = path.join(ROOT_DIR, 'manifest.firefox.json');
+  const firefoxZipPath = path.join(ROOT_DIR, 'e-gov-layout-changes-firefox.zip');
+
+  runTest('manifest.firefox.json が存在し、構文が正しいJSONであること', () => {
+    assert(fs.existsSync(firefoxManifestPath), 'manifest.firefox.json が存在する');
+    const content = fs.readFileSync(firefoxManifestPath, 'utf8');
+    const ffManifest = JSON.parse(content);
+    assert.strictEqual(ffManifest.manifest_version, 3, 'manifest_version は 3 であること');
+    assert.strictEqual(ffManifest.version, manifest.version, 'Firefox manifestのバージョンが通常manifestと一致すること');
+  });
+
+  runTest('manifest.firefox.json に Gecko ID および strict_min_version が正しく定義されていること', () => {
+    const ffManifest = JSON.parse(fs.readFileSync(firefoxManifestPath, 'utf8'));
+    assert(ffManifest.browser_specific_settings, 'browser_specific_settings が定義されていること');
+    assert(ffManifest.browser_specific_settings.gecko, 'gecko 設定が定義されていること');
+    assert.strictEqual(ffManifest.browser_specific_settings.gecko.id, 'egov-himotoki@efukan.jp', 'Gecko IDが設定されていること');
+    assert.strictEqual(ffManifest.browser_specific_settings.gecko.strict_min_version, '109.0', 'strict_min_version が 109.0 であること');
+  });
+
+  runTest('manifest.firefox.json の background が scripts 配列形式（Event Page）であること', () => {
+    const ffManifest = JSON.parse(fs.readFileSync(firefoxManifestPath, 'utf8'));
+    assert(ffManifest.background, 'background が定義されていること');
+    assert(Array.isArray(ffManifest.background.scripts), 'background.scripts が配列であること');
+    assert(ffManifest.background.scripts.includes('js/background.js'), 'js/background.js が含まれていること');
+  });
+
+  if (fs.existsSync(firefoxZipPath)) {
+    runTest('e-gov-layout-changes-firefox.zip 内の manifest.json が Firefox 仕様に準拠していること', () => {
+      const manifestInZip = execSync(`unzip -p "${firefoxZipPath}" manifest.json`, { encoding: 'utf8' });
+      const parsedInZip = JSON.parse(manifestInZip);
+      assert.strictEqual(parsedInZip.browser_specific_settings?.gecko?.id, 'egov-himotoki@efukan.jp');
+      assert.strictEqual(parsedInZip.browser_specific_settings?.gecko?.strict_min_version, '109.0');
+      assert(Array.isArray(parsedInZip.background?.scripts));
+    });
+
+    runTest('e-gov-layout-changes-firefox.zip に全必須ファイルが含まれ不要ファイルが混入していないこと', () => {
+      const zipFileList = execSync(`unzip -l "${firefoxZipPath}"`, { encoding: 'utf8' });
+      assert(zipFileList.includes('manifest.json'));
+      assert(zipFileList.includes('popup.html'));
+      assert(zipFileList.includes('options.html'));
+      assert(zipFileList.includes('js/content.js'));
+      assert(zipFileList.includes('js/citation.js'));
+      assert(zipFileList.includes('icons/icon128.png'));
+      assert(!zipFileList.includes('node_modules'));
+      assert(!zipFileList.includes('.git'));
+      assert(!zipFileList.includes('scripts/'));
+      assert(!zipFileList.includes('FIREFOX_ADDONS.md'));
+    });
+  }
+
   console.log(`\n======================================================`);
   console.log(`全総合健全性テスト完了: ${passedTests}/${totalTests} PASS (100%)`);
   console.log(`======================================================\n`);

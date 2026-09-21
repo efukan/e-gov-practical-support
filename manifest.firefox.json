@@ -1,0 +1,67 @@
+{
+  "manifest_version": 3,
+  "name": "__MSG_extName__",
+  "version": "2.2.0",
+  "default_locale": "ja",
+  "description": "__MSG_extDesc__",
+  "permissions": [
+    "storage"
+  ],
+  "host_permissions": [
+    "*://laws.e-gov.go.jp/*"
+  ],
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "__MSG_extName__",
+    "default_icon": {
+      "16": "icons/icon16.png",
+      "48": "icons/icon48.png",
+      "128": "icons/icon128.png"
+    }
+  },
+  "icons": {
+    "16": "icons/icon16.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "*://laws.e-gov.go.jp/*"
+      ],
+      "css": [
+        "css/style.css"
+      ],
+      "js": [
+        "js/settings.js",
+        "js/utils.js",
+        "js/tooltip.js",
+        "js/horizontal.js",
+        "js/dim.js",
+        "js/conjunction.js",
+        "js/scrollspy.js",
+        "js/citation.js",
+        "js/refer_popup.js",
+        "js/jump.js",
+        "js/definition.js",
+        "js/content.js"
+      ],
+      "run_at": "document_end"
+    }
+  ],
+  "background": {
+    "scripts": [
+      "js/background.js"
+    ]
+  },
+  "options_ui": {
+    "page": "options.html",
+    "open_in_tab": true
+  },
+  "browser_specific_settings": {
+    "gecko": {
+      "id": "egov-himotoki@efukan.jp",
+      "strict_min_version": "109.0"
+    }
+  }
+}

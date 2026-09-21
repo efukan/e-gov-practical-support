@@ -10,7 +10,9 @@
     "generate-icons": "node scripts/generate_icons.js",
     "generate-promos": "node scripts/generate_promo.js",
     "generate-edge-assets": "node scripts/generate_edge_assets.js",
-    "package": "rm -f e-gov-layout-changes.zip && zip -r e-gov-layout-changes.zip manifest.json options.html popup.html LICENSE _locales css js icons -x \"*.DS_Store*\""
+    "package": "rm -f e-gov-layout-changes.zip && zip -r e-gov-layout-changes.zip manifest.json options.html popup.html LICENSE _locales css js icons -x \"*.DS_Store*\"",
+    "package:firefox": "node scripts/package_firefox.js",
+    "package:all": "npm run package && npm run package:firefox"
   },
   "keywords": [],
   "author": "",

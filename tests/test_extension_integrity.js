@@ -470,61 +470,67 @@ async function main() {
 
   const zipPath = path.join(ROOT_DIR, 'e-gov-layout-changes.zip');
 
-  runTest('配布パッケージ e-gov-layout-changes.zip の存在とサイズ確認', () => {
-    assert(fs.existsSync(zipPath), 'e-gov-layout-changes.zip がルートに存在する');
-    const stats = fs.statSync(zipPath);
-    assert(stats.size > 50000, `ZIPサイズが妥当である (${Math.round(stats.size / 1024)} KB)`);
-    assert(stats.size < 5000000, `ZIPサイズが過大でない (${Math.round(stats.size / 1024)} KB)`);
-  });
-
-  runTest('manifest.json に記載されたすべてのファイルがZIPアーカイブに含まれていること', () => {
-    const zipFileList = execSync(`unzip -l "${zipPath}"`, { encoding: 'utf8' });
-
-    // manifest記載の content_scripts, background, icons, action, options_ui, locales を抽出
-    const requiredFiles = [
-      'manifest.json',
-      'popup.html',
-      'options.html',
-      'icons/icon16.png',
-      'icons/icon48.png',
-      'icons/icon128.png',
-      'css/style.css',
-      'css/popup.css',
-      'css/options.css',
-      'js/popup.js',
-      'js/options.js',
-      'js/background.js',
-      '_locales/ja/messages.json',
-      '_locales/en/messages.json'
-    ];
-
-    // content_scripts の js を追加
-    manifest.content_scripts.forEach(cs => {
-      cs.js.forEach(f => requiredFiles.push(f));
+  // 配布ZIPは gitignore 対象の成果物なので、clone 直後の環境には存在しない。
+  // ZIP がある場合（npm run package 実行後）だけ中身を検証する。
+  // Firefox 用ZIPの検証（後述）と同じ扱い。
+  if (fs.existsSync(zipPath)) {
+    runTest('配布パッケージ e-gov-layout-changes.zip のサイズ確認', () => {
+      const stats = fs.statSync(zipPath);
+      assert(stats.size > 50000, `ZIPサイズが妥当である (${Math.round(stats.size / 1024)} KB)`);
+      assert(stats.size < 5000000, `ZIPサイズが過大でない (${Math.round(stats.size / 1024)} KB)`);
     });
 
-    requiredFiles.forEach(file => {
-      assert(zipFileList.includes(file), `ZIP内に必須ファイル '${file}' が存在する`);
-    });
-  });
+    runTest('manifest.json に記載されたすべてのファイルがZIPアーカイブに含まれていること', () => {
+      const zipFileList = execSync(`unzip -l "${zipPath}"`, { encoding: 'utf8' });
 
-  runTest('不要な開発用ファイルがZIPアーカイブに混入していないこと', () => {
-    const zipFileList = execSync(`unzip -l "${zipPath}"`, { encoding: 'utf8' });
-    const forbiddenPatterns = [
-      'node_modules',
-      '.git',
-      '.agents',
-      'tests/',
-      'package.json',
-      'package-lock.json',
-      'scripts/',
-      'CHROMEWEBSTORE.md'
-    ];
+      // manifest記載の content_scripts, background, icons, action, options_ui, locales を抽出
+      const requiredFiles = [
+        'manifest.json',
+        'popup.html',
+        'options.html',
+        'icons/icon16.png',
+        'icons/icon48.png',
+        'icons/icon128.png',
+        'css/style.css',
+        'css/popup.css',
+        'css/options.css',
+        'js/popup.js',
+        'js/options.js',
+        'js/background.js',
+        '_locales/ja/messages.json',
+        '_locales/en/messages.json'
+      ];
 
-    forbiddenPatterns.forEach(pat => {
-      assert(!zipFileList.includes(pat), `ZIP内に不要開発用パス '${pat}' が混入していないこと`);
+      // content_scripts の js を追加
+      manifest.content_scripts.forEach(cs => {
+        cs.js.forEach(f => requiredFiles.push(f));
+      });
+
+      requiredFiles.forEach(file => {
+        assert(zipFileList.includes(file), `ZIP内に必須ファイル '${file}' が存在する`);
+      });
     });
-  });
+
+    runTest('不要な開発用ファイルがZIPアーカイブに混入していないこと', () => {
+      const zipFileList = execSync(`unzip -l "${zipPath}"`, { encoding: 'utf8' });
+      const forbiddenPatterns = [
+        'node_modules',
+        '.git',
+        '.agents',
+        'tests/',
+        'package.json',
+        'package-lock.json',
+        'scripts/',
+        'CHROMEWEBSTORE.md'
+      ];
+
+      forbiddenPatterns.forEach(pat => {
+        assert(!zipFileList.includes(pat), `ZIP内に不要開発用パス '${pat}' が混入していないこと`);
+      });
+    });
+  } else {
+    console.log('  - e-gov-layout-changes.zip が無いため配布ZIPの検証をスキップ（npm run package で生成すると検証されます）');
+  }
 
   // =============================================================================
   // 6. Firefox アドオン互換性およびパッケージ健全性テスト

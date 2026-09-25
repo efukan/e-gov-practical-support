@@ -4,6 +4,7 @@ CHROMEWEBSTORE.md
 EDGE_ADDONS.md
 FIREFOX_ADDONS.md
 PROMOTION_GUIDE.md
+style-profile.md
 node_modules/
 assets/
 # scripts/ は実験用の使い捨てスクリプト置き場（ローカルパスを含むため非公開）。

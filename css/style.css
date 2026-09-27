@@ -180,6 +180,14 @@
   letter-spacing: .02em !important;
 }
 
+/* 定義語ポップアップ：範囲を限った定義の「どこで効くか」 */
+.egov-ext-tip-scope {
+  margin: 0 0 6px !important;
+  color: var(--tip-muted) !important;
+  font-size: 11.5px !important;
+  line-height: 1.5 !important;
+}
+
 .egov-ext-tip-header-title {
   display: inline-flex !important;
   align-items: center !important;
@@ -487,7 +495,54 @@ article.article,
 .SupplProvision,
 [id^="Mp-"],
 [id^="Sp-"] {
-  scroll-margin-top: var(--egov-header-offset, 72px) !important;
+  scroll-margin-top: var(--egov-header-offset, 12px) !important;
+}
+
+/* ----- 5b. 元の位置へ戻るボタン (Return to Reading Position) ----- */
+/* e-Gov の下端のツールバー（印刷・ダウンロード）に重ならない高さに置く */
+.egov-ext-return {
+  position: fixed !important;
+  right: 24px !important;
+  bottom: 64px !important;
+  z-index: 2147483000 !important;
+  display: flex !important;
+  align-items: stretch !important;
+  border-radius: 18px !important;
+  overflow: hidden !important;
+  background: rgba(16, 66, 164, 0.94) !important;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.22) !important;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif !important;
+}
+
+.egov-ext-return button {
+  appearance: none !important;
+  border: none !important;
+  margin: 0 !important;
+  background: transparent !important;
+  color: #fff !important;
+  font-size: 13px !important;
+  font-weight: 700 !important;
+  line-height: 1 !important;
+  cursor: pointer !important;
+}
+
+.egov-ext-return-btn {
+  padding: 10px 12px 10px 16px !important;
+}
+
+.egov-ext-return-close {
+  padding: 10px 12px !important;
+  border-left: 1px solid rgba(255, 255, 255, 0.3) !important;
+  opacity: 0.85 !important;
+}
+
+.egov-ext-return button:hover {
+  background: rgba(255, 255, 255, 0.14) !important;
+}
+
+.egov-ext-return button:focus-visible {
+  outline: 2px solid #fff !important;
+  outline-offset: -3px !important;
 }
 
 /* ----- 6. 定義語ホバー辞書＆ハイライト (Defined Terms Highlight & Tooltip) ----- */
@@ -531,6 +586,14 @@ body a .egov-definition-word,
   text-decoration-color: currentColor !important;
 }
 
+/* 一部がリンクの中にある定義語（e-Gov は「第一号被保険者」の「第一号」を号への参照リンクにする）は、
+   リンクの色に合わせず、定義語として 1 語に見せる */
+body a .egov-definition-word--joined,
+.LawBody a .egov-definition-word--joined {
+  color: var(--egov-def-color, #00695c) !important;
+  text-decoration: underline dotted var(--egov-def-color, #00695c) !important;
+}
+
 /* 括弧書きの薄字化（dimmed-text）と定義語が入れ子になった場合でも、定義語の視認性を最優先する */
 body.egov-ext-dim-active .egov-ext-dimmed-text .egov-definition-word,
 body.egov-ext-dim-active .egov-definition-word .egov-ext-dimmed-text,
@@ -538,6 +601,18 @@ body.egov-ext-dim-active .egov-definition-word.egov-ext-dimmed-text {
   color: var(--egov-def-color, #00695c) !important;
   text-decoration: underline dotted var(--egov-def-color, #00695c) !important;
   background-color: var(--egov-def-bg, rgba(0, 105, 92, 0.05)) !important;
+}
+
+/*
+  定義している箇所（「以下「X」という」の X、2 列の定義の 1 列目）。
+  宣言は括弧書きの中にあることが多く、薄字化で灰色になると、どこで定義しているか見つけにくい。
+  下線は付けず（乗せても自分の定義が出るだけ）、定義語の色と太字で示す
+*/
+body .egov-definition-decl,
+body.egov-ext-dim-active .egov-ext-dimmed-text .egov-definition-decl,
+body.egov-ext-dim-active a .egov-ext-dimmed-text .egov-definition-decl {
+  color: var(--egov-def-color, #00695c) !important;
+  font-weight: 700 !important;
 }
 
 /* キーボード操作でも定義語にフォーカスできるので、フォーカスリングを明示する */
@@ -765,6 +840,11 @@ div.egov-ext-preview-title {
   font-weight: 600 !important;
 }
 
+/* 丸数字（②）は字面が小さく、地の文に埋もれるので少し大きくする */
+.egov-ext-preview-paragraph-num--circled {
+  font-size: 1.15em !important;
+}
+
 .egov-ext-preview-sentence {
   color: var(--tip-fg) !important;
 }
@@ -849,6 +929,7 @@ div.egov-ext-preview-title {
   .egov-ext-jump-modal,
   .egov-ext-jump-backdrop,
   .egov-ext-tip,
+  .egov-ext-return,
   .egov-ext-citation-btn,
   .egov-ext-citation-modal,
   .egov-ext-citation-overlay,
@@ -869,6 +950,11 @@ div.egov-ext-preview-title {
   .egov-definition-word {
     border-bottom: none !important;
     text-decoration: none !important;
+  }
+
+  .egov-definition-decl {
+    color: inherit !important;
+    font-weight: inherit !important;
   }
 }
 

@@ -121,7 +121,7 @@ const SAMPLE_LAW_HTML = `<!DOCTYPE html><html><body>
     <div class="_div_ArticleTitle"><span>第二条</span></div>
     <div class="_div_Paragraph" id="Mp-At_2-Pr_1">
       <div class="_div_ParagraphNum"><span>二</span></div>
-      <div class="_div_ParagraphSentence">個人情報取扱事業者は、第三条第二項の規定により、当該情報（第五号に掲げるもの（以下「特定情報」という。）に限る。）を保護しなければならない。</div>
+      <div class="_div_ParagraphSentence">個人情報取扱事業者は、第三条第二項の規定により、当該情報（第五号に掲げるもの（以下「特定情報」という。）に限り、特定情報の写しを含む。）を保護しなければならない。</div>
     </div>
     <div class="_div_Item" id="Mp-At_2-Pr_1-It_1">
       <div class="_div_ItemTitle"><span>一</span></div>
@@ -672,64 +672,56 @@ async function check(name, fn) {
     return '本法令ジャンプ（項・号ピンポイント解決・附則/表記揺れ対応）および他法令別タブリンクの正常動作確認';
   });
 
-  await check('長距離ジャンプ: ハイブリッド近接展開と精密到着補正（Arrival Precision Tracker）', async () => {
+  await check('長距離ジャンプ: 瞬時に寄せたあと、上の条の高さが変わって生じたずれを押さえ直す（pinScrollTarget）', async () => {
     const { dom, ext } = await createTestEnv(SAMPLE_LAW_HTML);
 
-    // 2500px 下にある長距離条文を模擬
     const distantArticle = dom.window.document.createElement('div');
     distantArticle.className = '_div_Article';
     distantArticle.id = 'Mp-At_800';
     distantArticle.innerHTML = '<div class="_div_ArticleTitle">第八百条</div>';
     dom.window.document.body.appendChild(distantArticle);
 
-    let scrolledCalls = [];
-    distantArticle.scrollIntoView = (opts) => {
-      scrolledCalls.push(opts);
-    };
-
-    // 初期位置を 2500px 下にモック
+    const offset = ext.updateHeaderOffset();
     let currentTop = 2500;
-    distantArticle.getBoundingClientRect = () => ({
-      top: currentTop,
-      bottom: currentTop + 80,
-      height: 80
-    });
+    distantArticle.getBoundingClientRect = () => ({ top: currentTop, bottom: currentTop + 80, height: 80 });
 
-    let scrolledBy = [];
-    dom.window.scrollBy = (opts) => {
-      scrolledBy.push(opts);
-      if (typeof opts === 'object' && opts.top !== undefined) {
-        currentTop -= opts.top;
-      }
+    const intoViewCalls = [];
+    distantArticle.scrollIntoView = (opts) => {
+      intoViewCalls.push(opts);
+      currentTop = offset;
+    };
+    const scrolledBy = [];
+    dom.window.scrollBy = (x, y) => {
+      const dy = typeof x === 'object' ? x.top : y;
+      scrolledBy.push(dy);
+      currentTop -= dy;
     };
 
-    // 長距離ジャンプを実行
     ext.fastSmoothScroll(distantArticle);
 
-    // 1. 長距離（2000px超）のため、まず先行して instant 展開が行われ、次に smooth 着地が行われること
-    const hasInstant = scrolledCalls.some(c => typeof c === 'object' && c.behavior === 'instant');
-    const hasSmooth = scrolledCalls.some(c => typeof c === 'object' && c.behavior === 'smooth');
-    if (!hasInstant || !hasSmooth) {
-      throw new Error(`長距離ハイブリッドスクロールが正しく呼ばれていない (instant: ${hasInstant}, smooth: ${hasSmooth})`);
+    // 1. 遠い移動は smooth にせず、scrollIntoView で瞬時に寄せる
+    if (!intoViewCalls.some(c => c && c.behavior === 'instant')) {
+      throw new Error('長距離ジャンプで instant の scrollIntoView が呼ばれていない');
     }
 
-    // 2. スクロール中に途中の要素が展開され、目標位置から 40px のレイアウト伸縮ズレが生じた状況をシミュレート
-    const expectedHeaderOffset = ext.updateHeaderOffset();
-    currentTop = expectedHeaderOffset + 40; // 40px 下に押し出されたズレ
+    // 2. 上の条が実寸で描かれて 40px 押し下げられた状況（高速レンダリングで実際に起きる）
+    currentTop = offset + 40;
+    await new Promise(r => setTimeout(r, 80));
 
-    // scrollend イベントを発火させて精密到着補正を発動
-    const scrollEndEvent = new dom.window.Event('scrollend');
-    dom.window.dispatchEvent(scrollEndEvent);
-
-    await new Promise(r => setTimeout(r, 40));
-
-    // 3. scrollBy によりズレ（40px）が吸着補正されたことを検証
-    if (scrolledBy.length === 0) {
-      throw new Error('scrollend 時に精密到着補正（scrollBy）が発動しなかった');
+    if (!scrolledBy.includes(40)) {
+      throw new Error(`押し下げられた 40px が補正されていない (scrollBy: ${JSON.stringify(scrolledBy)})`);
     }
-    const lastCorrection = scrolledBy[scrolledBy.length - 1];
-    if (typeof lastCorrection === 'object' && lastCorrection.top !== 40) {
-      throw new Error(`補正スクロール量が一致しない (期待値: 40, 実際: ${lastCorrection.top})`);
+    if (currentTop !== offset) {
+      throw new Error(`補正後の位置が目標と一致しない (期待: ${offset}, 実際: ${currentTop})`);
+    }
+
+    // 3. 利用者がホイールを回したら押さえるのをやめる
+    dom.window.dispatchEvent(new dom.window.Event('wheel'));
+    const before = scrolledBy.length;
+    currentTop = offset + 300;
+    await new Promise(r => setTimeout(r, 80));
+    if (scrolledBy.length !== before) {
+      throw new Error('ホイール操作のあとも位置の補正が続いている（利用者のスクロールと取り合う）');
     }
 
     // 4. ハイライトが付与されていること
@@ -737,8 +729,137 @@ async function check(name, fn) {
       throw new Error('長距離ジャンプ後に目標要素にハイライトが付与されていない');
     }
 
+    ext.cancelScrollPin();
     distantArticle.remove();
-    return '長距離先行展開（instant）→ 滑らか着地（smooth）→ 到着補正（scrollend吸着）の完全動作確認';
+    return '瞬時の寄せ → ずれの押さえ直し → 利用者の操作で解放 を確認';
+  });
+
+  await check('元の位置へ戻る: 遠くへ移動する前の位置を控え、右下のボタンで戻る', async () => {
+    const { dom, ext } = await createTestEnv(SAMPLE_LAW_HTML);
+    ext.settings = Object.assign({}, ext.DEFAULT_SETTINGS);
+    const doc = dom.window.document;
+    const reading = doc.getElementById('Mp-At_2-Pr_1');
+    const far = doc.getElementById('Mp-At_1');
+    // 読んでいる段落が枠の上端近くに見え、移動先は遠くにある状況を作る
+    doc.elementFromPoint = () => reading.querySelector('._div_ParagraphSentence');
+    const tops = new Map([[reading.querySelector('._div_ParagraphSentence'), 30], [far, 5000]]);
+    for (const [el, top] of tops) el.getBoundingClientRect = () => ({ top: tops.get(el), bottom: tops.get(el) + 20, height: 20, left: 0, width: 800 });
+    doc.documentElement.getBoundingClientRect = () => ({ top: 0, left: 0, width: 800, height: 600 });
+    far.scrollIntoView = () => { tops.set(far, 12); tops.set(reading.querySelector('._div_ParagraphSentence'), -4000); };
+    dom.window.scrollBy = () => {};
+
+    ext.fastSmoothScroll(far);
+    const box = doc.getElementById('egov-ext-return');
+    if (!box) throw new Error('遠くへ移動したのに「戻る」ボタンが出ない');
+    if (!box.querySelector('.egov-ext-return-btn').textContent.includes('第２条へ戻る')) {
+      throw new Error(`ボタンの文言が不正: ${box.textContent}`);
+    }
+    ext.cancelScrollPin();
+
+    // 戻ると、控えた要素を控えたときと同じ位置（30px）へ押さえ、ボタンは消える
+    let pinned = null;
+    const origPin = ext.pinScrollTarget;
+    ext.pinScrollTarget = (el, opts) => { pinned = { el, offset: opts.offset }; return null; };
+    box.querySelector('.egov-ext-return-btn').click();
+    ext.pinScrollTarget = origPin;
+    if (!pinned || pinned.el !== reading.querySelector('._div_ParagraphSentence') || pinned.offset !== 30) {
+      throw new Error(`控えた位置へ戻っていない: ${pinned && pinned.offset}`);
+    }
+    if (doc.getElementById('egov-ext-return')) throw new Error('戻ったあともボタンが残っている');
+
+    // 近い移動（画面の半分未満）では控えない
+    tops.set(far, 100);
+    far.scrollIntoView = () => {};
+    ext.fastSmoothScroll(far);
+    ext.cancelScrollPin();
+    if (doc.getElementById('egov-ext-return')) throw new Error('近い移動でも戻り先を控えた');
+    return '控える・文言・戻る・近い移動では控えない を確認';
+  });
+
+  await check('条項付きURLの解決: 章・節を省いた短い id（Mp-At_2-Pr_1-It_14）から本文の要素を特定する', async () => {
+    const html = `<!DOCTYPE html><html><body><div class="main-content"><div class="LawBody">
+      <article class="article" id="Mp-Ch_1-At_1"><div class="paragraph" id="Mp-Ch_1-At_1-Pr_1">第一条</div></article>
+      <article class="article" id="Mp-Ch_1-At_2"><div class="paragraph" id="Mp-Ch_1-At_2-Pr_1">
+        <div class="item" id="Mp-Ch_1-At_2-Pr_1-It_1">一</div>
+        <div class="item" id="Mp-Ch_1-At_2-Pr_1-It_14">十四</div>
+      </div></article>
+      <article class="article" id="Mp-Ch_3_2-At_12_2"><div class="paragraph" id="Mp-Ch_3_2-At_12_2-Pr_1">第十二条の二</div></article>
+      <article class="article" id="Mp-Pa_2-Ch_1-Se_1-Ss_2-At_22"><div class="paragraph" id="Mp-Pa_2-Ch_1-Se_1-Ss_2-At_22-Pr_2">２</div></article>
+      <article class="article" id="415AC0000000057-Sp"><div id="415AC0000000057-Sp-At_1">附則第一条</div></article>
+    </div></div></body></html>`;
+    const { ext } = await createTestEnv(html);
+    const cases = {
+      'Mp-At_2-Pr_1-It_14': 'Mp-Ch_1-At_2-Pr_1-It_14',
+      '#Mp-At_2-Pr_1-It_14': 'Mp-Ch_1-At_2-Pr_1-It_14',
+      'Mp-At_2': 'Mp-Ch_1-At_2',
+      'Mp-At_12_2-Pr_1': 'Mp-Ch_3_2-At_12_2-Pr_1',
+      'Mp-At_22-Pr_2': 'Mp-Pa_2-Ch_1-Se_1-Ss_2-At_22-Pr_2',
+      'Mp_At_22_Pr_2': 'Mp-Pa_2-Ch_1-Se_1-Ss_2-At_22-Pr_2',
+      '415AC0000000057-Sp-At_1': '415AC0000000057-Sp-At_1'
+    };
+    for (const [input, expected] of Object.entries(cases)) {
+      const el = ext.resolveTargetElement(input);
+      if (!el || el.id !== expected) {
+        throw new Error(`${input} → 期待 ${expected}, 実際 ${el ? el.id : 'null'}`);
+      }
+    }
+    // 存在しない号・章だけの id は別の要素に当たらないこと
+    for (const input of ['Mp-At_2-Pr_1-It_4', 'Mp-Ch_9', 'Mp-At_12']) {
+      const el = ext.resolveTargetElement(input);
+      if (el) throw new Error(`${input} が別の要素 ${el.id} に誤って当たった`);
+    }
+    return `${Object.keys(cases).length} 件の短い id を正しく解決、誤一致なし`;
+  });
+
+  await check('条項付きURLの着地: 本文が後から描かれても、現れた要素へ着地しハイライトする（landOnHash）', async () => {
+    const { dom, ext } = await createTestEnv(SAMPLE_LAW_HTML);
+    ext.settings = Object.assign({}, ext.DEFAULT_SETTINGS);
+    let pinned = null;
+    const originalPin = ext.pinScrollTarget;
+    ext.pinScrollTarget = (el) => { pinned = el; return null; };
+
+    ext.landOnHash('#Mp-At_7-Pr_2');
+    await new Promise(r => setTimeout(r, 50));
+    if (pinned) throw new Error('要素が無いうちに着地処理が走った');
+
+    // e-Gov が本文を後から描く状況を模擬
+    const late = dom.window.document.createElement('div');
+    late.className = '_div_Article';
+    late.id = 'Mp-Ch_2-At_7';
+    late.innerHTML = '<div class="_div_Paragraph" id="Mp-Ch_2-At_7-Pr_2">第七条第二項</div>';
+    dom.window.document.querySelector('.LawBody').appendChild(late);
+
+    await new Promise(r => setTimeout(r, 250));
+    ext.pinScrollTarget = originalPin;
+    if (!pinned || pinned.id !== 'Mp-Ch_2-At_7-Pr_2') {
+      throw new Error(`後から現れた第七条第二項に着地していない (実際: ${pinned ? pinned.id : 'null'})`);
+    }
+    await new Promise(r => setTimeout(r, 30));
+    if (!pinned.classList.contains('egov-ext-jump-target')) {
+      throw new Error('着地先がハイライトされていない');
+    }
+    return '遅れて描かれた項への着地・ハイライトを確認';
+  });
+
+  await check('条文ジャンプ検索: 「附則1」でこの法令自身の附則（法令ID-Sp-At_1）へ移動する', async () => {
+    const html = `<!DOCTYPE html><html><body><div class="main-content"><div class="LawBody">
+      <article class="article" id="Mp-Ch_1-At_1"><div class="paragraph" id="Mp-Ch_1-At_1-Pr_1">第一条</div></article>
+      <article class="article" id="415AC0000000057-Sp"><div id="415AC0000000057-Sp-At_1">附則第一条</div><div id="415AC0000000057-Sp-At_2">附則第二条</div></article>
+    </div></div></body></html>`;
+    const { dom, ext } = await createTestEnv(html);
+    ext.settings = Object.assign({}, ext.DEFAULT_SETTINGS);
+    ext.removeJumpSearch();
+    ext.setupJumpSearch();
+    const input = dom.window.document.querySelector('.egov-ext-jump-input');
+    input.value = '附則2';
+    input.dispatchEvent(new dom.window.KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+    await new Promise(r => setTimeout(r, 40));
+    ext.cancelScrollPin();
+    const target = dom.window.document.getElementById('415AC0000000057-Sp-At_2');
+    if (!target.classList.contains('egov-ext-jump-target')) {
+      throw new Error('「附則2」で 415AC0000000057-Sp-At_2 に移動していない');
+    }
+    return '附則の id 形式（法令ID-Sp-At_N）での移動を確認';
   });
 
   await check('ポップアップ上マウス移動: プレビュー内リンク・定義語通過時の自壊防止およびKeep-Alive安定化', async () => {
@@ -2002,7 +2123,8 @@ async function check(name, fn) {
     fallbackArticle.id = 'Mp-At_52_2';
     fallbackArticle.className = 'Article';
     const sourceFallback = fnGetSource(fallbackArticle);
-    if (sourceFallback !== '第52条の2') {
+    // 番号は漢数字で作り、横書き表記変換が有効なら見出しを出すときに算用数字へ直す
+    if (sourceFallback !== '第五十二条の二') {
       throw new Error(`IDフォールバックからの枝番抽出失敗: ${sourceFallback}`);
     }
 
@@ -2097,15 +2219,16 @@ async function check(name, fn) {
     const item3 = bunkazaiArticle.querySelector('#Mp-At_2-Pr_1-It_3');
     const sourceItem3 = fnGetSource(item3);
     const formattedItem3 = ext.convertLawTextToHorizontal(sourceItem3);
-    if (formattedItem3 !== '（文化財の定義）第２条第１項第３号') {
-      throw new Error(`号番号のカッコ除去失敗: actual="${formattedItem3}", expected="（文化財の定義）第２条第１項第３号"`);
+    // 項が一つしかない条は、引用で「第一項」を書かない（第二条第三号）
+    if (formattedItem3 !== '（文化財の定義）第２条第３号') {
+      throw new Error(`号番号のカッコ除去失敗: actual="${formattedItem3}", expected="（文化財の定義）第２条第３号"`);
     }
 
     const item3_2 = bunkazaiArticle.querySelector('#Mp-At_2-Pr_1-It_3_2');
     const sourceItem3_2 = fnGetSource(item3_2);
     const formattedItem3_2 = ext.convertLawTextToHorizontal(sourceItem3_2);
-    if (formattedItem3_2 !== '（文化財の定義）第２条第１項第３号の２') {
-      throw new Error(`号番号枝番の正規化失敗: actual="${formattedItem3_2}", expected="（文化財の定義）第２条第１項第３号の２"`);
+    if (formattedItem3_2 !== '（文化財の定義）第２条第３号の２') {
+      throw new Error(`号番号枝番の正規化失敗: actual="${formattedItem3_2}", expected="（文化財の定義）第２条第３号の２"`);
     }
 
     // 3.4 横書き設定 OFF 時の検証
@@ -2123,6 +2246,259 @@ async function check(name, fn) {
   });
 
   console.log('\n--- 10. 非条文ページ（/result やトップページ等）における機能完全停止・クリーンアップの検証 ---');
+
+  // ==========================================
+  // 定義語：宣言の範囲・語の採り方・下線の付け方（法令ひもときの規則を移したもの）
+  // ==========================================
+
+  /** 新しい表示（article.article > div.paragraph > div.item）の法令本文を組み立てる */
+  const NEW_LAYOUT_LAW = `<!DOCTYPE html><html><body><div class="main-content"><div class="provisiontext"><article class="law">
+    <article class="article" id="Mp-Ch_1-At_1"><div class="articlecontent"><em class="articleheading">（目的）</em>
+      <div class="paragraph" id="Mp-Ch_1-At_1-Pr_1"><div class="istitle"><span class="paragraphtitle">第一条　</span><p class="sentence">この法律は、建築物の敷地に関する基準を定める。</p></div></div>
+    </div></article>
+    <article class="article" id="Mp-Ch_1-At_2"><div class="articlecontent"><em class="articleheading">（用語の定義）</em>
+      <div class="paragraph" id="Mp-Ch_1-At_2-Pr_1"><div class="istitle"><span class="paragraphtitle">第二条　</span><p class="sentence">この法律において次の各号に掲げる用語の意義は、それぞれ当該各号に定めるところによる。</p></div>
+        <div class="item istitle" id="Mp-Ch_1-At_2-Pr_1-It_1"><span class="itemtitle">一　</span><div class="column"><p class="sentence">建築物</p></div><div class="column"><p class="sentence">土地に定着する工作物のうち、屋根を有するもの</p></div></div>
+        <div class="item istitle" id="Mp-Ch_1-At_2-Pr_1-It_9_2"><span class="itemtitle">九の二　</span><div class="column"><p class="sentence">耐火建築物</p></div><div class="column"><p class="sentence">次に掲げる基準に適合する建築物をいう。</p></div></div>
+        <div class="item istitle" id="Mp-Ch_1-At_2-Pr_1-It_20"><span class="itemtitle">二十　</span><div class="column"><p class="sentence">都市計画区域又は準都市計画区域</p></div><div class="column"><p class="sentence">それぞれ、都市計画法に規定する都市計画区域又は準都市計画区域をいう。</p></div></div>
+        <div class="item istitle" id="Mp-Ch_1-At_2-Pr_1-It_26"><span class="itemtitle">二十六　</span><div class="column"><p class="sentence">組織変更</p></div><div class="column"><p class="sentence">次のイ又はロに掲げる会社が組織を変更することをいう。</p></div>
+          <div class="subitem istitle"><span class="subitemtitle">イ　</span><div class="column"><p class="sentence">株式会社</p></div><div class="column"><p class="sentence">合名会社又は合資会社</p></div></div>
+        </div>
+      </div>
+    </div></article>
+    <section class="chapter"><article class="article" id="Mp-Ch_2-Se_1-At_3"><div class="articlecontent">
+      <div class="paragraph" id="Mp-Ch_2-Se_1-At_3-Pr_1"><div class="istitle"><span class="paragraphtitle">第三条　</span><p class="sentence">国土交通大臣は、建築物の審査をする者を指定する（以下この節において単に「指定」という。）。都市計画区域内の耐火建築物は、この限りでない。</p></div></div>
+      <div class="paragraph" id="Mp-Ch_2-Se_1-At_3-Pr_2"><div class="istitle"><span class="paragraphtitle">２　</span><p class="sentence">指定は、申請により行う。</p></div></div>
+    </div></article>
+    <article class="article" id="Mp-Ch_2-Se_1-At_4"><div class="articlecontent">
+      <div class="paragraph" id="Mp-Ch_2-Se_1-At_4-Pr_1"><div class="istitle"><span class="paragraphtitle">第四条　</span><p class="sentence">指定を受けた者は、届け出なければならない。</p></div></div>
+    </div></article>
+    <article class="article" id="Mp-Ch_2-Se_2-At_5"><div class="articlecontent">
+      <div class="paragraph" id="Mp-Ch_2-Se_2-At_5-Pr_1"><div class="istitle"><span class="paragraphtitle">第五条　</span><p class="sentence">市町村の指定する区域については、同法の規定を適用しない。株式会社は、この限りでない。</p></div></div>
+    </article></section>
+    <article class="article" id="999AC0000000001-Sp"><div class="articlecontent">
+      <div class="paragraph" id="999AC0000000001-Sp-Pr_1"><div class="istitle"><span class="paragraphtitle">１　</span><p class="sentence">この法律は、公布の日（以下「施行日」という。）から施行する。</p></div></div>
+      <div class="paragraph" id="999AC0000000001-Sp-Pr_2"><div class="istitle"><span class="paragraphtitle">２　</span><p class="sentence">施行日前にした行為については、なお従前の例による。</p></div></div>
+    </div></article>
+    <article class="article" id="Mp-Ch_2-Se_2-At_6"><div class="articlecontent">
+      <div class="paragraph" id="Mp-Ch_2-Se_2-At_6-Pr_1"><div class="istitle"><span class="paragraphtitle">第六条　</span><p class="sentence">施行日の前日までに建築物を建築した者は、届け出るものとする。</p></div></div>
+    </div></article>
+  </article></div></div></body></html>`;
+
+  await check('定義語の抽出（新しい表示）: 2列の定義・「それぞれ」の分割・号の細分の除外・範囲の読み取り', async () => {
+    const { ext } = await createTestEnv(NEW_LAYOUT_LAW, { url: 'https://laws.e-gov.go.jp/law/999AC0000000001' });
+    ext.settings = Object.assign({}, ext.DEFAULT_SETTINGS);
+    ext.definitionExtractionCompleted = false;
+    await ext.extractDefinitionsAsync();
+
+    const has = (t) => ext.definitionDefs.has(t);
+    for (const t of ['建築物', '耐火建築物', '都市計画区域', '準都市計画区域', '組織変更', '指定', '施行日']) {
+      if (!has(t)) throw new Error(`「${t}」が定義語として抽出されていない: ${Array.from(ext.definitionDefs.keys())}`);
+    }
+    // 号の細分（イ）の 2 列は区分の並びで定義ではない
+    if (has('株式会社')) throw new Error('号の細分「株式会社｜合名会社又は合資会社」を定義語にしている');
+    if (has('都市計画区域又は準都市計画区域')) throw new Error('「それぞれ」で並んだ語を分けずに 1 語にしている');
+
+    // 見出しは id の番号から作り、項が一つの条では「第一項」を書かない
+    const src = ext.definitionMap.get('耐火建築物').source;
+    if (src !== '（用語の定義）第二条第九号の二') throw new Error(`耐火建築物の出典が不正: ${src}`);
+
+    // 「以下この節において」は節の中の条だけ
+    const shitei = ext.definitionDefs.get('指定')[0];
+    if (shitei.scope.kind !== 'articles' || !shitei.scope.ids.has('Mp-Ch_2-Se_1-At_4') || shitei.scope.ids.has('Mp-Ch_2-Se_2-At_5')) {
+      throw new Error(`「指定」の範囲が節になっていない: ${JSON.stringify(shitei.scope.ids && Array.from(shitei.scope.ids))}`);
+    }
+    // 附則の宣言は、その附則の中だけ
+    const sekou = ext.definitionDefs.get('施行日')[0];
+    if (sekou.scope.kind !== 'group' || sekou.scope.group !== '999AC0000000001-Sp') {
+      throw new Error(`附則の「施行日」の範囲が附則に閉じていない: ${JSON.stringify(sekou.scope)}`);
+    }
+    if (sekou.source !== '附則第一項') throw new Error(`附則の出典が不正: ${sekou.source}`);
+
+    // 範囲の言い方：宣言した条から見た「この節」ではなく、段の名前と条番号で言う
+    if (shitei.scope.label !== '第二章第一節（第三条から第四条まで）') throw new Error(`「指定」の範囲の言い方が不正: ${shitei.scope.label}`);
+    if (sekou.scope.label !== '附則') throw new Error(`附則の範囲の言い方が不正: ${sekou.scope.label}`);
+    if (ext.definitionMap.get('建築物').scope.label) throw new Error('法令全体の定義に範囲の言い方が付いている');
+    return '2列定義・分割・細分除外・節と附則の範囲・範囲の言い方・見出しを確認';
+  });
+
+  await check('定義語の下線: 範囲の外・宣言の括弧の中・複合語の途中・「同法」の「法」には付けない', async () => {
+    const { window, ext } = await createTestEnv(NEW_LAYOUT_LAW, { url: 'https://laws.e-gov.go.jp/law/999AC0000000001' });
+    ext.settings = Object.assign({}, ext.DEFAULT_SETTINGS, { horizontal: false, dim: false, conjunction: false });
+    ext.definitionExtractionCompleted = false;
+    await ext.extractDefinitionsAsync();
+    ext.enableDefinitionHighlighting(window.document.body);
+
+    const words = (id) => Array.from(window.document.getElementById(id).querySelectorAll('.egov-definition-word')).map(s => s.textContent);
+    // 節の中（第三条第二項・第四条）の「指定」には付く
+    if (!words('Mp-Ch_2-Se_1-At_3-Pr_2').includes('指定')) throw new Error('節の中の「指定」に下線が無い');
+    if (!words('Mp-Ch_2-Se_1-At_4-Pr_1').includes('指定')) throw new Error('節の中の第四条の「指定」に下線が無い');
+    // 節の外（第五条）の「指定」には付けない
+    if (words('Mp-Ch_2-Se_2-At_5-Pr_1').includes('指定')) throw new Error('範囲外の第五条の「指定」に下線が付いた');
+    // 附則の「施行日」は本則（第六条）では定義語ではない
+    if (words('Mp-Ch_2-Se_2-At_6-Pr_1').includes('施行日')) throw new Error('附則の「施行日」が本則にまで付いた');
+    if (!words('999AC0000000001-Sp-Pr_2').includes('施行日')) throw new Error('附則の中の「施行日」に下線が無い');
+    // 宣言の括弧の中（「指定」）には付けない
+    // 宣言の括弧の中（「指定」）と、宣言より前の「指定する」には付けない
+    const decl = window.document.querySelector('#Mp-Ch_2-Se_1-At_3-Pr_1 p.sentence');
+    if (Array.from(decl.querySelectorAll('.egov-definition-word')).some(s => s.textContent === '指定')) {
+      throw new Error('宣言の括弧「指定」の中、または宣言より前の「指定」に下線が付いた');
+    }
+    // 1 列目（定義される語そのもの）には付けない
+    if (window.document.querySelector('#Mp-Ch_1-At_2-Pr_1-It_1 .column .egov-definition-word')?.closest('.column') === window.document.querySelector('#Mp-Ch_1-At_2-Pr_1-It_1 .column')) {
+      throw new Error('定義している 1 列目に下線が付いた');
+    }
+    // 第三条の「都市計画区域内の耐火建築物」：接尾辞「内」は許し、長い語を先に取る
+    const at3 = words('Mp-Ch_2-Se_1-At_3-Pr_1');
+    if (!at3.includes('都市計画区域') || !at3.includes('耐火建築物')) throw new Error(`第三条の下線が不正: ${at3}`);
+    if (at3.includes('建築物') && at3.filter(w => w === '建築物').length > 1) throw new Error('「耐火建築物」の中の「建築物」にも下線が付いた');
+    // 下線は指す定義を持つ
+    const span = window.document.querySelector('#Mp-Ch_2-Se_1-At_4-Pr_1 .egov-definition-word');
+    const def = ext.definitionList[Number(span.dataset.defIndex)];
+    if (!def || def.term !== '指定') throw new Error('下線が指す定義を持っていない');
+    return '範囲・括弧・1列目・複合語の扱いを確認';
+  });
+
+  await check('定義している箇所の印と「定義へ」: 括弧書きの中の宣言を色付きにし、ポップアップから移動できる', async () => {
+    const { window, ext } = await createTestEnv(NEW_LAYOUT_LAW, { url: 'https://laws.e-gov.go.jp/law/999AC0000000001' });
+    ext.settings = Object.assign({}, ext.DEFAULT_SETTINGS, { horizontal: false, conjunction: false });
+    ext.enableDimParentheses();
+    ext.definitionExtractionCompleted = false;
+    await ext.extractDefinitionsAsync();
+    ext.enableDefinitionHighlighting(window.document.body);
+
+    // 括弧書き（薄字化）の中の宣言「指定」に印が付く
+    const decl = Array.from(window.document.querySelectorAll('#Mp-Ch_2-Se_1-At_3-Pr_1 .egov-definition-decl')).find(s => s.textContent === '指定');
+    if (!decl) throw new Error('宣言「指定」に定義している箇所の印が付いていない');
+    if (!decl.closest('.egov-ext-dimmed-text')) throw new Error('この試験では宣言が薄字化の中にあるはず');
+    // 2 列の 1 列目にも印が付く（下線ではなく）
+    const cell = window.document.querySelector('#Mp-Ch_1-At_2-Pr_1-It_1 .column .egov-definition-decl');
+    if (!cell || cell.textContent !== '建築物') throw new Error('1 列目の「建築物」に印が付いていない');
+    if (window.document.querySelector('#Mp-Ch_1-At_2-Pr_1-It_1 .column .egov-definition-word')?.closest('.column') === cell.closest('.column')) {
+      throw new Error('1 列目に下線が付いている');
+    }
+    // 二度掛けても印が二重にならない
+    ext.enableDefinitionHighlighting(window.document.body);
+    if (window.document.querySelector('.egov-definition-decl .egov-definition-decl, .egov-definition-decl .egov-definition-word')) {
+      throw new Error('印が二重に付いた');
+    }
+
+    // ポップアップに「定義へ」ボタンがあり、押すと定義の項へ移動して宣言の語が光る
+    ext.definitionTooltip = null;
+    const use = window.document.querySelector('#Mp-Ch_2-Se_1-At_4-Pr_1 .egov-definition-word');
+    let content = null;
+    const origBind = ext.bindHoverTooltip;
+    ext.bindHoverTooltip = (cfg) => { content = cfg.resolveContent(use); };
+    ext.enableDefinitionHighlighting(window.document.body);
+    ext.bindHoverTooltip = origBind;
+    if (!content) throw new Error('ポップアップの中身を作れなかった');
+    const scopeLine = content.querySelector('.egov-ext-tip-scope');
+    if (!scopeLine || scopeLine.textContent !== '第二章第一節（第三条から第四条まで）の中だけの定義') {
+      throw new Error(`ポップアップの範囲表示が不正: ${scopeLine && scopeLine.textContent}`);
+    }
+    const btn = content.querySelector('.egov-ext-btn-jump');
+    if (!btn || btn.dataset.defIndex === undefined) throw new Error('「定義へ」ボタン（data-def-index 付き）が無い');
+    window.document.body.appendChild(content);
+    let scrolledTo = null;
+    const origScroll = ext.fastSmoothScroll;
+    ext.fastSmoothScroll = (el, opts) => { scrolledTo = { el, flash: opts && opts.flashTarget }; };
+    // ツールチップは中身を複製して出すので、委譲ハンドラ経由で動くこと
+    const cloneBtn = btn.cloneNode(true);
+    window.document.body.appendChild(cloneBtn);
+    cloneBtn.dispatchEvent(new window.MouseEvent('click', { bubbles: true }));
+    ext.fastSmoothScroll = origScroll;
+    if (!scrolledTo || scrolledTo.el.id !== 'Mp-Ch_2-Se_1-At_3-Pr_1') throw new Error(`定義の項へ移動していない: ${scrolledTo && scrolledTo.el.id}`);
+    if (scrolledTo.flash !== decl) throw new Error('光らせる対象が宣言の語になっていない');
+    return '括弧内の宣言・1列目の印、二重化なし、「定義へ」での移動を確認';
+  });
+
+  await check('他法令プレビュー: 項番号の無い古い法令は ②③ で項を示す', async () => {
+    const { ext } = await createTestEnv('<div class="LawBody"></div>');
+    ext.settings = Object.assign({}, ext.DEFAULT_SETTINGS);
+    const content = {
+      LawTitle: '児童福祉法',
+      ArticleTitle: '第三十三条の十八',
+      Paragraph: [
+        { '-Num': '1', ParagraphNum: '', ParagraphSentence: { Sentence: [{ '#text': '第1項本文' }] } },
+        { '-Num': '2', ParagraphNum: '', ParagraphSentence: { Sentence: [{ '#text': '第2項本文' }] } },
+        { '-Num': '3', ParagraphNum: '', ParagraphSentence: { Sentence: [{ '#text': '第3項本文' }] } }
+      ]
+    };
+    const dom = ext.renderArticlePreview(content, [], '児童福祉法', '第３３条の１８第２項', 'https://laws.e-gov.go.jp', 'Mp-At_33_18-Pr_2');
+    const nums = Array.from(dom.querySelectorAll('.egov-ext-preview-paragraph-num')).map(n => n.textContent.trim());
+    if (nums.join(',') !== '②,③') throw new Error(`項番号が不正: ${nums.join(',')}`);
+    // XML から読む経路も Num 属性を持ち帰る
+    const xml = new (require('jsdom').JSDOM)('').window.DOMParser;
+    const doc = new xml().parseFromString('<Article Num="3"><ArticleTitle>第三条</ArticleTitle><Paragraph Num="1"><ParagraphNum/><ParagraphSentence><Sentence>一</Sentence></ParagraphSentence></Paragraph><Paragraph Num="2"><ParagraphNum/><ParagraphSentence><Sentence>二</Sentence></ParagraphSentence></Paragraph></Article>', 'text/xml');
+    const fromXml = ext.xmlNodeToContent(doc.documentElement, '法');
+    if (!fromXml.Paragraph || fromXml.Paragraph[1]['-Num'] !== '2') throw new Error('XML の Paragraph の Num 属性を持ち帰っていない');
+    return '丸数字の項番号と XML の Num 属性を確認';
+  });
+
+  await check('定義語の抽出（旧表示）: 平らに並ぶ項と号、span の 2 列、見出し入りの前置きからの範囲', async () => {
+    const html = `<!DOCTYPE html><html><body><div class="LawBody">
+      <section id="Mp-Ch_1-At_2" class=" Article"><div class="_div_ArticleCaption"><span>（定義）</span></div>
+        <div id="Mp-Ch_1-At_2-Pr_1" class="_div_ArticleTitle"><span style="font-weight: bold;">第二条</span>　<span>第二章において、次の各号に掲げる用語の意義は、当該各号に定めるところによる。</span></div>
+        <div id="Mp-Ch_1-At_2-Pr_1-It_1" class="_div_ItemSentence"><span style="font-weight: bold;">一</span>　<span>内国法人</span>　<span>国内に本店を有する法人をいう。</span></div>
+        <div id="Mp-Ch_1-At_2-Pr_1-It_12_7_2" class="_div_ItemSentence"><span style="font-weight: bold;">十二の七の二</span>　<span>通算法人</span>　<span>通算親法人及び通算子法人をいう。</span></div>
+        <div id="Mp-Ch_1-At_2-Pr_2" class="_div_ParagraphSentence"><span style="font-weight: bold;">２</span>　<span>第三章において「欠損金額」とは、損金の額が益金の額を超える場合のその超える部分の金額をいう。</span></div>
+      </section>
+      <section id="Mp-Ch_2-At_3" class=" Article"><div id="Mp-Ch_2-At_3-Pr_1" class="_div_ArticleTitle"><span style="font-weight: bold;">第三条</span>　<span>内国法人の欠損金額については、通算法人を除く。</span></div></section>
+      <section id="Mp-Ch_3-At_4" class=" Article"><div id="Mp-Ch_3-At_4-Pr_1" class="_div_ArticleTitle"><span style="font-weight: bold;">第四条</span>　<span>内国法人の欠損金額は、別に定める。</span></div></section>
+    </div></body></html>`;
+    const { window, ext } = await createTestEnv(html);
+    ext.settings = Object.assign({}, ext.DEFAULT_SETTINGS, { horizontal: false, dim: false, conjunction: false });
+    ext.definitionExtractionCompleted = false;
+    await ext.extractDefinitionsAsync();
+
+    const naikoku = ext.definitionDefs.get('内国法人');
+    if (!naikoku) throw new Error(`旧表示の 2 列（span）から「内国法人」を抽出できない: ${Array.from(ext.definitionDefs.keys())}`);
+    if (naikoku[0].scope.kind !== 'articles' || !naikoku[0].scope.ids.has('Mp-Ch_2-At_3') || naikoku[0].scope.ids.has('Mp-Ch_3-At_4')) {
+      throw new Error('「第二章において」が第二章の条に閉じていない（条の見出し「第二条」を範囲の句に含めている）');
+    }
+    // この条は項が二つあるので「第一項」を書く
+    if (ext.definitionMap.get('通算法人').source !== '（定義）第二条第一項第十二号の七の二') {
+      throw new Error(`枝番の号の出典が不正: ${ext.definitionMap.get('通算法人').source}`);
+    }
+    const kesson = ext.definitionDefs.get('欠損金額');
+    if (!kesson || kesson[0].source !== '（定義）第二条第二項') throw new Error(`「欠損金額」の出典が不正: ${kesson && kesson[0].source}`);
+
+    ext.enableDefinitionHighlighting(window.document.body);
+    const words = (id) => Array.from(window.document.getElementById(id).querySelectorAll('.egov-definition-word')).map(s => s.textContent);
+    if (!words('Mp-Ch_2-At_3-Pr_1').includes('内国法人')) throw new Error('第二章の条で「内国法人」に下線が無い');
+    if (words('Mp-Ch_3-At_4-Pr_1').includes('内国法人')) throw new Error('第三章の条にまで第二章の「内国法人」が付いた');
+    if (!words('Mp-Ch_3-At_4-Pr_1').includes('欠損金額')) throw new Error('第三章の条で「欠損金額」に下線が無い');
+    if (words('Mp-Ch_2-At_3-Pr_1').includes('欠損金額')) throw new Error('第二章の条にまで第三章の「欠損金額」が付いた');
+    return '旧表示の抽出・章の範囲・枝番の出典を確認';
+  });
+
+  await check('定義語の規則: 範囲の句の読み取りと本文で塗ってよい位置', async () => {
+    const { ext } = await createTestEnv('<div class="LawBody"></div>');
+    const T = ext._testDefinition;
+    const ids = ['a1', 'a2', 'a3', 'a4', 'a5'];
+    const env = { ids, cur: 1, numToIdx: new Map([['1', 0], ['2', 1], ['3', 2], ['4', 3], ['5', 4]]), heads: [{ tag: 'Section', key: 'Mp-Se_1' }], headIds: new Map([['Mp-Se_1', ['a2', 'a3']]]), suppl: false, root: 'Mp' };
+    const read = (p) => { const r = T.readDefScope(p, env); return r ? r.join(',') : null; };
+    const cases = [
+      ['この条', 'a2'], ['以下この条', 'a2'], ['この節', 'a2,a3'], ['この法律', null],
+      ['この条及び次条', 'a2,a3'], ['第三条から第五条まで', 'a3,a4,a5'], ['前条', 'a1'], ['第２条', 'a2']
+    ];
+    for (const [p, want] of cases) {
+      if (read(p) !== want) throw new Error(`範囲「${p}」→ 期待 ${want}, 実際 ${read(p)}`);
+    }
+    const allowed = (text, term) => { const i = text.indexOf(term); return T.isDefUseAllowed(text, i, i + term.length); };
+    const useCases = [
+      ['当該建築物の敷地', '建築物', true], ['特殊建築物の敷地', '建築物', false], ['建築物以外の工作物', '建築物', true],
+      ['同法の規定', '法', false], ['法第二条', '法', true], ['法律の規定', '法', false], ['データベース等', 'データ', false],
+      ['建築物又は工作物', '建築物', true], ['空家等管理活用支援法人', '空家等', false]
+    ];
+    for (const [text, term, want] of useCases) {
+      if (allowed(text, term) !== want) throw new Error(`「${text}」の「${term}」: 期待 ${want}`);
+    }
+    // 「「X」とは」は意味を与えている文だけ
+    if (T.declSpans('第三条中「甲」とは「乙」と読み替える。').length) throw new Error('読替えの「「甲」とは」を宣言にしている');
+    if (T.declSpans('「都市計画区域」とは次条の区域を、「準都市計画区域」とは第五条の区域をいう。').length !== 2) throw new Error('読点の無い 2 つの宣言を拾えていない');
+    return `範囲 ${cases.length} 件・塗る位置 ${useCases.length} 件を確認`;
+  });
 
   await check('非条文ページ（/result や /）における判定・ホバー抑止・自作UI非表示およびSPA遷移クリーンアップの検証', async () => {
     // 1. URL判定テスト: /result および /（トップページ）では checkIfLawPage が確実に false を返すこと

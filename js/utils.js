@@ -349,11 +349,14 @@ window.egovExt = window.egovExt || {};
     ext.cancelTask(taskName);
 
     const state = { cancelled: false };
+    // 終わった（または取り消された）ことを待てるようにする（ext.waitForTasks）
+    state.done = new Promise(resolve => { state.resolveDone = resolve; });
     ext.activeTasks[taskName] = state;
 
     let index = 0;
     function runNextChunk() {
       if (state.cancelled) {
+        state.resolveDone();
         if (onComplete) onComplete(state);
         return;
       }
@@ -385,6 +388,7 @@ window.egovExt = window.egovExt || {};
         if (ext.activeTasks[taskName] === state) {
           ext.activeTasks[taskName] = null;
         }
+        state.resolveDone();
         if (onComplete) onComplete(state);
       }
     }
@@ -401,6 +405,27 @@ window.egovExt = window.egovExt || {};
    * @param {number} chunkSize - 1チャンク内の処理要素数
    * @returns {Promise<Object>} キャンセル検知用の状態オブジェクト
    */
+  /**
+   * 指定した分割処理が走っていれば、終わるまで待つ（途中で同じ名前の処理が始め直されたら、それも待つ）。
+   * 待つのは timeoutMs まで。分割処理は画面が空いたときに少しずつ進むので、地方税法のような
+   * 大きな法令では 30 秒以上かかり、待ち続けると後の処理がいつまでも始まらない
+   * @param {string[]} taskNames
+   * @param {number} [timeoutMs=4000]
+   * @returns {Promise<void>}
+   */
+  ext.waitForTasks = async function(taskNames, timeoutMs = 4000) {
+    const deadline = Date.now() + timeoutMs;
+    for (let guard = 0; guard < 20; guard++) {
+      const pending = taskNames.map(n => ext.activeTasks[n]).filter(st => st && st.done);
+      const rest = deadline - Date.now();
+      if (!pending.length || rest <= 0) return;
+      await Promise.race([
+        Promise.all(pending.map(st => st.done)),
+        new Promise(resolve => setTimeout(resolve, rest))
+      ]);
+    }
+  };
+
   ext.runTaskInChunksPromise = function(taskName, items, processFunc, chunkSize = 150) {
     return new Promise((resolve) => {
       ext.runTaskInChunks(taskName, items, processFunc, chunkSize, (state) => {
@@ -756,27 +781,151 @@ window.egovExt = window.egovExt || {};
   };
 
   /**
-   * スクロールアニメーションの requestAnimationFrame ID を管理する変数
-   * @type {number|null}
+   * 本文の枠がページの中でスクロールしているときの、枠の上端からの余白（px）。
+   * 枠の中には固定ヘッダーが無いので、前の号の末尾が数行見える 72px は要らない。
+   * 大きく空けると、号を指すリンクで一つ前の号が先に目に入り「違う号に飛んだ」と読める
+   * @type {number}
    */
-  ext.activeScrollAnimationFrame = null;
+  const INNER_SCROLL_OFFSET = 12;
 
   /**
-   * 固定ヘッダー（titlebarや上部ナビゲーション）の高さを測定し、
-   * CSS変数 --egov-header-offset を更新する。
-   * @returns {number} ヘッダーの高さ＋余白（ピクセル）
+   * スクロールしているのが文書全体（window）かどうか
+   * @param {Element} scroller
+   * @returns {boolean}
    */
-  ext.updateHeaderOffset = function() {
-    if (typeof document === 'undefined') return 72;
-    let headerHeight = 0;
-    const titlebar = document.getElementById('titlebar');
-    if (titlebar && window.getComputedStyle) {
-      const tbStyle = window.getComputedStyle(titlebar);
-      if (tbStyle.position === 'fixed' || tbStyle.position === 'sticky') {
-        headerHeight = Math.max(headerHeight, titlebar.offsetHeight || 0);
+  function isDocumentScroller(scroller) {
+    return !scroller || scroller === document.scrollingElement || scroller === document.documentElement || scroller === document.body;
+  }
+
+  /**
+   * 要素を縦にスクロールさせている祖先を返す。
+   * e-Gov の条文ページは、ページ全体ではなく本文の枠（section#revision）がスクロールする
+   * （ヘッダーと目次は枠の外にある）。window.scrollBy で位置を直しても本文は動かないので、
+   * スクロール位置を直す処理は必ずここで枠を求めてから行う。
+   * @param {Element} el
+   * @returns {Element} スクロールしている要素（無ければ document.scrollingElement）
+   */
+  ext.getScrollContainer = function(el) {
+    const docScroller = document.scrollingElement || document.documentElement;
+    if (!el || typeof window.getComputedStyle !== 'function') return docScroller;
+    let p = el.parentElement;
+    while (p && p !== document.body && p !== document.documentElement) {
+      const oy = window.getComputedStyle(p).overflowY;
+      if ((oy === 'auto' || oy === 'scroll' || oy === 'overlay') && p.scrollHeight > p.clientHeight + 1) {
+        return p;
       }
+      p = p.parentElement;
     }
-    const offset = Math.max(72, headerHeight + 20);
+    return docScroller;
+  };
+
+  /**
+   * 要素の上端が、スクロール枠の上端から何 px 下にあるか
+   * @param {Element} el
+   * @param {Element} scroller
+   * @returns {number}
+   */
+  function topWithinScroller(el, scroller) {
+    const base = isDocumentScroller(scroller) ? 0 : scroller.getBoundingClientRect().top;
+    return el.getBoundingClientRect().top - base;
+  }
+
+  /**
+   * スクロール枠を delta px だけ瞬時に動かす
+   * @param {Element} scroller
+   * @param {number} delta
+   */
+  function scrollScrollerBy(scroller, delta) {
+    if (isDocumentScroller(scroller)) {
+      if (typeof window.scrollBy === 'function') {
+        try { window.scrollBy(0, delta); } catch (e) {}
+      }
+    } else {
+      scroller.scrollTop += delta;
+    }
+  }
+
+  /**
+   * 要素が、まだ描かれていない content-visibility:auto の中にあるか。
+   * そうした要素の getBoundingClientRect() は描かれる前の古い位置を返す
+   * （実測：個人情報保護法の附則第一条が実際には 71,496px 下にあるのに -157px と出た）。
+   * 位置を測る前に scrollIntoView で描かせる必要がある
+   * @param {Element} el
+   * @returns {boolean}
+   */
+  function isSkippedByContentVisibility(el) {
+    return typeof el.checkVisibility === 'function' && !el.checkVisibility({ contentVisibilityAuto: true });
+  }
+
+  /**
+   * 要素を枠の上端へ瞬時に寄せる（scroll-margin-top に従う）。描かれていない要素も描かせてから寄せる
+   * @param {Element} el
+   */
+  function scrollIntoViewInstant(el) {
+    if (typeof el.scrollIntoView !== 'function') return;
+    try {
+      el.scrollIntoView({ block: 'start', behavior: 'instant' });
+    } catch (e) {
+      el.scrollIntoView(true);
+    }
+  }
+
+  /**
+   * スクロール枠の現在位置
+   * @param {Element} scroller
+   * @returns {number}
+   */
+  function scrollPosition(scroller) {
+    return isDocumentScroller(scroller) ? (window.pageYOffset || 0) : scroller.scrollTop;
+  }
+
+  /**
+   * 法令本文をスクロールさせている枠（e-Gov の現行画面では section#revision）。
+   * 本文の中の要素から求める。getLawContainer() が返す .main-content は枠の外側にあり、
+   * そこから上をたどっても枠に当たらない
+   * @returns {Element|null}
+   */
+  ext.getLawScrollContainer = function() {
+    const probe = document.querySelector('[id^="Mp-"], [id*="-Sp-"], .provisiontext, .LawBody') ||
+                  (ext.getLawContainer ? ext.getLawContainer() : null);
+    return probe && probe !== document.body ? ext.getScrollContainer(probe) : null;
+  };
+
+  /** 要素の上端がスクロール枠の上端から何 px 下にあるか（jump.js の「元の位置へ戻る」でも使う） */
+  ext.topWithinScroller = function(el, scroller) {
+    return topWithinScroller(el, scroller);
+  };
+
+  /** スクロールしているのが文書全体（window）かどうか */
+  ext.isDocumentScroller = function(scroller) {
+    return isDocumentScroller(scroller);
+  };
+
+  /**
+   * 条文へ移動したときに、目的の要素を枠の上端からどれだけ下に置くか（px）を求め、
+   * CSS変数 --egov-header-offset（scroll-margin-top。e-Gov 自身の目次移動もこれに従う）を更新する。
+   * 本文が枠の中でスクロールする e-Gov の現行画面では小さな余白、
+   * ページ全体がスクロールする場合は固定ヘッダーの高さ＋余白。
+   * @param {Element} [scroller] - スクロール枠（省略時は本文から求める）
+   * @returns {number}
+   */
+  ext.updateHeaderOffset = function(scroller) {
+    if (typeof document === 'undefined') return 72;
+    const sc = scroller || ext.getLawScrollContainer();
+    let offset;
+    if (sc && !isDocumentScroller(sc)) {
+      offset = INNER_SCROLL_OFFSET;
+    } else {
+      let headerHeight = 0;
+      const titlebar = document.getElementById('titlebar');
+      if (titlebar && window.getComputedStyle) {
+        const tbStyle = window.getComputedStyle(titlebar);
+        if (tbStyle.position === 'fixed' || tbStyle.position === 'sticky') {
+          headerHeight = Math.max(headerHeight, titlebar.offsetHeight || 0);
+        }
+      }
+      offset = Math.max(72, headerHeight + 20);
+    }
     if (document.documentElement && document.documentElement.style) {
       document.documentElement.style.setProperty('--egov-header-offset', `${offset}px`);
     }
@@ -784,18 +933,44 @@ window.egovExt = window.egovExt || {};
   };
 
   /**
+   * e-Gov の要素 id から、編・章・節・款・目の段を取り除いた形にする。
+   * 本文の id は「Mp-Ch_1-At_2-Pr_1-It_14」のように所属する章・節を挟むが、
+   * URL や他の法令からのリンクは「Mp-At_2-Pr_1-It_14」と条から書く。
+   * @param {string} id
+   * @returns {string}
+   */
+  function stripHierarchy(id) {
+    return id.replace(/-(?:Pa|Ch|Se|Ss|Di)_[0-9]+(?:_[0-9]+)*(?=-|$)/g, '');
+  }
+  ext.stripHierarchyFromId = stripHierarchy;
+
+  /**
+   * 比較用に id をそろえる（区切りの表記揺れ「-」「_」をなくしてから段を取り除く）
+   * @param {string} id
+   * @returns {string}
+   */
+  function normalizeIdForMatch(id) {
+    return id.replace(/-/g, '_').replace(/_(?:Pa|Ch|Se|Ss|Di)_[0-9]+(?:_[0-9]+)*(?=_[A-Za-z]|$)/g, '');
+  }
+
+  /**
    * リンクの参照先 ID から、実際の対象要素を解決する共通関数。
-   * ハイフン／アンダースコアの表記揺れ（Mp-At_ ⇄ Mp_At_）や改正附則の前方一致・後方一致に対応。
+   * 章・節を省いた短い形（Mp-At_2-Pr_1-It_14）、ハイフン／アンダースコアの表記揺れ
+   * （Mp-At_ ⇄ Mp_At_）、改正附則の前方一致・後方一致に対応。
    *
    * @param {string} targetId - 要素IDまたはハッシュ
    * @returns {HTMLElement|null}
    */
   ext.resolveTargetElement = function(targetId) {
     if (!targetId || typeof document === 'undefined') return null;
+    targetId = String(targetId).replace(/^#/, '');
+    try { targetId = decodeURIComponent(targetId); } catch (e) {}
+    if (!targetId) return null;
 
+    const escapeAttr = (s) => s.replace(/["\\]/g, '\\$&');
     const findById = (id) => document.getElementById(id) ||
-                             document.querySelector(`[name="${id}"]`) ||
-                             (ext.deepQuerySelectorAll ? ext.deepQuerySelectorAll(document.body, `[id="${id}"], [name="${id}"]`)[0] : null);
+                             document.querySelector(`[name="${escapeAttr(id)}"]`) ||
+                             (ext.deepQuerySelectorAll ? ext.deepQuerySelectorAll(document.body, `[id="${escapeAttr(id)}"], [name="${escapeAttr(id)}"]`)[0] : null);
 
     const direct = findById(targetId);
     if (direct) return direct;
@@ -812,12 +987,27 @@ window.egovExt = window.egovExt || {};
       if (alt) return alt;
     }
 
-    // 2. 改正附則などの前方一致・後方一致検索（ハイフン／アンダースコア両対応）
-    const match = targetId.match(/^(Mp|Sp|Sp_.*)-(.+)$/);
-    if (match) {
-      const selector = `[id^="${match[1]}-"][id$="${match[2]}"], [id^="${match[1]}_"][id$="${match[2]}"]`;
-      return document.querySelector(selector) ||
-             (ext.deepQuerySelectorAll ? ext.deepQuerySelectorAll(document.body, selector)[0] : null);
+    const match = targetId.match(/^(Mp|Sp|[0-9A-Za-z]+-Sp)[-_](.+)$/);
+    if (!match) return null;
+    const prefix = match[1];
+    const candidates = (ext.deepQuerySelectorAll ? ext.deepQuerySelectorAll(document.body, `[id^="${escapeAttr(prefix)}-"], [id^="${escapeAttr(prefix)}_"]`)
+                                                 : Array.from(document.querySelectorAll(`[id^="${escapeAttr(prefix)}-"], [id^="${escapeAttr(prefix)}_"]`)));
+
+    // 2. 章・節を省いた短い形。段を取り除いた id が完全に一致するものだけを採る
+    //    （後方一致だけで探すと「At_2」が別の段の「At_2」に当たりうる）
+    const wanted = normalizeIdForMatch(targetId);
+    // 段だけを指す id（Mp-Ch_3）は段を取ると何も残らず、どの要素とも一致してしまう
+    for (let i = 0; wanted.length > prefix.length && i < candidates.length; i++) {
+      if (normalizeIdForMatch(candidates[i].id) === wanted) return candidates[i];
+    }
+
+    // 3. 改正附則などの後方一致（区切りの直後から一致するものに限る）
+    const tail = match[2];
+    for (let i = 0; i < candidates.length; i++) {
+      const id = candidates[i].id;
+      if (id.length > tail.length && id.endsWith(tail) && /[-_]/.test(id[id.length - tail.length - 1])) {
+        return candidates[i];
+      }
     }
 
     return null;
@@ -858,130 +1048,197 @@ window.egovExt = window.egovExt || {};
   };
 
   /**
-   * 自然で滑らかなスムーズスクロール関数（精密到着補正＆長距離対応）
-   * 
-   * CSS scroll-margin-top とネイティブ scrollIntoView をベースにしつつ、
-   * content-visibility: auto の動的伸縮や非同期DOM変換によるレイアウトシフトを自動検知し、
-   * スクロール終了時にピタッと吸着させる精密補正（Arrival Precision Tracker）を備えます。
-   *
-   * @param {HTMLElement} target - スクロール先の要素
-   * @param {number} [customDuration=null] - オプション（互換性用）
-   * @param {number} [topPadding=28] - オプション（互換性用）
+   * 実行中の位置保持（pinScrollTarget）
+   * @type {{stop: Function, target: Element}|null}
    */
-  ext.fastSmoothScroll = function(target, customDuration = null, topPadding = 28) {
-    if (!target) return;
+  let activePin = null;
 
-    // ヘッダーオフセットCSS変数を最新化
-    ext.updateHeaderOffset();
-
-    // スクロール対象の可視要素をピンポイント解決（項・号・見出し等）
-    const scrollTarget = ext.resolveScrollTarget ? ext.resolveScrollTarget(target) : target;
-    if (!scrollTarget) return;
-
-    // 現在のビューポートと目標要素の相対距離を測定
-    const initialRect = scrollTarget.getBoundingClientRect ? scrollTarget.getBoundingClientRect() : { top: 0 };
-    const headerOffset = ext.updateHeaderOffset ? ext.updateHeaderOffset() : 72;
-    const distance = Math.abs(initialRect.top - headerOffset);
-
-    // 長距離（2000px以上）の場合：
-    // 途中の数百個の未描画要素による累積伸縮誤差を防ぐため、
-    // まず目標要素自身を即座にビューポート近傍に引き込み（展開確定）、次のフレームで滑らかに最終着地させる
-    if (distance > 2000 && scrollTarget.scrollIntoView) {
-      try {
-        scrollTarget.scrollIntoView({ behavior: 'instant', block: 'start' });
-      } catch (e) {
-        scrollTarget.scrollIntoView(true);
-      }
-    }
-
-    // ネイティブの滑らかなスクロールを開始
-    if (scrollTarget.scrollIntoView) {
-      try {
-        scrollTarget.scrollIntoView({ behavior: 'smooth', block: 'start' });
-      } catch (e) {
-        scrollTarget.scrollIntoView(true);
-      }
-    } else if (typeof window !== 'undefined' && window.scrollTo) {
-      const rect = scrollTarget.getBoundingClientRect ? scrollTarget.getBoundingClientRect() : { top: 0 };
-      const top = (window.pageYOffset || 0) + rect.top - headerOffset;
-      window.scrollTo(0, Math.max(0, top));
-    }
-
-    // 精密到着補正（Arrival Precision Tracker）:
-    // スクロール中に途中の要素が実寸展開されたり非同期DOM変換（横書き・引用ボタン）が走って
-    // ドキュメント高さが伸縮しても、到着時に必ずピタッと目的位置に静止させる。
-    let correctionAttempts = 0;
-    const maxCorrectionAttempts = 3;
-
-    if (ext._activeScrollTimers) {
-      ext._activeScrollTimers.forEach(t => clearTimeout(t));
-    }
-    ext._activeScrollTimers = [];
-
-    function applyArrivalCorrection() {
-      if (!scrollTarget || !scrollTarget.isConnected || !scrollTarget.getBoundingClientRect) return;
-      const currentRect = scrollTarget.getBoundingClientRect();
-      const currentOffset = ext.updateHeaderOffset ? ext.updateHeaderOffset() : 72;
-      const diff = currentRect.top - currentOffset;
-
-      // 4px以上のズレが生じている場合のみ微調整
-      if (Math.abs(diff) > 4 && correctionAttempts < maxCorrectionAttempts) {
-        correctionAttempts++;
-        if (typeof window !== 'undefined' && window.scrollBy) {
-          try {
-            window.scrollBy({ top: diff, behavior: 'smooth' });
-          } catch (e) {
-            window.scrollBy(0, diff);
-          }
-        } else if (scrollTarget.scrollIntoView) {
-          try {
-            scrollTarget.scrollIntoView({ behavior: 'smooth', block: 'start' });
-          } catch (e) {}
-        }
-      }
-    }
-
-    // 1. スクロール停止の検知（scrollend イベント）
-    let scrollEndFired = false;
-    const onScrollEnd = () => {
-      scrollEndFired = true;
-      if (typeof window !== 'undefined' && window.removeEventListener) {
-        window.removeEventListener('scrollend', onScrollEnd);
-      }
-      applyArrivalCorrection();
-      const t1 = setTimeout(applyArrivalCorrection, 120);
-      ext._activeScrollTimers.push(t1);
-    };
-
-    if (typeof window !== 'undefined' && window.addEventListener) {
-      window.addEventListener('scrollend', onScrollEnd, { once: true });
-    }
-
-    // 2. タイマーによるセーフティネット（scrollend未対応環境や停止検知用）
-    const checkDelay = Math.min(600, Math.max(250, Math.round(200 + Math.sqrt(distance) * 5)));
-    const t2 = setTimeout(() => {
-      if (!scrollEndFired) {
-        applyArrivalCorrection();
-      }
-    }, checkDelay);
-    ext._activeScrollTimers.push(t2);
-
-    // 3. 非同期DOM変換（被引用ボタン挿入等）による微小ズレに対する最終ガード
-    const t3 = setTimeout(applyArrivalCorrection, Math.max(checkDelay + 150, 450));
-    ext._activeScrollTimers.push(t3);
-
-    // ハイライトアニメーションの付与（既存のアニメーションをリセットして再発火）
-    scrollTarget.classList.remove('egov-ext-jump-target');
-    const t4 = setTimeout(() => {
-      scrollTarget.classList.add('egov-ext-jump-target');
-      const t5 = setTimeout(() => {
-        scrollTarget.classList.remove('egov-ext-jump-target');
-      }, 2500);
-      ext._activeScrollTimers.push(t5);
-    }, 10);
-    ext._activeScrollTimers.push(t4);
+  /** 実行中の位置保持を止める */
+  ext.cancelScrollPin = function() {
+    if (activePin) activePin.stop();
   };
 
+  /**
+   * 目的の要素を、スクロール枠の上端から offset の位置にしばらくとどめる。
+   *
+   * なぜ要るか：高速レンダリング（content-visibility:auto）は画面外の条を仮の高さ 350px で並べる。
+   * 移動した直後に、目的の条より上にある条が実寸で描かれて縮む（または伸びる）と、
+   * ブラウザのスクロールアンカリングでは補われず、目的の条が画面の外へ押し出される
+   * （実測：憲法第九条へのリンクで 1,239px、建築基準法第二条第十四号で 280px 上にずれ、
+   * 画面には第十八号が出ていた）。横書き変換や引用ボタンの挿入も同じ時期に高さを変える。
+   * そこで、ずれが落ち着くまで毎フレーム位置を測って戻す。
+   * 利用者が自分でスクロールし始めたら（ホイール・タッチ・キー・マウスボタン）すぐ手を離す。
+   *
+   * @param {Element} target
+   * @param {Object} [opts]
+   * @param {number} [opts.offset] - 枠の上端からの位置（省略時は updateHeaderOffset）
+   * @param {number} [opts.minDuration=1500] - 少なくともこの時間は見張る（ms）
+   * @param {number} [opts.settle=1000] - この時間ずれが出なければ終える（ms）
+   * @param {number} [opts.maxDuration=8000] - 最長の見張り時間（ms）
+   * @returns {{stop: Function}|null}
+   */
+  ext.pinScrollTarget = function(target, opts = {}) {
+    ext.cancelScrollPin();
+    if (!target || typeof target.getBoundingClientRect !== 'function') return null;
+
+    const scroller = opts.scroller || ext.getScrollContainer(target);
+    const offset = typeof opts.offset === 'number' ? opts.offset : ext.updateHeaderOffset(scroller);
+    const minDuration = typeof opts.minDuration === 'number' ? opts.minDuration : 1500;
+    const settle = typeof opts.settle === 'number' ? opts.settle : 1000;
+    const maxDuration = typeof opts.maxDuration === 'number' ? opts.maxDuration : 8000;
+
+    const raf = typeof window.requestAnimationFrame === 'function'
+      ? window.requestAnimationFrame.bind(window)
+      : (fn) => setTimeout(fn, 16);
+    const caf = typeof window.cancelAnimationFrame === 'function'
+      ? window.cancelAnimationFrame.bind(window)
+      : clearTimeout;
+    const now = () => (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now();
+
+    // 時間は最初のフレームから数える。裏のタブで開いたページでは rAF が止まっており、
+    // 開いた時刻から数えると、表に出したときにはもう見張りが終わっている
+    let start = null;
+    let lastMove = 0;
+    let frame = null;
+    let stopped = false;
+
+    const USER_EVENTS = ['wheel', 'touchstart', 'keydown', 'mousedown'];
+    const onUserInput = () => pin.stop();
+
+    const pin = {
+      target,
+      stop() {
+        if (stopped) return;
+        stopped = true;
+        if (frame !== null) caf(frame);
+        USER_EVENTS.forEach(type => window.removeEventListener(type, onUserInput, true));
+        if (activePin === pin) activePin = null;
+      }
+    };
+
+    const place = () => {
+      const delta = Math.round(topWithinScroller(target, scroller) - offset);
+      if (Math.abs(delta) < 1) return;
+      const before = scrollPosition(scroller);
+      scrollScrollerBy(scroller, delta);
+      // 端まで来て動けないときは「動いた」に数えない（数えると最長時間まで回り続ける）
+      if (Math.abs(scrollPosition(scroller) - before) >= 1) lastMove = now();
+    };
+
+    const loop = () => {
+      frame = null;
+      if (stopped) return;
+      // 外された・隠された要素は位置が測れないのでやめる
+      if (!target.isConnected || (typeof target.checkVisibility === 'function' && !target.checkVisibility())) {
+        pin.stop();
+        return;
+      }
+      const t = now();
+      if (start === null) { start = t; lastMove = t; }
+      place();
+      const elapsed = t - start;
+      if (elapsed >= maxDuration || (elapsed >= minDuration && t - lastMove >= settle)) {
+        pin.stop();
+        return;
+      }
+      frame = raf(loop);
+    };
+
+    USER_EVENTS.forEach(type => window.addEventListener(type, onUserInput, { capture: true, passive: true }));
+    activePin = pin;
+    if (isSkippedByContentVisibility(target)) {
+      // 位置を測れないので、まずブラウザに描かせて寄せる（測って直すのは次のフレームから）
+      scrollIntoViewInstant(target);
+    } else {
+      place();
+    }
+    frame = raf(loop);
+    return pin;
+  };
+
+  /**
+   * 着地した要素を一時的にハイライトする（どの項・号に来たかを目で確かめられるように）
+   * @param {Element} el
+   */
+  ext.flashJumpTarget = function(el) {
+    if (!el || !el.classList) return;
+    el.classList.remove('egov-ext-jump-target');
+    if (ext._flashTimers) ext._flashTimers.forEach(t => clearTimeout(t));
+    ext._flashTimers = [];
+    ext._flashTimers.push(setTimeout(() => {
+      el.classList.add('egov-ext-jump-target');
+      ext._flashTimers.push(setTimeout(() => el.classList.remove('egov-ext-jump-target'), 2500));
+    }, 10));
+  };
+
+  /**
+   * 条文の中の要素へ移動する（条文ジャンプ・ポップアップの「ジャンプ」ボタン）。
+   *
+   * 近い移動だけ滑らかに動かし、遠い移動は瞬時に飛ぶ。遠くまで smooth で動かすと、
+   * 途中の条が仮の高さから実寸に変わるたびに行き先がずれ、着いたあとで大きく跳ねる。
+   * どちらも着いたあとは pinScrollTarget で位置を保つ。
+   *
+   * @param {HTMLElement} target - スクロール先の要素
+   * @param {Object} [opts]
+   * @param {Element} [opts.flashTarget] - 着いたあと光らせる要素（省略時は target）
+   * @param {boolean} [opts.remember=true] - 移動の前に読んでいた位置を控える（「元の位置へ戻る」用）
+   */
+  ext.fastSmoothScroll = function(target, opts = {}) {
+    if (!target) return;
+
+    const scrollTarget = ext.resolveScrollTarget ? ext.resolveScrollTarget(target) : target;
+    if (!scrollTarget || typeof scrollTarget.getBoundingClientRect !== 'function') return;
+
+    ext.cancelScrollPin();
+    if (ext._pendingSmoothScroll) ext._pendingSmoothScroll();
+
+    const scroller = ext.getScrollContainer(scrollTarget);
+    const offset = ext.updateHeaderOffset(scroller);
+    const viewHeight = isDocumentScroller(scroller) ? (window.innerHeight || 800) : (scroller.clientHeight || 800);
+    // 描かれていない要素は位置が当てにならないので、遠いものとして扱う
+    const delta = isSkippedByContentVisibility(scrollTarget)
+      ? Infinity
+      : Math.round(topWithinScroller(scrollTarget, scroller) - offset);
+
+    // 画面の半分より遠くへ動くときは、読んでいた位置を控えておく（右下の「戻る」ボタンで戻れる）
+    if (opts.remember !== false && Math.abs(delta) > viewHeight / 2 && ext.rememberReadingPosition) {
+      ext.rememberReadingPosition(scroller);
+    }
+
+    const reduceMotion = typeof window.matchMedia === 'function' &&
+                         window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    const scrollApi = isDocumentScroller(scroller) ? window : scroller;
+
+    if (Math.abs(delta) <= viewHeight * 1.5 && !reduceMotion && typeof scrollApi.scrollBy === 'function') {
+      try {
+        scrollApi.scrollBy({ top: delta, behavior: 'smooth' });
+      } catch (e) {
+        scrollScrollerBy(scroller, delta);
+      }
+      // 滑らかに動いている間は位置を直さない（直すと動きと取り合う）。止まってから保つ
+      const eventTarget = isDocumentScroller(scroller) ? window : scroller;
+      let timer = null;
+      const startPin = () => {
+        eventTarget.removeEventListener('scrollend', startPin);
+        clearTimeout(timer);
+        ext._pendingSmoothScroll = null;
+        ext.pinScrollTarget(scrollTarget, { scroller, offset });
+      };
+      eventTarget.addEventListener('scrollend', startPin, { once: true });
+      timer = setTimeout(startPin, 700);
+      ext._pendingSmoothScroll = () => {
+        eventTarget.removeEventListener('scrollend', startPin);
+        clearTimeout(timer);
+        ext._pendingSmoothScroll = null;
+      };
+    } else {
+      // 遠い移動はブラウザの scrollIntoView で寄せる（途中の条の描き直しも含めて一度で済む）
+      scrollIntoViewInstant(scrollTarget);
+      ext.pinScrollTarget(scrollTarget, { scroller, offset });
+    }
+
+    ext.flashJumpTarget(opts.flashTarget || scrollTarget);
+  };
   /**
    * 参照条文ポップアップや定義語ツールチップ用のDOMを整形する共通関数
    * 条番号、項番号、号番号、各カラムをインライン配置し、余計な改行を除去して
@@ -1289,6 +1546,11 @@ window.egovExt = window.egovExt || {};
         e.preventDefault();
         e.stopPropagation();
         window.open(url, '_blank', 'noopener,noreferrer');
+      } else if (action === 'jump' && btn.dataset.defIndex !== undefined && ext.jumpToDefinition) {
+        // 定義語ポップアップの「定義へ」
+        e.preventDefault();
+        e.stopPropagation();
+        ext.jumpToDefinition(Number(btn.dataset.defIndex));
       } else if (action === 'jump') {
         e.preventDefault();
         e.stopPropagation();

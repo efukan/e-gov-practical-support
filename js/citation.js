@@ -732,6 +732,8 @@ window.egovExt = window.egovExt || {};
         const pObj = {};
         const numNode = pNode.querySelector(':scope > ParagraphNum');
         pObj.ParagraphNum = numNode ? numNode.textContent.trim() : '';
+        // 古い法令は ParagraphNum が空で、項の番号は Num 属性にしか無い（e-Gov は「②」と出す）
+        pObj['-Num'] = pNode.getAttribute('Num') || '';
 
         const pSentenceNode = pNode.querySelector(':scope > ParagraphSentence');
         if (pSentenceNode) {
@@ -1110,6 +1112,18 @@ window.egovExt = window.egovExt || {};
     return String(n);
   }
 
+  /**
+   * 数値 → 丸数字（①〜㊿）。51 以上は (51)
+   * @param {number} n
+   * @returns {string}
+   */
+  function circledNumber(n) {
+    if (n >= 1 && n <= 20) return String.fromCharCode(0x2460 + n - 1);
+    if (n >= 21 && n <= 35) return String.fromCharCode(0x3251 + n - 21);
+    if (n >= 36 && n <= 50) return String.fromCharCode(0x32B1 + n - 36);
+    return `(${n})`;
+  }
+
   function stripHtmlTags(str) {
     if (!str) return '';
     return str.replace(/<[^>]*>/g, '');
@@ -1335,10 +1349,17 @@ window.egovExt = window.egovExt || {};
           pDiv.appendChild(document.createTextNode('　'));
         }
 
-        if (p.ParagraphNum && p.ParagraphNum.trim()) {
+        // 項番号。古い法令（ParagraphNum が空）は、e-Gov の本文と同じく丸数字（②）で出す。
+        // 空のまま出さないと、第二項以降が前の項の続きに見える
+        let rawParagraphNum = (p.ParagraphNum || '').toString().trim();
+        if (!rawParagraphNum && pIdx > 0) {
+          const n = parseInt(normPNum, 10) || (pIdx + 1);
+          rawParagraphNum = circledNumber(n);
+        }
+        if (rawParagraphNum) {
           const numSpan = document.createElement('span');
-          numSpan.className = 'egov-ext-preview-paragraph-num ParagraphNum';
-          let numText = p.ParagraphNum.trim();
+          numSpan.className = 'egov-ext-preview-paragraph-num ParagraphNum' + (p.ParagraphNum ? '' : ' egov-ext-preview-paragraph-num--circled');
+          let numText = rawParagraphNum;
           if (ext.settings && ext.settings.horizontal && ext.convertParagraphNumToHorizontal) {
             numText = ext.convertParagraphNumToHorizontal(numText).trim();
           }

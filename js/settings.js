@@ -29,6 +29,8 @@ window.egovExt = window.egovExt || {};
     scrollspy: true,
     popup: true,
     definition: true,
+    // 政令・省令で、親の法律（「以下「法」という」の法律）の定義語も引く。定義語ホバー辞書がオンのときだけ働く
+    parentDefinition: true,
     newtab: true,
     dim: true,
     jump: true,

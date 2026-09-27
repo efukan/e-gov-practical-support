@@ -2435,6 +2435,86 @@ async function check(name, fn) {
     return '丸数字の項番号と XML の Num 属性を確認';
   });
 
+  await check('親の法律の定義語: 法律 XML から法律全体に効く定義だけを抜き出す', async () => {
+    const { ext } = await createTestEnv('<div class="LawBody"></div>');
+    const T = ext._testDefinition;
+    const xml = `<Law><LawBody><LawTitle>児童福祉法</LawTitle><MainProvision>
+      <Chapter Num="1"><Article Num="4">
+        <Paragraph Num="1"><ParagraphSentence><Sentence>この法律で、児童とは、満十八歳に満たない者をいい、児童を左のように分ける。</Sentence></ParagraphSentence></Paragraph>
+        <Paragraph Num="2"><ParagraphSentence><Sentence>この法律で、<Ruby>障<Rt>しよう</Rt></Ruby>害児とは、身体に障害のある児童をいう。</Sentence></ParagraphSentence></Paragraph>
+      </Article>
+      <Article Num="6_2">
+        <Paragraph Num="1"><ParagraphSentence><Sentence>この法律において、次の各号に掲げる用語の意義は、当該各号に定めるところによる。</Sentence></ParagraphSentence>
+          <Item Num="1"><ItemTitle>一</ItemTitle><ItemSentence><Column><Sentence>里親</Sentence></Column><Column><Sentence>養育里親をいう。</Sentence></Column></ItemSentence></Item>
+          <Item Num="9_2"><ItemTitle>九の二</ItemTitle><ItemSentence><Column><Sentence>里親等</Sentence></Column><Column><Sentence>里親及び小規模住居型児童養育事業を行う者をいう。</Sentence></Column></ItemSentence></Item>
+        </Paragraph>
+      </Article>
+      <Article Num="7">
+        <Paragraph Num="1"><ParagraphSentence><Sentence>都道府県は、施設（以下この条において「対象施設」という。）を設置する。障害児入所支援（以下「入所支援」という。）を行う。</Sentence></ParagraphSentence></Paragraph>
+      </Article></Chapter>
+      <Chapter Num="2"><Article Num="8">
+        <Paragraph Num="1"><ParagraphSentence><Sentence>この章において、次の各号に掲げる用語の意義は、当該各号に定めるところによる。</Sentence></ParagraphSentence>
+          <Item Num="1"><ItemTitle>一</ItemTitle><ItemSentence><Column><Sentence>章内語</Sentence></Column><Column><Sentence>この章だけの語をいう。</Sentence></Column></ItemSentence></Item>
+        </Paragraph>
+      </Article></Chapter>
+    </MainProvision><SupplProvision><Paragraph Num="1"><ParagraphSentence><Sentence>この法律は、公布の日（以下「施行日」という。）から施行する。</Sentence></ParagraphSentence></Paragraph></SupplProvision></LawBody></Law>`;
+    const doc = new (require('jsdom').JSDOM)('').window.DOMParser;
+    const parsed = T.extractParentDefinitions(new doc().parseFromString(xml, 'text/xml'), '322AC0000000164');
+    const byTerm = Object.fromEntries(parsed.defs.map(d => [d.term, d]));
+    if (parsed.lawTitle !== '児童福祉法') throw new Error(`法令名が不正: ${parsed.lawTitle}`);
+    for (const t of ['児童', '障害児', '里親', '里親等', '入所支援']) {
+      if (!byTerm[t]) throw new Error(`「${t}」を引き継いでいない: ${Object.keys(byTerm)}`);
+    }
+    // この条・この章に限った定義、附則の定義は引き継がない
+    for (const t of ['対象施設', '章内語', '施行日']) {
+      if (byTerm[t]) throw new Error(`範囲を限った／附則の「${t}」まで引き継いでいる`);
+    }
+    if (byTerm['障害児'].label !== '第四条第二項') throw new Error(`見出しが不正: ${byTerm['障害児'].label}`);
+    if (byTerm['障害児'].text.includes('しよう')) throw new Error('ルビの読みが定義文に混ざっている');
+    if (byTerm['里親等'].label !== '第六条の二第九号の二' || byTerm['里親等'].anchor !== 'Mp-At_6_2-Pr_1-It_9_2') {
+      throw new Error(`号の見出し・位置が不正: ${byTerm['里親等'].label} ${byTerm['里親等'].anchor}`);
+    }
+    return `${parsed.defs.length} 語を引き継ぎ、範囲を限った定義・附則の定義は除外`;
+  });
+
+  await check('親の法律の定義語: 親の法律の見分け・この法令の定義が優先・ポップアップ', async () => {
+    const html = `<!DOCTYPE html><html><body><div class="main-content"><div class="provisiontext"><article class="law">
+      <article class="article" id="Mp-Ch_1-At_1"><div class="paragraph" id="Mp-Ch_1-At_1-Pr_1"><div class="istitle"><span class="paragraphtitle">第一条　</span><p class="sentence"><a href="/law/322AC0000000164#Mp-At_4">児童福祉法（昭和二十二年法律第百六十四号。以下「法」という。）第四条</a>に規定する障害児の里親は、届け出なければならない。</p></div></div></article>
+      <article class="article" id="Mp-Ch_1-At_2"><div class="paragraph" id="Mp-Ch_1-At_2-Pr_1"><div class="istitle"><span class="paragraphtitle">第二条　</span><p class="sentence">この条において「里親」とは、特別の里親をいう。里親は、報告する。</p></div></div></article>
+      <article class="article" id="999AC0000000001-Sp"><div class="paragraph" id="999AC0000000001-Sp-Pr_1"><p class="sentence"><a href="/law/401AC0000000001">別の法律（以下「法」という。）</a>の改正</p></div></article>
+    </article></div></div></body></html>`;
+    const { window, ext } = await createTestEnv(html, { url: 'https://laws.e-gov.go.jp/law/323CO0000000074' });
+    const T = ext._testDefinition;
+    if (!T.isOrdinanceLawId('323CO0000000074') || T.isOrdinanceLawId('322AC0000000164')) throw new Error('政令・法律の見分けが不正');
+    const parents = T.findParentLaws(window.document.querySelector('.provisiontext'), '323CO0000000074');
+    if (parents.length !== 1 || parents[0].lawId !== '322AC0000000164' || parents[0].alias !== '法') {
+      throw new Error(`親の法律の見分けが不正（附則の「法」を拾っていないか）: ${JSON.stringify(parents)}`);
+    }
+
+    // 親の定義を足した状態で、この法令の定義（第二条の中だけ）が第二条では優先される
+    ext.settings = Object.assign({}, ext.DEFAULT_SETTINGS, { horizontal: false, dim: false, conjunction: false });
+    ext.definitionExtractionCompleted = false;
+    await ext.extractDefinitionsAsync();
+    const parentDef = { term: '里親', index: ext.definitionList.length, source: '第六条の四', element: null, block: null,
+      scope: { kind: 'parent', lawId: '322AC0000000164', label: '児童福祉法' }, pattern: 5,
+      parent: { lawId: '322AC0000000164', lawTitle: '児童福祉法', text: 'この法律で、里親とは、…をいう。', url: 'https://laws.e-gov.go.jp/law/322AC0000000164#Mp-At_6_4' } };
+    ext.definitionList.push(parentDef);
+    ext.definitionDefs.get('里親').push(parentDef);
+    ext.enableDefinitionHighlighting(window.document.body);
+    const defOf = (sel) => { const s = window.document.querySelector(sel + ' .egov-definition-word[data-word="里親"]'); return s && ext.definitionList[Number(s.dataset.defIndex)]; };
+    if (!defOf('#Mp-Ch_1-At_1-Pr_1') || !defOf('#Mp-Ch_1-At_1-Pr_1').parent) throw new Error('第一条の「里親」が親の法律の定義を指していない');
+    if (!defOf('#Mp-Ch_1-At_2-Pr_1') || defOf('#Mp-Ch_1-At_2-Pr_1').parent) throw new Error('第二条の「里親」でこの法令の定義が優先されていない');
+
+    const content = T.buildParentDefinitionContent(parentDef);
+    const box = window.document.createElement('div');
+    box.appendChild(content);
+    if (!box.querySelector('.egov-ext-tip-header-title').textContent.startsWith('児童福祉法第六条の四')) throw new Error('見出しが不正');
+    if (box.querySelector('.egov-ext-tip-scope').textContent !== '児童福祉法で定義された語') throw new Error('範囲表示が不正');
+    const open = box.querySelector('.egov-ext-btn-open');
+    if (!open || open.dataset.url !== parentDef.parent.url) throw new Error('「開く」ボタンの行き先が不正');
+    return '親の見分け（附則を除外）・この法令の定義の優先・ポップアップを確認';
+  });
+
   await check('定義語の抽出（旧表示）: 平らに並ぶ項と号、span の 2 列、見出し入りの前置きからの範囲', async () => {
     const html = `<!DOCTYPE html><html><body><div class="LawBody">
       <section id="Mp-Ch_1-At_2" class=" Article"><div class="_div_ArticleCaption"><span>（定義）</span></div>
@@ -2497,6 +2577,10 @@ async function check(name, fn) {
     // 「「X」とは」は意味を与えている文だけ
     if (T.declSpans('第三条中「甲」とは「乙」と読み替える。').length) throw new Error('読替えの「「甲」とは」を宣言にしている');
     if (T.declSpans('「都市計画区域」とは次条の区域を、「準都市計画区域」とは第五条の区域をいう。').length !== 2) throw new Error('読点の無い 2 つの宣言を拾えていない');
+    // 古い法律の括弧の無い宣言（頭に「この法律で」が付くものだけ）
+    const bare = T.declSpans('この法律で、児童とは、満十八歳に満たない者をいい、児童を左のように分ける。');
+    if (bare.length !== 1 || bare[0].term !== '児童' || bare[0].phrase !== 'この法律') throw new Error(`括弧の無い宣言を拾えていない: ${JSON.stringify(bare)}`);
+    if (T.declSpans('前項の場合において、許可とは別に届け出る。').length) throw new Error('頭に「この法律で」の無い「Xとは」を宣言にしている');
     return `範囲 ${cases.length} 件・塗る位置 ${useCases.length} 件を確認`;
   });
 

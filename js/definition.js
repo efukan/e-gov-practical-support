@@ -109,9 +109,17 @@ window.egovExt = window.egovExt || {};
   ];
 
   /**
-   * 文の中の定義語の宣言
+   * 鉤括弧を付けない宣言（「この法律で、児童とは、…をいい」）。昭和 20 年代の法律
+   * （児童福祉法・建築基準法の一部など）はこの書き方をする。頭に「この法律で／において」が
+   * 付いているものだけを採る（付いていない「Xとは」は、文の途中の言い換えや引用のことがある）
+   */
+  const BARE_DECL_RE = /(この(?:法律|政令|省令|府令|規則|命令|勅令|章|節|款|目|条|項)|本(?:法|令))(?:で|において)、?([^、。「」（）()\s　]{1,20}?)とは、/g;
+
+  /**
+   * 文の中の定義語の宣言。start・end は語を囲む括弧の位置（括弧の無い宣言は語の前後 1 字）。
+   * phrase は括弧の無い宣言の範囲の句（「この法律」）。括弧の宣言は declScopePhrase で読む
    * @param {string} text
-   * @returns {{start: number, end: number, term: string, hereafter: boolean}[]}
+   * @returns {{start: number, end: number, term: string, hereafter: boolean, phrase?: string}[]}
    */
   function declSpans(text) {
     const out = [];
@@ -140,7 +148,27 @@ window.egovExt = window.egovExt || {};
         out.push({ start, end, term: m[1], hereafter: form.hereafter });
       }
     }
+    BARE_DECL_RE.lastIndex = 0;
+    let b;
+    while ((b = BARE_DECL_RE.exec(text))) {
+      const termStart = b.index + b[0].length - 'とは、'.length - b[2].length;
+      const termEnd = termStart + b[2].length;
+      const stop = text.indexOf('。', termEnd);
+      const rest = text.slice(termEnd, stop < 0 ? undefined : stop);
+      if (!/をい[うい]|とする|を含む|を除く/.test(rest)) continue;
+      out.push({ start: termStart - 1, end: termEnd + 1, term: b[2], hereafter: false, phrase: b[1] });
+    }
     return out;
+  }
+
+  /**
+   * 宣言の範囲を言う句（括弧の無い宣言は宣言そのものが持っている）
+   * @param {string} text
+   * @param {{start: number, phrase?: string}} d
+   * @returns {string|null}
+   */
+  function phraseOfDecl(text, d) {
+    return d.phrase !== undefined ? d.phrase : declScopePhrase(text, d.start);
   }
 
   /* ------------------------------------------------------------------ */
@@ -828,6 +856,12 @@ window.egovExt = window.egovExt || {};
   let declSites = new WeakMap();
 
   /**
+   * 号の 2 列を定義として読む前置き。「次の各号に掲げる用語の意義は」のほか、
+   * 古い法律の「児童を左のように分ける」（一 乳児 満一歳に満たない者）も語を定める
+   */
+  const LEAD_DEFINES_RE = /用語の意義|意義は|を(?:左|次)のように分ける/;
+
+  /**
    * 括弧書き（入れ子も含む）を取り除く
    * @param {string} text
    * @returns {string}
@@ -958,7 +992,8 @@ window.egovExt = window.egovExt || {};
         const blocks = ext.collectLeafBlocks(container);
         const state1 = await ext.runTaskInChunksPromise('definitionExtract', blocks, (block) => {
           const text = block.textContent;
-          if (!text || text.indexOf('「') < 0) return;
+          // 宣言の無い文は読まない（鉤括弧の宣言か、括弧の無い「この法律で、Xとは」）
+          if (!text || (text.indexOf('「') < 0 && text.indexOf('とは') < 0)) return;
           const spans = declSpans(text);
           if (!spans.length) return;
           const unit = locateUnit(block);
@@ -969,7 +1004,7 @@ window.egovExt = window.egovExt || {};
           for (const d of spans) {
             const term = d.term.replace(/[\s　]+/g, '');
             if (!isDefinitionTerm(term, true)) continue;
-            const scope = info ? resolveScope(declScopePhrase(text, d.start), info, index) : { kind: 'global' };
+            const scope = info ? resolveScope(phraseOfDecl(text, d), info, index) : { kind: 'global' };
             const def = addDefinition(term, {
               source: labelOf(element),
               element,
@@ -1010,7 +1045,7 @@ window.egovExt = window.egovExt || {};
             // 号の細分（イ・ロ）は、定義の号の下で区分を並べていることが多い
             // （会社法第二条第二十六号「組織変更」のイ「株式会社｜合名会社…」）。意義を述べるものだけ採る
             if (!/をい[うい]/.test(bodyMain)) return;
-          } else if (!/用語の意義|意義は/.test(lead) && !/をい[うい]/.test(bodyMain)) {
+          } else if (!LEAD_DEFINES_RE.test(lead) && !/をい[うい]/.test(bodyMain)) {
             return;
           }
 
@@ -1072,6 +1107,10 @@ window.egovExt = window.egovExt || {};
         ext.definitionExtractionCompleted = true;
         ext.extractedLawId = currentLawId;
         ext.log('Extraction complete (async). Total terms extracted:', ext.definitionMap.size, list.length);
+
+        // 政令・省令なら、親の法律の定義語を後から足す（自分の定義語の表示は待たせない）
+        definitionGeneration++;
+        scheduleParentDefinitions(definitionGeneration, currentLawId, container);
       } finally {
         paragraphCountCache = null;
         ext.definitionExtractionPromise = null;
@@ -1080,6 +1119,332 @@ window.egovExt = window.egovExt || {};
 
     return ext.definitionExtractionPromise;
   };
+
+  /* ------------------------------------------------------------------ */
+  /* 親の法律の定義語（政令・省令）                                        */
+  /* ------------------------------------------------------------------ */
+
+  /*
+   * 施行令・施行規則は、親の法律が定義した語をそのままの意味で使う（「児童福祉法（…。以下「法」
+   * という。）」の下で「児童」「障害児」を定義し直さない）。政令・省令を開いたときは、親の法律の
+   * 条文を e-Gov の法令API から取ってきて、法律全体に効く定義だけを引き継ぐ。
+   *
+   * 重くしないために：
+   * - この法令の定義語を先に出し、親の定義語は取れてから 2 回目の下線付けで足す
+   * - 取った定義（語・見出し・定義文）はブラウザに保存し、次からは通信も XML の読み込みもしない
+   * - 法律を開いたときは何もしない
+   */
+
+  /** 抽出の世代（法令を移ったり設定を変えたりして抽出し直したら、古い親の定義を捨てる） */
+  let definitionGeneration = 0;
+
+  const PARENT_CACHE_PREFIX = 'egovParentDefs:';
+  const PARENT_CACHE_INDEX = 'egovParentDefsIndex';
+  /** 抜き出し方を変えたら上げる（古い保存を使わないように） */
+  const PARENT_CACHE_VERSION = 1;
+  /** 保存した定義を使う期間。法律の改正で定義が変わることがあるので、長くは持たない */
+  const PARENT_CACHE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
+  /** 保存しておく法令の数（古いものから消す） */
+  const PARENT_CACHE_MAX = 20;
+  /** 一つの定義文として保存する長さの上限 */
+  const PARENT_TEXT_MAX = 600;
+
+  /**
+   * 法令IDが法律・憲法ではない（政令・省令・規則など）か
+   * @param {string} lawId
+   * @returns {boolean}
+   */
+  function isOrdinanceLawId(lawId) {
+    return !!lawId && !/AC|CONSTITUTION/i.test(lawId);
+  }
+
+  /**
+   * リンクの href から法令IDを読む
+   * @param {Element} a
+   * @returns {string}
+   */
+  function lawIdOfLink(a) {
+    const m = (a.getAttribute('href') || '').match(/\/law\/([0-9A-Za-z]+)/);
+    return m ? m[1].toUpperCase() : '';
+  }
+
+  /**
+   * 親の法律を探す。
+   * 1. 「児童福祉法（昭和二十二年法律第百六十四号。以下「法」という。）」の宣言（e-Gov はこの部分を法律へのリンクにしている）。
+   *    施行規則では「…施行令（以下「令」という。）」の施行令も親にする
+   * 2. 1 が無ければ、制定文で最初に挙がる法律
+   * @param {Element} container
+   * @param {string} selfId
+   * @returns {{lawId: string, alias: string}[]}
+   */
+  function findParentLaws(container, selfId) {
+    const found = [];
+    const add = (lawId, alias) => {
+      if (!lawId || lawId === selfId || found.some(f => f.lawId === lawId)) return;
+      if (!/AC|CO/.test(lawId)) return;
+      found.push({ lawId, alias });
+    };
+    const aliasOf = new Map();
+    const links = ext.deepQuerySelectorAll(container, 'a[href*="/law/"]');
+    for (let i = 0; i < links.length && aliasOf.size < 2; i++) {
+      const a = links[i];
+      // 附則（改正法の附則）の「以下「法」という」は、改正のもとになった別の法律を指すことがある
+      const unit = locateUnit(a);
+      if (unit && parseUnitId(unit.id).group.endsWith('-Sp')) continue;
+      let m = a.textContent.match(/以下「(法|令)」という/);
+      if (!m) {
+        // リンクの外に宣言が続く形（「<a>児童福祉法</a>（昭和…。以下「法」という。）」）
+        const next = a.nextSibling;
+        const tail = next && next.nodeType === 3 ? next.nodeValue.slice(0, 60) : '';
+        m = /^（[^）]*?以下「(法|令)」という/.exec(tail);
+      }
+      if (m && !aliasOf.has(m[1])) aliasOf.set(m[1], lawIdOfLink(a));
+    }
+    if (aliasOf.has('法')) add(aliasOf.get('法'), '法');
+    if (aliasOf.has('令')) add(aliasOf.get('令'), '令');
+    if (!found.length) {
+      const enact = ext.deepQuerySelectorAll(document.body, '[id^="EnactStatement"] a[href*="/law/"], .enactstatement a[href*="/law/"], ._div_EnactStatement a[href*="/law/"]');
+      for (const a of enact) {
+        const id = lawIdOfLink(a);
+        if (/AC/.test(id)) { add(id, ''); break; }
+      }
+    }
+    return found.slice(0, 2);
+  }
+
+  /**
+   * いま表示している版の日付（e-Gov の URL が /law/法令ID/20260701_… の形のとき）
+   * @returns {string} YYYY-MM-DD。現行版なら ''
+   */
+  function currentAsOf() {
+    const m = (window.location.pathname || '').match(/\/law\/[0-9A-Za-z]+\/(\d{4})(\d{2})(\d{2})_/);
+    return m ? `${m[1]}-${m[2]}-${m[3]}` : '';
+  }
+
+  /**
+   * XML の要素の文字（ルビの読み Rt は除く）
+   * @param {Element} node
+   * @returns {string}
+   */
+  function xmlText(node) {
+    if (!node) return '';
+    let out = '';
+    const walk = (n) => {
+      for (let c = n.firstChild; c; c = c.nextSibling) {
+        if (c.nodeType === 3) out += c.nodeValue;
+        else if (c.nodeType === 1 && c.tagName !== 'Rt') walk(c);
+      }
+    };
+    walk(node);
+    return out.trim();
+  }
+
+  /** 番号の属性（'9_2'）→「九の二」の形の数字の並び */
+  function numLabel(num, unit) {
+    const nums = String(num || '').split('_').map(Number).filter(n => n > 0);
+    if (!nums.length) return '';
+    return `第${numberToKanji(nums[0])}${unit}` + nums.slice(1).map(n => `の${numberToKanji(n)}`).join('');
+  }
+
+  /** 範囲の句が「この法律」相当（法律全体に効く）か。句が無い宣言も法律全体に効く */
+  function isLawWidePhrase(phrase) {
+    return phrase === null || /^(?:以下)?この(?:法律|法|政令|省令|府令|規則|命令|勅令)$/.test(phrase);
+  }
+
+  /**
+   * 親の法律の XML から、法律全体に効く定義を抜き出す
+   * @param {Document} doc
+   * @param {string} lawId
+   * @returns {{lawTitle: string, defs: {term: string, label: string, text: string, anchor: string}[]}}
+   */
+  function extractParentDefinitions(doc, lawId) {
+    const lawTitle = xmlText(doc.querySelector('LawTitle')) || lawId;
+    const main = doc.querySelector('MainProvision');
+    const defs = [];
+    const seen = new Set();
+    const push = (term, label, text, anchor) => {
+      const t = term.replace(/[\s　]+/g, '');
+      if (!t || seen.has(t)) return;
+      seen.add(t);
+      defs.push({ term: t, label, text: text.length > PARENT_TEXT_MAX ? text.slice(0, PARENT_TEXT_MAX) + '…' : text, anchor });
+    };
+    if (!main) return { lawTitle, defs };
+
+    const scanParagraph = (para, artNum, multi) => {
+      const pNum = para.getAttribute('Num') || '1';
+      const pLabel = numLabel(artNum, '条') + (multi ? numLabel(pNum, '項') : '');
+      const pAnchor = artNum ? `Mp-At_${artNum}-Pr_${pNum}` : `Mp-Pr_${pNum}`;
+      const lead = xmlText(para.querySelector(':scope > ParagraphSentence'));
+
+      // 項の本文の宣言（「この法律において「X」とは」「以下「X」という」）
+      declSpans(lead).forEach(d => {
+        if (!isDefinitionTerm(d.term, true) || !isLawWidePhrase(phraseOfDecl(lead, d))) return;
+        push(d.term, pLabel, lead, pAnchor);
+      });
+
+      const columnsLawWide = isLawWidePhrase(columnScopePhrase(lead));
+      para.querySelectorAll(':scope > Item').forEach(item => {
+        const iNum = item.getAttribute('Num') || '';
+        const iLabel = pLabel + numLabel(iNum, '号');
+        const iAnchor = `${pAnchor}-It_${iNum}`;
+        const title = xmlText(item.querySelector(':scope > ItemTitle'));
+        const cols = Array.from(item.querySelectorAll(':scope > ItemSentence > Column'));
+        if (cols.length >= 2 && columnsLawWide) {
+          const term = xmlText(cols[0]).replace(/[\s　]+/g, '');
+          const body = cols.slice(1).map(xmlText).join('');
+          if (LEAD_DEFINES_RE.test(lead) || /をい[うい]/.test(stripParentheticals(body))) {
+            let terms = [term];
+            if (/^それぞれ/.test(body) && /又は|及び|並びに|若しくは|、/.test(term)) {
+              terms = term.split(/、|又は|及び|並びに|若しくは/).filter(Boolean);
+            }
+            terms.forEach(t => {
+              if (isDefinitionTerm(t, false)) push(t, iLabel, `${title}　${term}　${body}`, iAnchor);
+            });
+          }
+        }
+        // 号の中の宣言（号の細分の文も含める）
+        const itemText = Array.from(item.querySelectorAll('Sentence')).map(xmlText).join('');
+        declSpans(itemText).forEach(d => {
+          if (!isDefinitionTerm(d.term, true) || !isLawWidePhrase(phraseOfDecl(itemText, d))) return;
+          push(d.term, iLabel, `${title}　${itemText}`, iAnchor);
+        });
+      });
+    };
+
+    const articles = main.querySelectorAll('Article');
+    if (articles.length) {
+      articles.forEach(article => {
+        const artNum = article.getAttribute('Num') || '';
+        const paras = article.querySelectorAll(':scope > Paragraph');
+        paras.forEach(para => scanParagraph(para, artNum, paras.length > 1));
+      });
+    } else {
+      const paras = main.querySelectorAll(':scope > Paragraph');
+      paras.forEach(para => scanParagraph(para, '', paras.length > 1));
+    }
+    return { lawTitle, defs };
+  }
+
+  /** ブラウザの保存領域（chrome.storage.local）。使えなければ null */
+  function localStore() {
+    try {
+      return (typeof chrome !== 'undefined' && chrome.storage && chrome.storage.local) ? chrome.storage.local : null;
+    } catch (e) {
+      return null;
+    }
+  }
+
+  /**
+   * 親の法律の定義を、保存があればそこから、無ければ取ってきて返す
+   * @param {string} lawId
+   * @param {string} asof
+   * @returns {Promise<{lawTitle: string, defs: Object[]}|null>}
+   */
+  async function loadParentLaw(lawId, asof) {
+    const key = `${PARENT_CACHE_PREFIX}${lawId}:${asof || 'current'}`;
+    const store = localStore();
+    if (store) {
+      try {
+        const got = await store.get(key);
+        const hit = got && got[key];
+        if (hit && hit.v === PARENT_CACHE_VERSION && Date.now() - hit.t < PARENT_CACHE_TTL_MS) {
+          return { lawTitle: hit.lawTitle, defs: hit.defs };
+        }
+      } catch (e) {}
+    }
+
+    const url = `https://laws.e-gov.go.jp/api/2/law_file/xml/${encodeURIComponent(lawId)}` + (asof ? `?asof=${encodeURIComponent(asof)}` : '');
+    let parsed;
+    try {
+      const res = await fetch(url, { headers: { 'Accept': 'application/xml, text/xml, */*' } });
+      if (!res.ok) return null;
+      const doc = new (window.DOMParser || DOMParser)().parseFromString(await res.text(), 'text/xml');
+      if (doc.querySelector('parsererror')) return null;
+      parsed = extractParentDefinitions(doc, lawId);
+    } catch (e) {
+      console.warn('egov-ext: Failed to load parent law definitions:', e);
+      return null;
+    }
+
+    if (store) {
+      try {
+        const idxGot = await store.get(PARENT_CACHE_INDEX);
+        let index = (idxGot && idxGot[PARENT_CACHE_INDEX]) || [];
+        index = index.filter(e => e.key !== key);
+        index.push({ key, t: Date.now() });
+        const drop = index.length > PARENT_CACHE_MAX ? index.splice(0, index.length - PARENT_CACHE_MAX) : [];
+        if (drop.length) await store.remove(drop.map(e => e.key));
+        await store.set({ [key]: { v: PARENT_CACHE_VERSION, t: Date.now(), lawTitle: parsed.lawTitle, defs: parsed.defs }, [PARENT_CACHE_INDEX]: index });
+      } catch (e) {
+        // 保存できなくても、この表示では使える
+      }
+    }
+    return parsed;
+  }
+
+  /**
+   * 親の法律の定義語を取りに行き、取れたら今の定義に足して下線を付け直す
+   * @param {number} generation
+   * @param {string} lawId
+   * @param {Element} container
+   */
+  function scheduleParentDefinitions(generation, lawId, container) {
+    if (!ext.settings || !ext.settings.definition || ext.settings.parentDefinition === false) return;
+    if (!isOrdinanceLawId(lawId)) return;
+    const parents = findParentLaws(container, lawId);
+    if (!parents.length) return;
+    const asof = currentAsOf();
+
+    (async () => {
+      const loaded = [];
+      for (const p of parents) {
+        const law = await loadParentLaw(p.lawId, asof);
+        if (law) loaded.push({ lawId: p.lawId, alias: p.alias, law });
+      }
+      // 待っている間に抽出し直された・法令を移った・設定を切ったなら捨てる
+      if (generation !== definitionGeneration || !loaded.length) return;
+      if (!ext.settings.global || !ext.settings.definition || ext.settings.parentDefinition === false) return;
+      if ((ext.getLawIdFromUrl ? ext.getLawIdFromUrl(window.location.href) : '') !== lawId) return;
+
+      let added = 0;
+      loaded.forEach(({ lawId: parentId, law }) => {
+        law.defs.forEach(d => {
+          const def = {
+            term: d.term,
+            index: ext.definitionList.length,
+            source: d.label,
+            element: null,
+            block: null,
+            scope: { kind: 'parent', lawId: parentId, label: law.lawTitle },
+            pattern: 5,
+            parent: {
+              lawId: parentId,
+              lawTitle: law.lawTitle,
+              text: d.text,
+              url: `https://laws.e-gov.go.jp/law/${parentId}${d.anchor ? '#' + d.anchor : ''}`
+            }
+          };
+          ext.definitionList.push(def);
+          // 横書き表記変換の後の本文（「第１号被保険者」）でも引けるようにする
+          const forms = [d.term];
+          if (ext.settings.horizontal && ext.convertLawTextToHorizontal && /[〇一二三四五六七八九十百千]/.test(d.term)) {
+            const variant = ext.convertLawTextToHorizontal(d.term);
+            if (variant && variant !== d.term) forms.push(variant);
+          }
+          forms.forEach(form => {
+            const arr = ext.definitionDefs.get(form);
+            if (arr) arr.push(def); else ext.definitionDefs.set(form, [def]);
+            if (!ext.definitionMap.has(form)) ext.definitionMap.set(form, def);
+          });
+          added++;
+        });
+      });
+      if (!added) return;
+      ext.log('parent definitions merged:', added, loaded.map(l => l.law.lawTitle));
+      // まだ下線の無い所にだけ付け足す（付けた下線はそのまま）
+      ext.enableDefinitionHighlighting();
+    })();
+  }
 
   /* ------------------------------------------------------------------ */
   /* 本文への下線付け                                                     */
@@ -1104,6 +1469,8 @@ window.egovExt = window.egovExt || {};
    */
   function scopeRank(def) {
     const scope = def.scope;
+    // 親の法律の定義は、この法令の定義が効かない場所でだけ使う
+    if (scope && scope.kind === 'parent') return 2e9;
     if (!scope || scope.kind === 'global') return 1e9;
     if (scope.kind === 'group') return 1e8;
     return scope.ids.size;
@@ -1463,6 +1830,49 @@ window.egovExt = window.egovExt || {};
   };
 
   /**
+   * 親の法律の定義のポップアップ。定義文はこのページに無いので、保存した文から組み立てる。
+   * 「定義へ」の代わりに、親の法律の該当箇所を別タブで開く「開く」を置く
+   * @param {Object} def
+   * @returns {DocumentFragment}
+   */
+  function buildParentDefinitionContent(def) {
+    const horizontal = ext.settings.horizontal && ext.convertLawTextToHorizontal;
+    const conv = (t) => horizontal ? ext.convertLawTextToHorizontal(t) : t;
+    const frag = document.createDocumentFragment();
+
+    const header = document.createElement('div');
+    header.className = 'egov-ext-tip-header';
+    const titleWrap = document.createElement('div');
+    titleWrap.className = 'egov-ext-tip-header-title';
+    titleWrap.textContent = conv(`${def.parent.lawTitle}${def.source}`);
+    header.appendChild(titleWrap);
+    if (ext.createTipActionButton) {
+      header.appendChild(ext.createTipActionButton({
+        icon: 'open',
+        label: '開く',
+        title: `${def.parent.lawTitle}の該当箇所を別タブで開く`,
+        url: def.parent.url
+      }));
+    }
+    frag.appendChild(header);
+
+    const scopeEl = document.createElement('div');
+    scopeEl.className = 'egov-ext-tip-scope';
+    scopeEl.textContent = `${def.parent.lawTitle}で定義された語`;
+    frag.appendChild(scopeEl);
+
+    const body = document.createElement('div');
+    body.className = 'egov-ext-tip-body';
+    const text = document.createElement('div');
+    text.className = 'egov-ext-parent-def-text';
+    text.textContent = def.parent.text;
+    body.appendChild(text);
+    frag.appendChild(body);
+    if (horizontal && ext.applyHorizontalConversion) ext.applyHorizontalConversion(body);
+    return frag;
+  }
+
+  /**
    * 定義語ホバー辞書のイベントを登録する。
    * ツールチップの生成・配置・表示制御は js/tooltip.js の共通基盤が担当し、
    * ここでは「定義語からポップアップの中身を作る」部分だけを受け持つ。
@@ -1479,6 +1889,7 @@ window.egovExt = window.egovExt || {};
       isEnabled: () => !!(ext.settings.global && ext.settings.definition && (!ext.checkIfLawPage || ext.checkIfLawPage())),
       resolveContent: (target) => {
         const def = defForAnchor(target);
+        if (def && def.parent) return buildParentDefinitionContent(def);
         if (!def || !def.element) return null;
 
         const frag = document.createDocumentFragment();
@@ -1563,7 +1974,11 @@ window.egovExt = window.egovExt || {};
       locateUnit,
       resolveDefAt,
       numeralToNumber,
-      numberToKanji
+      numberToKanji,
+      extractParentDefinitions,
+      findParentLaws,
+      buildParentDefinitionContent,
+      isOrdinanceLawId
     };
   }
 

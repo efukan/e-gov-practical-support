@@ -139,8 +139,8 @@ async function main() {
   const settingKeys = Object.keys(defaultSettings);
   const toggleKeys = settingKeys.filter(k => k !== 'definitionColor');
 
-  runTest('DEFAULT_SETTINGS に全12設定キー（11機能トグル＋定義語カラー）が定義され、全機能が初期状態で全て ON (true) であること', () => {
-    const expectedKeys = ['global', 'scrollspy', 'popup', 'definition', 'newtab', 'dim', 'jump', 'horizontal', 'conjunction', 'fastrender', 'citation', 'definitionColor'];
+  runTest('DEFAULT_SETTINGS に全13設定キー（12機能トグル＋定義語カラー）が定義され、全機能が初期状態で全て ON (true) であること', () => {
+    const expectedKeys = ['global', 'scrollspy', 'popup', 'definition', 'parentDefinition', 'newtab', 'dim', 'jump', 'horizontal', 'conjunction', 'fastrender', 'citation', 'definitionColor'];
     assert.strictEqual(settingKeys.length, expectedKeys.length);
     expectedKeys.forEach(k => assert(settingKeys.includes(k), `キー '${k}' が DEFAULT_SETTINGS に存在する`));
     

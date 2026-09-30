@@ -733,12 +733,15 @@ async function main() {
     assert.strictEqual(ffManifest.version, manifest.version, 'Firefox manifestのバージョンが通常manifestと一致すること');
   });
 
-  runTest('manifest.firefox.json に Gecko ID および strict_min_version が正しく定義されていること', () => {
+  runTest('manifest.firefox.json に Gecko ID・strict_min_version・データ収集の宣言が正しく定義されていること', () => {
     const ffManifest = JSON.parse(fs.readFileSync(firefoxManifestPath, 'utf8'));
     assert(ffManifest.browser_specific_settings, 'browser_specific_settings が定義されていること');
     assert(ffManifest.browser_specific_settings.gecko, 'gecko 設定が定義されていること');
     assert.strictEqual(ffManifest.browser_specific_settings.gecko.id, 'egov-himotoki@efukan.jp', 'Gecko IDが設定されていること');
-    assert.strictEqual(ffManifest.browser_specific_settings.gecko.strict_min_version, '109.0', 'strict_min_version が 109.0 であること');
+    // データ収集の宣言（data_collection_permissions）が効くのは Firefox 140 以降
+    assert.strictEqual(ffManifest.browser_specific_settings.gecko.strict_min_version, '140.0', 'strict_min_version が 140.0 であること');
+    // e-Gov の API へ送るもの: 表示中の法令の法令ID・条文ID（websiteContent）と、法令名検索で入力した語（searchTerms）
+    assert.deepStrictEqual(ffManifest.browser_specific_settings.gecko.data_collection_permissions, { required: ['websiteContent', 'searchTerms'] }, 'データ収集の宣言が websiteContent と searchTerms であること');
   });
 
   runTest('manifest.firefox.json の background が scripts 配列形式（Event Page）であること', () => {
@@ -753,7 +756,8 @@ async function main() {
       const manifestInZip = execSync(`unzip -p "${firefoxZipPath}" manifest.json`, { encoding: 'utf8' });
       const parsedInZip = JSON.parse(manifestInZip);
       assert.strictEqual(parsedInZip.browser_specific_settings?.gecko?.id, 'egov-himotoki@efukan.jp');
-      assert.strictEqual(parsedInZip.browser_specific_settings?.gecko?.strict_min_version, '109.0');
+      assert.strictEqual(parsedInZip.browser_specific_settings?.gecko?.strict_min_version, '140.0');
+      assert.deepStrictEqual(parsedInZip.browser_specific_settings?.gecko?.data_collection_permissions, { required: ['websiteContent', 'searchTerms'] });
       assert(Array.isArray(parsedInZip.background?.scripts));
     });
 

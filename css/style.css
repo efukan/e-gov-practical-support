@@ -467,7 +467,10 @@ body.egov-ext-dim-active a.egov-ext-dimmed-text {
 .egov-ext-fav-btn {
   display: inline-flex !important;
   align-items: center !important;
+  justify-content: center !important;
   gap: 4px !important;
+  /* 「お気に入りに追加」「お気に入り済み」で幅が変わって隣の入力欄が動かないよう、幅をそろえる */
+  min-width: 132px !important;
   height: 28px !important;
   padding: 0 10px 0 8px !important;
   margin: 0 !important;
@@ -498,16 +501,33 @@ body.egov-ext-dim-active a.egov-ext-dimmed-text {
   fill: none !important;
 }
 
-/* 登録済み: 星を塗り、枠を金色にする */
+/* 登録済み: 金色で塗りつぶし、星も塗る（登録前の白地・枠線だけの表示と、ひと目で見分けられるように） */
 .egov-ext-fav-btn.is-favorite {
-  border-color: #b8860b !important;
-  color: #8a5a00 !important;
-  background: rgba(255, 248, 225, 0.95) !important;
+  border-color: #d99a00 !important;
+  color: #3e2700 !important;
+  background: #ffc107 !important;
+  box-shadow: 0 4px 10px rgba(217, 154, 0, 0.35) !important;
+}
+
+.egov-ext-fav-btn.is-favorite:hover {
+  background: #ffb300 !important;
+  border-color: #c78c00 !important;
 }
 
 .egov-ext-fav-btn.is-favorite svg {
-  fill: #f5b301 !important;
-  color: #d99a00 !important;
+  fill: #3e2700 !important;
+  color: #3e2700 !important;
+}
+
+/* 登録した瞬間に星を一度弾ませる */
+@keyframes egov-ext-fav-pop {
+  0% { transform: scale(1); }
+  40% { transform: scale(1.45); }
+  100% { transform: scale(1); }
+}
+
+.egov-ext-fav-btn.is-popping svg {
+  animation: egov-ext-fav-pop 0.35s ease-out !important;
 }
 
 /* 保存できなかったとき（件数や同期容量の上限）。数秒で元の表示に戻る */

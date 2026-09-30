@@ -38,7 +38,7 @@ window.egovExt = window.egovExt || {};
     conjunction: true,
     fastrender: true,
     citation: true,
-    // 条文ページ右上の「☆ お気に入り」ボタン。お気に入りの一覧はポップアップから開く
+    // 条文ページ右上の「☆ お気に入りに追加」ボタン。お気に入りの一覧はポップアップから開く
     favorite: true,
     definitionColor: '#00695c'
   });

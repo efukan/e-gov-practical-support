@@ -92,6 +92,11 @@
   --md-comp-swatch-active-border: #191c20;
 }
 
+/* キーボードで移った項目が、固定した見出しの裏に隠れないようにする */
+html {
+  scroll-padding-top: 88px;
+}
+
 body {
   font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", "Hiragino Sans", "Noto Sans JP", "Yu Gothic UI", Roboto, sans-serif;
   margin: 0;
@@ -115,12 +120,18 @@ body * {
   gap: 16px;
 }
 
-/* ヘッダー */
+/* ヘッダー。スクロールしても上端に残す。
+   body の余白（上24px・左右16px）の分だけ外へ広げ、下を流れる中身が見出しの上や左右から透けないようにする */
 .header {
+  position: sticky;
+  top: 0;
+  z-index: 20;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding-bottom: 12px;
+  margin: -24px -16px 0;
+  padding: 24px 16px 12px;
+  background-color: var(--md-sys-color-background);
   border-bottom: 1px solid var(--md-sys-color-outline);
 }
 

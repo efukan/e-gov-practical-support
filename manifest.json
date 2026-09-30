@@ -44,6 +44,7 @@
         "js/refer_popup.js",
         "js/jump.js",
         "js/favorites.js",
+        "js/quick_toggle.js",
         "js/definition.js",
         "js/content.js"
       ],

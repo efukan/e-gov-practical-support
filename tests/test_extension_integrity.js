@@ -139,8 +139,8 @@ async function main() {
   const settingKeys = Object.keys(defaultSettings);
   const toggleKeys = settingKeys.filter(k => k !== 'definitionColor');
 
-  runTest('DEFAULT_SETTINGS に全14設定キー（13機能トグル＋定義語カラー）が定義され、全機能が初期状態で全て ON (true) であること', () => {
-    const expectedKeys = ['global', 'scrollspy', 'popup', 'definition', 'parentDefinition', 'newtab', 'dim', 'jump', 'horizontal', 'conjunction', 'fastrender', 'citation', 'favorite', 'definitionColor'];
+  runTest('DEFAULT_SETTINGS に全15設定キー（14機能トグル＋定義語カラー）が定義され、全機能が初期状態で全て ON (true) であること', () => {
+    const expectedKeys = ['global', 'scrollspy', 'popup', 'definition', 'parentDefinition', 'newtab', 'dim', 'jump', 'horizontal', 'conjunction', 'fastrender', 'citation', 'favorite', 'quickToggle', 'definitionColor'];
     assert.strictEqual(settingKeys.length, expectedKeys.length);
     expectedKeys.forEach(k => assert(settingKeys.includes(k), `キー '${k}' が DEFAULT_SETTINGS に存在する`));
     
@@ -380,6 +380,46 @@ async function main() {
     ext.settings.favorite = false;
     ext.setupFavoriteButton();
     assert(!document.getElementById('egov-ext-fav-btn'), '設定をオフにするとボタンが消える');
+  });
+
+  await runAsyncTest('条文ページの切り替えボタン: お気に入りの左隣に置き、押すと設定を保存して全機能を掛け直す・設定オフで除去', async () => {
+    const dom = new JSDOM('<!DOCTYPE html><html><head><title>地方自治法 | e-Gov 法令検索</title></head><body></body></html>',
+      { runScripts: 'dangerously', url: 'https://laws.e-gov.go.jp/law/322AC0000000067' });
+    const window = dom.window;
+    const document = window.document;
+    const storage = createStorageMock();
+    window.chrome = { storage };
+    window.eval(settingsJs);
+    window.eval(utilsJsForFavorites);
+    window.eval(jumpJsForFavorites);
+    window.eval(favoritesJs);
+    window.eval(fs.readFileSync(path.join(ROOT_DIR, 'js', 'quick_toggle.js'), 'utf8'));
+    const ext = window.egovExt;
+    ext.settings = Object.assign({}, ext.DEFAULT_SETTINGS);
+    let applied = 0;
+    ext.applySettings = () => { applied++; };
+
+    ext.setupJumpSearch();
+    ext.setupFavoriteButton();
+    ext.setupQuickToggles();
+    const group = document.getElementById('egov-ext-quick-toggles');
+    assert(group, '切り替えボタンの組が置かれた');
+    assert.strictEqual(group.nextElementSibling && group.nextElementSibling.id, 'egov-ext-fav-btn', 'お気に入りボタンの左隣に置かれる');
+    const buttons = Array.from(group.querySelectorAll('.egov-ext-quick-btn'));
+    assert.strictEqual(buttons.map(b => b.dataset.key).join(','), 'horizontal,dim,conjunction,definition');
+    assert(buttons.every(b => b.getAttribute('aria-pressed') === 'true'), '初期値はすべてオン');
+
+    buttons[0].click();
+    await new Promise(r => setTimeout(r, 20));
+    assert.strictEqual(ext.settings.horizontal, false, '押した機能がオフになる');
+    assert.strictEqual(buttons[0].getAttribute('aria-pressed'), 'false', '見た目もオフになる');
+    assert.strictEqual(storage.sync.mem.egovSettings.horizontal, false, '設定が保存される');
+    assert.strictEqual(storage.sync.mem.egovSettings.dim, true, 'ほかの機能はそのまま');
+    assert.strictEqual(applied, 1, '全機能の掛け直しが呼ばれる');
+
+    ext.settings.quickToggle = false;
+    ext.setupQuickToggles();
+    assert(!document.getElementById('egov-ext-quick-toggles'), '設定をオフにすると消える');
   });
 
   runTest('ポップアップの法令名検索: 名前がそのもの・前方一致・法律を上に、廃止を下に並べる', () => {

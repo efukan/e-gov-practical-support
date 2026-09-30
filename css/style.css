@@ -462,6 +462,82 @@ body.egov-ext-dim-active a.egov-ext-dimmed-text {
   background-color: #f0f0f0 !important;
 }
 
+/* ----- 5a-0. 表示の切り替えボタン (Quick Toggles) ----- */
+/* お気に入りボタンの左隣。算用数字・括弧・接続詞・定義語をその場でオン・オフする。
+   オンは青の塗りと塗った丸、オフは灰色の文字と白抜きの丸で、色と形の両方で分かるようにする */
+.egov-ext-quick-toggles {
+  display: inline-flex !important;
+  align-items: center !important;
+  height: 28px !important;
+  padding: 2px !important;
+  gap: 2px !important;
+  border: 1px solid #1042a4 !important;
+  border-radius: 16px !important;
+  background: rgba(255, 255, 255, 0.9) !important;
+  backdrop-filter: blur(10px) !important;
+  -webkit-backdrop-filter: blur(10px) !important;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1) !important;
+  pointer-events: auto !important;
+  box-sizing: border-box !important;
+}
+
+.egov-ext-quick-btn {
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 4px !important;
+  height: 22px !important;
+  margin: 0 !important;
+  padding: 0 8px !important;
+  border: none !important;
+  border-radius: 12px !important;
+  background: transparent !important;
+  color: #80868b !important;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Hiragino Sans", "Noto Sans JP", sans-serif !important;
+  font-size: 11px !important;
+  font-weight: 700 !important;
+  line-height: 1 !important;
+  white-space: nowrap !important;
+  cursor: pointer !important;
+  box-sizing: border-box !important;
+  transition: background-color 0.15s, color 0.15s !important;
+}
+
+.egov-ext-quick-btn:hover {
+  background: rgba(16, 66, 164, 0.08) !important;
+  color: #3c4043 !important;
+}
+
+.egov-ext-quick-dot {
+  display: inline-block !important;
+  width: 7px !important;
+  height: 7px !important;
+  border-radius: 50% !important;
+  border: 1.5px solid currentColor !important;
+  box-sizing: border-box !important;
+  flex-shrink: 0 !important;
+}
+
+.egov-ext-quick-btn.is-on {
+  background: #e3ecfb !important;
+  color: #1042a4 !important;
+}
+
+.egov-ext-quick-btn.is-on:hover {
+  background: #d2e0f8 !important;
+}
+
+.egov-ext-quick-btn.is-on .egov-ext-quick-dot {
+  background: #1042a4 !important;
+  border-color: #1042a4 !important;
+}
+
+/* 幅の狭い画面では、左の「法令検索」のロゴに重なるので出さない（ポップアップの「機能の設定」から切り替えられる） */
+@media (max-width: 1179px) {
+  .egov-ext-quick-toggles {
+    display: none !important;
+  }
+}
+
 /* ----- 5a. お気に入りボタン (Favorite Button) ----- */
 /* 条文ジャンプ検索の左隣。高さと枠は入力欄に揃える */
 .egov-ext-fav-btn {
@@ -991,6 +1067,7 @@ div.egov-ext-preview-title {
 .egov-ext-citation-btn:focus-visible,
 .egov-ext-jump-clear:focus-visible,
 .egov-ext-fav-btn:focus-visible,
+.egov-ext-quick-btn:focus-visible,
 .egov-ext-tip-action-btn:focus-visible {
   outline: 2px solid #1042a4 !important;
   outline-offset: 2px !important;
@@ -1003,6 +1080,7 @@ div.egov-ext-preview-title {
   .egov-ext-status-badge,
   .egov-ext-jump-container,
   .egov-ext-fav-btn,
+  .egov-ext-quick-toggles,
   .egov-ext-jump-modal,
   .egov-ext-jump-backdrop,
   .egov-ext-tip,

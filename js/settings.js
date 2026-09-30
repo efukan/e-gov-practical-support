@@ -40,6 +40,8 @@ window.egovExt = window.egovExt || {};
     citation: true,
     // 条文ページ右上の「☆ お気に入りに追加」ボタン。お気に入りの一覧はポップアップから開く
     favorite: true,
+    // 条文ページ右上の切り替えボタンの組（算用数字・括弧・接続詞・定義語をその場でオン・オフ）
+    quickToggle: true,
     definitionColor: '#00695c'
   });
 

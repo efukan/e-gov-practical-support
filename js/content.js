@@ -118,6 +118,7 @@ window.egovExt = window.egovExt || {};
       ext.restoreAllOriginalHTML();
       if (ext.removeJumpSearch) ext.removeJumpSearch();
       if (ext.removeFavoriteButton) ext.removeFavoriteButton();
+      if (ext.removeQuickToggles) ext.removeQuickToggles();
       if (ext.clearReturnStack) ext.clearReturnStack();
       if (ext.disableCitations) ext.disableCitations();
       if (ext.disablePopup) ext.disablePopup();
@@ -213,6 +214,9 @@ window.egovExt = window.egovExt || {};
     // 画面の構造に依存する処理（薄字化など）を呼び出す
     handleDynamicContent(true);
   }
+
+  // 条文ページ上の切り替えボタン（quick_toggle.js）から、設定を変えたあとに呼ぶ
+  ext.applySettings = applySettings;
 
   /**
    * コミット中のDOM更新によるMutationObserverの無限ループを防ぐため、
@@ -501,6 +505,7 @@ window.egovExt = window.egovExt || {};
     ext.updateStatusBadge();
     if (ext.removeJumpSearch) ext.removeJumpSearch();
     if (ext.removeFavoriteButton) ext.removeFavoriteButton();
+    if (ext.removeQuickToggles) ext.removeQuickToggles();
     if (ext.clearReturnStack) ext.clearReturnStack();
     if (ext.disablePopup) ext.disablePopup();
     if (ext.referenceTooltip) ext.referenceTooltip.hide(true);
@@ -718,6 +723,17 @@ window.egovExt = window.egovExt || {};
       }
     } else {
       if (ext.removeFavoriteButton) ext.removeFavoriteButton();
+    }
+
+    // 表示の切り替えボタン（お気に入りボタンの左隣。設定が変わるたびにオン・オフの見た目を合わせる）
+    if (ext.settings.quickToggle && isLawPage && ext.setupQuickToggles) {
+      try {
+        ext.setupQuickToggles();
+      } catch (e) {
+        console.error("egov-ext: Error setting up quick toggles:", e);
+      }
+    } else {
+      if (ext.removeQuickToggles) ext.removeQuickToggles();
     }
 
     // 条文ジャンプ検索

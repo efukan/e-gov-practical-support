@@ -249,37 +249,56 @@ async function main() {
   const utilsJsForFavorites = fs.readFileSync(path.join(ROOT_DIR, 'js', 'utils.js'), 'utf8');
   const jumpJsForFavorites = fs.readFileSync(path.join(ROOT_DIR, 'js', 'jump.js'), 'utf8');
 
-  /** chrome.storage.local と onChanged の最小限の模擬 */
-  function createLocalStorageMock() {
+  /** chrome.storage の1区画（sync / local）の最小限の模擬。onChanged も発火する */
+  function createStorageArea(areaName, listeners, options = {}) {
     const mem = {};
-    const listeners = [];
+    const notify = (changes) => listeners.forEach(l => l(changes, areaName));
     return {
       mem,
-      local: {
-        get: async (key) => (key in mem ? { [key]: JSON.parse(JSON.stringify(mem[key])) } : {}),
-        set: async (obj) => {
-          const changes = {};
-          for (const k of Object.keys(obj)) {
-            changes[k] = { oldValue: mem[k], newValue: obj[k] };
-            mem[k] = JSON.parse(JSON.stringify(obj[k]));
-          }
-          listeners.forEach(l => l(changes, 'local'));
-        }
+      get: async (key) => {
+        if (key === null || key === undefined) return JSON.parse(JSON.stringify(mem));
+        return key in mem ? { [key]: JSON.parse(JSON.stringify(mem[key])) } : {};
       },
+      set: async (obj) => {
+        if (options.maxItems && Object.keys(Object.assign({}, mem, obj)).length > options.maxItems) {
+          throw new Error('QUOTA_BYTES quota exceeded');
+        }
+        const changes = {};
+        for (const k of Object.keys(obj)) {
+          changes[k] = { oldValue: mem[k], newValue: obj[k] };
+          mem[k] = JSON.parse(JSON.stringify(obj[k]));
+        }
+        notify(changes);
+      },
+      remove: async (key) => {
+        const keys = Array.isArray(key) ? key : [key];
+        const changes = {};
+        keys.forEach(k => { if (k in mem) { changes[k] = { oldValue: mem[k] }; delete mem[k]; } });
+        notify(changes);
+      }
+    };
+  }
+
+  function createStorageMock(options) {
+    const listeners = [];
+    return {
+      sync: createStorageArea('sync', listeners, options),
+      local: createStorageArea('local', listeners),
       onChanged: { addListener: (l) => listeners.push(l) }
     };
   }
 
-  await runAsyncTest('お気に入りの追加・重複時の更新・削除（chrome.storage.local に新しい順で保存）', async () => {
+  await runAsyncTest('お気に入りの追加・重複時の更新・削除（chrome.storage.sync に1件1キーで保存し、新しい順で読む）', async () => {
     const dom = new JSDOM('<!DOCTYPE html><html><body></body></html>', { runScripts: 'dangerously' });
     const window = dom.window;
-    const storage = createLocalStorageMock();
-    window.chrome = { storage: { local: storage.local, onChanged: storage.onChanged } };
+    const storage = createStorageMock();
+    window.chrome = { storage };
     window.eval(favoritesJs);
     const ext = window.egovExt;
 
     assert.strictEqual((await ext.loadFavorites()).length, 0, '初期状態は空');
     await ext.addFavorite({ lawId: '322AC0000000067', title: '地方自治法', lawNum: '昭和二十二年法律第六十七号' });
+    await new Promise(r => setTimeout(r, 5)); // 登録日時をずらす
     await ext.addFavorite({ lawId: '129ac0000000089', title: '民法' });
     let list = await ext.loadFavorites();
     assert.strictEqual(list.map(f => f.lawId).join(','), '129AC0000000089,322AC0000000067', '新しく登録したものが先頭、法令IDは大文字にそろう');
@@ -293,8 +312,36 @@ async function main() {
     await ext.removeFavorite('322AC0000000067');
     list = await ext.loadFavorites();
     assert.strictEqual(list.map(f => f.lawId).join(','), '129AC0000000089', '外した法令が消える');
-    assert(Array.isArray(storage.mem.egovFavorites), 'egovFavorites キーに配列で保存される');
+    assert.strictEqual(storage.sync.mem['egovFav:129AC0000000089'].t, '民法', 'egovFav:<法令ID> のキーに1件ずつ保存される');
+    assert(!('egovFav:322AC0000000067' in storage.sync.mem), '外した法令のキーは消える');
     assert.strictEqual(ext.getLawPageUrl('129AC0000000089'), 'https://laws.e-gov.go.jp/law/129AC0000000089');
+  });
+
+  await runAsyncTest('お気に入り: 上限の件数・同期容量の不足では登録せず理由を返す、開発版の local の一覧を同期へ移す', async () => {
+    const dom = new JSDOM('<!DOCTYPE html><html><body></body></html>', { runScripts: 'dangerously' });
+    const window = dom.window;
+    const storage = createStorageMock({ maxItems: 3 });
+    await storage.local.set({ egovFavorites: [{ lawId: '322AC0000000067', title: '地方自治法', lawNum: '', addedAt: 1 }] });
+    window.chrome = { storage };
+    window.eval(favoritesJs);
+    const ext = window.egovExt;
+
+    const migrated = await ext.loadFavorites();
+    assert.strictEqual(migrated.length, 1, '以前 local に置いた一覧が読める');
+    assert(storage.sync.mem['egovFav:322AC0000000067'], '同期ストレージへ移された');
+    assert(!('egovFavorites' in storage.local.mem), 'local の古い一覧は消える');
+
+    assert.strictEqual((await ext.addFavorite({ lawId: 'A1', title: 'a' })).ok, true);
+    assert.strictEqual((await ext.addFavorite({ lawId: 'A2', title: 'b' })).ok, true);
+    const quota = await ext.addFavorite({ lawId: 'A3', title: 'c' });
+    assert.strictEqual(quota.ok, false, '容量を超えると登録しない');
+    assert.strictEqual(quota.reason, 'quota');
+    assert(ext.describeFavoriteError(quota).includes('同期'), '容量不足の説明を返す');
+
+    ext.FAVORITES_MAX = 3;
+    const full = await ext.addFavorite({ lawId: 'A4', title: 'd' });
+    assert.strictEqual(full.reason, 'full', '上限の件数に達したら full');
+    assert.strictEqual((await ext.addFavorite({ lawId: 'A1', title: 'a（改）' })).ok, true, '登録済みの法令の更新は上限でもできる');
   });
 
   await runAsyncTest('条文ページのお気に入りボタン: 法令名の読み取り・登録/解除・他画面での変更への追従・設定オフで除去', async () => {
@@ -303,8 +350,8 @@ async function main() {
     </body></html>`, { runScripts: 'dangerously', url: 'https://laws.e-gov.go.jp/law/322AC0000000067' });
     const window = dom.window;
     const document = window.document;
-    const storage = createLocalStorageMock();
-    window.chrome = { storage: { local: storage.local, onChanged: storage.onChanged } };
+    const storage = createStorageMock();
+    window.chrome = { storage };
     window.eval(utilsJsForFavorites);
     window.eval(jumpJsForFavorites);
     window.eval(favoritesJs);
@@ -323,10 +370,10 @@ async function main() {
     btn.click();
     await new Promise(r => setTimeout(r, 20));
     assert.strictEqual(btn.getAttribute('aria-pressed'), 'true', '押すと登録済みの表示になる');
-    assert.strictEqual(storage.mem.egovFavorites[0].title, '地方自治法', '法令名が保存される');
+    assert.strictEqual(storage.sync.mem['egovFav:322AC0000000067'].t, '地方自治法', '法令名が保存される');
 
-    // ポップアップ側で外された場合もボタンの表示が戻る
-    await storage.local.set({ egovFavorites: [] });
+    // ポップアップや同期している別の端末で外された場合もボタンの表示が戻る
+    await storage.sync.remove('egovFav:322AC0000000067');
     await new Promise(r => setTimeout(r, 20));
     assert.strictEqual(btn.getAttribute('aria-pressed'), 'false', '他の画面で外されたら表示が戻る');
 
@@ -357,6 +404,30 @@ async function main() {
 
     const byAbbrev = rankSearchItems(raw.map(toSearchItem), '電子契約法');
     assert.strictEqual(byAbbrev[0].lawId, 'A5', '略称がそのものなら先頭');
+  });
+
+  await runAsyncTest('ポップアップの検索の履歴: 新しい順・同じ語は先頭へ・件数の上限・1件ずつ消せる（local に保存）', async () => {
+    const dom = new JSDOM('<!DOCTYPE html><html><body></body></html>', { runScripts: 'dangerously' });
+    const window = dom.window;
+    const storage = createStorageMock();
+    window.chrome = { storage };
+    window.eval(fs.readFileSync(path.join(ROOT_DIR, 'js', 'popup.js'), 'utf8'));
+    const { loadSearchHistory, addSearchHistory, removeSearchHistory, HISTORY_MAX } = window.egovExt._testPopup;
+
+    await addSearchHistory('民法');
+    await addSearchHistory('地自法');
+    await addSearchHistory('  民法 ');
+    await addSearchHistory('   ');
+    assert.strictEqual((await loadSearchHistory()).join(','), '民法,地自法', '同じ語は先頭へ移り、空の語は残さない');
+
+    for (let i = 0; i < HISTORY_MAX + 5; i++) await addSearchHistory('語' + i);
+    assert.strictEqual((await loadSearchHistory()).length, HISTORY_MAX, `履歴は ${HISTORY_MAX} 件まで`);
+
+    await removeSearchHistory('語' + (HISTORY_MAX + 4));
+    const list = await loadSearchHistory();
+    assert(!list.includes('語' + (HISTORY_MAX + 4)), '指定した語が消える');
+    assert(Array.isArray(storage.local.mem.egovSearchHistory), 'chrome.storage.local に保存される');
+    assert(!('egovSearchHistory' in storage.sync.mem), '同期ストレージには置かない');
   });
 
   // =============================================================================

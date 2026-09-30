@@ -510,6 +510,13 @@ body.egov-ext-dim-active a.egov-ext-dimmed-text {
   color: #d99a00 !important;
 }
 
+/* 保存できなかったとき（件数や同期容量の上限）。数秒で元の表示に戻る */
+.egov-ext-fav-btn.has-error {
+  border-color: #b3261e !important;
+  color: #b3261e !important;
+  background: rgba(252, 238, 238, 0.95) !important;
+}
+
 /* ジャンプした先の条文・項・号をハイライトするアニメーション */
 @keyframes egov-ext-highlight-fade {
   0% { background-color: rgba(255, 235, 59, 0.7); }

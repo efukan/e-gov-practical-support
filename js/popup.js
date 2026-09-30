@@ -5,6 +5,7 @@
  * トグルUIの実体は js/settings.js の initSettingsUI() が担い、
  * ここではポップアップ固有の振る舞いを扱う。
  * - 法令名検索（e-Gov法令API の法令名・略称検索。結果から新しいタブで開く・お気に入りに加える）
+ * - 検索の履歴（入力欄を押したときや ↓ で、入力欄の下に出す。ゴミ箱で1件ずつ消せる）
  * - お気に入りの一覧（js/favorites.js が保存を担う）
  * - 「機能の設定」の折りたたみ、詳細設定を開くボタン
  */
@@ -22,6 +23,12 @@ window.egovExt = window.egovExt || {};
 
   /** 入力が止まってから検索するまでの待ち時間（ms） */
   const SEARCH_DEBOUNCE_MS = 300;
+
+  /** 検索の履歴の保存先（chrome.storage.local。この端末だけに置き、同期はしない） */
+  const HISTORY_STORAGE_KEY = 'egovSearchHistory';
+
+  /** 覚えておく検索の履歴の件数 */
+  const HISTORY_MAX = 10;
 
   /** 「機能の設定」の開閉を覚えておく localStorage のキー */
   const SETTINGS_OPEN_KEY = 'egovPopupSettingsOpen';
@@ -130,9 +137,66 @@ window.egovExt = window.egovExt || {};
     };
   }
 
+  /**
+   * 検索の履歴を返す（新しいものが先頭）
+   * @returns {Promise<string[]>}
+   */
+  async function loadSearchHistory() {
+    try {
+      const result = await chrome.storage.local.get(HISTORY_STORAGE_KEY);
+      const list = result && result[HISTORY_STORAGE_KEY];
+      if (Array.isArray(list)) return list.filter(q => typeof q === 'string' && q.trim());
+    } catch (e) {
+      console.debug('egov-ext: 検索の履歴を読めませんでした:', e);
+    }
+    return [];
+  }
+
+  /**
+   * @param {string[]} list
+   * @returns {Promise<string[]>}
+   */
+  async function saveSearchHistory(list) {
+    const next = list.slice(0, HISTORY_MAX);
+    try {
+      await chrome.storage.local.set({ [HISTORY_STORAGE_KEY]: next });
+    } catch (e) {
+      console.debug('egov-ext: 検索の履歴を保存できませんでした:', e);
+    }
+    return next;
+  }
+
+  /**
+   * 検索語を履歴の先頭に加える（同じ語は先頭へ移す）
+   * @param {string} query
+   * @returns {Promise<string[]>} 保存後の履歴
+   */
+  async function addSearchHistory(query) {
+    const q = String(query || '').trim();
+    const list = await loadSearchHistory();
+    if (!q) return list;
+    return saveSearchHistory([q].concat(list.filter(item => item !== q)));
+  }
+
+  /**
+   * 検索語を履歴から消す
+   * @param {string} query
+   * @returns {Promise<string[]>} 保存後の履歴
+   */
+  async function removeSearchHistory(query) {
+    const list = await loadSearchHistory();
+    return saveSearchHistory(list.filter(item => item !== query));
+  }
+
   const STAR_SVG = '<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">'
     + '<polygon points="12 2.8 14.9 8.7 21.4 9.6 16.7 14.2 17.8 20.6 12 17.6 6.2 20.6 7.3 14.2 2.6 9.6 9.1 8.7" '
     + 'stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg>';
+
+  const CLOCK_SVG = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">'
+    + '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>';
+
+  const TRASH_SVG = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">'
+    + '<path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3"/></svg>';
 
   /**
    * ☆ ボタンの見た目を登録状態に合わせる
@@ -157,7 +221,23 @@ window.egovExt = window.egovExt || {};
     const favoriteEmpty = document.getElementById('favorite-empty');
     const favoriteCount = document.getElementById('favorite-count');
     const settingsPanel = document.getElementById('settings-panel');
-    if (!searchInput || !favoriteList || !settingsPanel) return; // ポップアップ以外（テスト等）で読まれたとき
+    const searchWrap = document.getElementById('search-wrap');
+    const historyPanel = document.getElementById('search-history');
+    const historyList = document.getElementById('search-history-list');
+    const notice = document.getElementById('popup-notice');
+    if (!searchInput || !favoriteList || !settingsPanel || !historyPanel) return; // ポップアップ以外（テスト等）で読まれたとき
+
+    let noticeTimer = null;
+    /**
+     * 検索欄の下に短いお知らせを数秒だけ出す（お気に入りを保存できなかったとき等）
+     * @param {string} message
+     */
+    function showNotice(message) {
+      notice.textContent = message;
+      notice.hidden = false;
+      clearTimeout(noticeTimer);
+      noticeTimer = setTimeout(() => { notice.hidden = true; }, 6000);
+    }
 
     /** 登録済みの法令ID。☆ の見た目はここを見て決める */
     let favoriteIds = new Set();
@@ -170,10 +250,13 @@ window.egovExt = window.egovExt || {};
     }
 
     /**
-     * 法令を新しいタブで開き、ポップアップを閉じる
+     * 法令を新しいタブで開き、ポップアップを閉じる。
+     * 検索結果から開いたときは、その検索語を履歴に残す（タブを開くとポップアップが閉じるので先に保存する）
      * @param {string} lawId
+     * @param {boolean} fromSearch
      */
-    function openLaw(lawId) {
+    async function openLaw(lawId, fromSearch) {
+      if (fromSearch) await addSearchHistory(searchInput.value);
       chrome.tabs.create({ url: ext.getLawPageUrl(lawId) });
       window.close();
     }
@@ -181,9 +264,11 @@ window.egovExt = window.egovExt || {};
     /**
      * 一覧の1行（開くボタン＋☆）を作る
      * @param {{lawId: string, title: string, lawNum?: string, lawType?: string, repealLabel?: string}} law
+     * @param {{fromSearch?: boolean}} [options] - 検索結果の行なら、開いたり ☆ を押したりしたときに検索語を履歴に残す
      * @returns {HTMLLIElement}
      */
-    function buildLawItem(law) {
+    function buildLawItem(law, options) {
+      const fromSearch = !!(options && options.fromSearch);
       const li = document.createElement('li');
       li.className = 'law-item';
 
@@ -212,7 +297,7 @@ window.egovExt = window.egovExt || {};
         meta.appendChild(document.createTextNode(metaParts.join('・')));
         open.appendChild(meta);
       }
-      open.addEventListener('click', () => openLaw(law.lawId));
+      open.addEventListener('click', () => openLaw(law.lawId, fromSearch));
 
       const star = document.createElement('button');
       star.type = 'button';
@@ -221,16 +306,24 @@ window.egovExt = window.egovExt || {};
       star.innerHTML = STAR_SVG;
       renderStar(star, favoriteIds.has(law.lawId));
       star.addEventListener('click', async () => {
-        if (favoriteIds.has(law.lawId)) {
-          favoriteIds.delete(law.lawId);
-          syncStars();
-          await ext.removeFavorite(law.lawId);
-        } else {
-          favoriteIds.add(law.lawId);
-          syncStars();
-          await ext.addFavorite({ lawId: law.lawId, title: law.title, lawNum: law.lawNum });
-        }
+        const adding = !favoriteIds.has(law.lawId);
+        // 保存を待たずに見た目を先に変え、保存できなかったら戻す
+        if (adding) favoriteIds.add(law.lawId);
+        else favoriteIds.delete(law.lawId);
+        syncStars();
         updateFavoriteCount();
+        if (adding && fromSearch) addSearchHistory(searchInput.value);
+
+        const result = adding
+          ? await ext.addFavorite({ lawId: law.lawId, title: law.title, lawNum: law.lawNum })
+          : await ext.removeFavorite(law.lawId);
+        if (!result.ok) {
+          if (adding) favoriteIds.delete(law.lawId);
+          else favoriteIds.add(law.lawId);
+          syncStars();
+          updateFavoriteCount();
+          showNotice(ext.describeFavoriteError(result));
+        }
       });
 
       li.appendChild(open);
@@ -279,7 +372,7 @@ window.egovExt = window.egovExt || {};
         return;
       }
       const shown = result.items.slice(0, SEARCH_SHOW_MAX);
-      shown.forEach(item => searchResults.appendChild(buildLawItem(item)));
+      shown.forEach(item => searchResults.appendChild(buildLawItem(item, { fromSearch: true })));
       searchStatus.textContent = result.total > shown.length
         ? `検索結果 ${result.total}件（上位${shown.length}件を表示。語を足すと絞り込めます）`
         : `検索結果 ${result.total}件`;
@@ -319,12 +412,155 @@ window.egovExt = window.egovExt || {};
       }
     }
 
+    /** いま見えている一覧（検索結果かお気に入り）の先頭の行へ移る */
+    function focusFirstLaw() {
+      const first = (searchSection.hidden ? favoriteList : searchResults).querySelector('.law-open');
+      if (first) first.focus();
+    }
+
+    // ---- 検索の履歴（入力欄の下のドロップダウン） ----
+    // ポップアップを開いたときは検索欄に自動でカーソルが入るが、そこで履歴を出すとお気に入りが隠れるので、
+    // 入力欄を押したとき・↓ を押したとき・入力を消して空にしたときに出す
+
+    /**
+     * 履歴の1行（語を選ぶボタン＋ゴミ箱）を作る
+     * @param {string} query
+     * @returns {HTMLLIElement}
+     */
+    function buildHistoryItem(query) {
+      const li = document.createElement('li');
+      li.className = 'history-item';
+
+      const pick = document.createElement('button');
+      pick.type = 'button';
+      pick.className = 'history-pick';
+      pick.title = `「${query}」で検索`;
+      pick.innerHTML = CLOCK_SVG;
+      const text = document.createElement('span');
+      text.className = 'history-text';
+      text.textContent = query;
+      pick.appendChild(text);
+      pick.addEventListener('click', () => pickHistory(query));
+
+      const del = document.createElement('button');
+      del.type = 'button';
+      del.className = 'history-delete';
+      del.title = '履歴から消す';
+      del.setAttribute('aria-label', `「${query}」を履歴から消す`);
+      del.innerHTML = TRASH_SVG;
+      del.addEventListener('click', () => deleteHistory(query, li));
+
+      li.appendChild(pick);
+      li.appendChild(del);
+      return li;
+    }
+
+    /** 入力欄が空なら履歴を出す（履歴が無ければ出さない） */
+    async function showHistory() {
+      if (searchInput.value.trim()) {
+        hideHistory();
+        return;
+      }
+      const list = await loadSearchHistory();
+      // 読み込みの間に入力が始まっていたら出さない
+      if (searchInput.value.trim() || list.length === 0) {
+        hideHistory();
+        return;
+      }
+      historyList.textContent = '';
+      list.forEach(q => historyList.appendChild(buildHistoryItem(q)));
+      historyPanel.hidden = false;
+      searchInput.setAttribute('aria-expanded', 'true');
+      // ポップアップは中身の高さに合わせて開くので、お気に入りが少ないと重ねて出した履歴の下が切れる。
+      // 開いている間だけ、履歴の下端まで高さを確保する
+      const bottom = historyPanel.getBoundingClientRect().bottom + window.scrollY + 12;
+      document.body.style.minHeight = `${Math.ceil(bottom)}px`;
+    }
+
+    function hideHistory() {
+      historyPanel.hidden = true;
+      searchInput.setAttribute('aria-expanded', 'false');
+      document.body.style.minHeight = '';
+    }
+
+    /**
+     * 履歴の語で検索する
+     * @param {string} query
+     */
+    function pickHistory(query) {
+      hideHistory();
+      searchInput.value = query;
+      searchInput.focus();
+      addSearchHistory(query);
+      runSearch();
+    }
+
+    /**
+     * 履歴から1件消す。キーボードで操作していたときは、次の行（無ければ入力欄）へ移る
+     * @param {string} query
+     * @param {HTMLLIElement} li
+     */
+    async function deleteHistory(query, li) {
+      const list = await removeSearchHistory(query);
+      if (list.length === 0) {
+        hideHistory();
+        searchInput.focus();
+        return;
+      }
+      // フォーカスのある行を先に消すと履歴の外へフォーカスが抜けて閉じてしまうので、隣の行へ移してから消す
+      if (li.contains(document.activeElement)) {
+        const next = li.nextElementSibling || li.previousElementSibling;
+        const target = next && next.querySelector('.history-pick');
+        (target || searchInput).focus();
+      }
+      li.remove();
+    }
+
+    // 履歴の中を押しても入力欄からフォーカスを外さない（外れると履歴が閉じ、押した操作が届かない）
+    historyPanel.addEventListener('mousedown', (e) => e.preventDefault());
+
+    // 履歴の中は ↑↓ で移り、Delete で消し、Esc で入力欄へ戻る
+    historyPanel.addEventListener('keydown', (e) => {
+      const picks = Array.from(historyList.querySelectorAll('.history-pick'));
+      const current = document.activeElement;
+      const item = current && current.closest('.history-item');
+      const index = item ? picks.indexOf(item.querySelector('.history-pick')) : -1;
+      if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        // 最後の履歴で ↓ なら、その下の一覧へ移る（フォーカスが外れるので履歴は閉じる）
+        if (index < picks.length - 1) picks[index + 1].focus();
+        else focusFirstLaw();
+      } else if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        if (index > 0) picks[index - 1].focus();
+        else searchInput.focus();
+      } else if ((e.key === 'Delete' || e.key === 'Backspace') && item) {
+        e.preventDefault();
+        deleteHistory(picks[index].querySelector('.history-text').textContent, item);
+      } else if (e.key === 'Escape') {
+        e.preventDefault();
+        hideHistory();
+        searchInput.focus();
+      }
+    });
+
+    // 検索欄の周り（入力欄と履歴）の外へフォーカスが移ったら閉じる
+    searchWrap.addEventListener('focusout', (e) => {
+      if (!e.relatedTarget || !searchWrap.contains(e.relatedTarget)) hideHistory();
+    });
+
+    searchInput.addEventListener('mousedown', () => {
+      if (historyPanel.hidden) showHistory();
+    });
+
     searchInput.addEventListener('input', () => {
       clearTimeout(debounceTimer);
       if (!searchInput.value.trim()) {
         runSearch();
+        showHistory();
         return;
       }
+      hideHistory();
       debounceTimer = setTimeout(runSearch, SEARCH_DEBOUNCE_MS);
     });
 
@@ -332,21 +568,34 @@ window.egovExt = window.egovExt || {};
       if (e.isComposing) return; // 変換確定の Enter では検索しない
       if (e.key === 'Enter') {
         e.preventDefault();
+        hideHistory();
+        if (searchInput.value.trim()) addSearchHistory(searchInput.value);
         runSearch();
       } else if (e.key === 'ArrowDown') {
-        const first = (searchSection.hidden ? favoriteList : searchResults).querySelector('.law-open');
-        if (first) {
-          e.preventDefault();
-          first.focus();
+        e.preventDefault();
+        if (!historyPanel.hidden) {
+          const firstPick = historyList.querySelector('.history-pick');
+          if (firstPick) firstPick.focus();
+        } else if (!searchInput.value.trim()) {
+          // 空なら先に履歴を出す。履歴が無ければ一覧の先頭へ
+          showHistory().then(() => {
+            if (historyPanel.hidden) focusFirstLaw();
+          });
+        } else {
+          focusFirstLaw();
         }
+      } else if (e.key === 'Escape' && !historyPanel.hidden) {
+        e.preventDefault();
+        hideHistory();
       }
     });
 
     // 一覧の中は ↑↓ で行を移れるようにする（先頭で ↑ なら検索欄へ戻る）
     document.addEventListener('keydown', (e) => {
       if (e.key !== 'ArrowDown' && e.key !== 'ArrowUp') return;
-      const current = document.activeElement;
-      if (!current || !current.classList.contains('law-open')) return;
+      // 押した場所で判断する（検索欄や履歴で ↓ を押して一覧の先頭へ移った直後に、同じ押下でもう1行進まないように）
+      const current = e.target;
+      if (!current || !current.classList || !current.classList.contains('law-open')) return;
       const list = current.closest('.law-list');
       if (!list) return;
       const buttons = Array.from(list.querySelectorAll('.law-open'));
@@ -384,7 +633,7 @@ window.egovExt = window.egovExt || {};
     }
   });
 
-  // テスト用に並べ替えの関数を公開する
-  ext._testPopup = { toSearchItem, rankSearchItems, matchScore };
+  // テスト用に並べ替え・検索の履歴の関数を公開する
+  ext._testPopup = { toSearchItem, rankSearchItems, matchScore, loadSearchHistory, addSearchHistory, removeSearchHistory, HISTORY_MAX };
 
 })(window.egovExt);

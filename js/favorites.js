@@ -2,26 +2,32 @@
  * favorites.js
  *
  * 法令のお気に入り。content script とポップアップの両方から読み込まれる。
- * - 保存・読み込み（chrome.storage.local。端末内だけに置き、同期はしない）
+ * - 保存・読み込み（chrome.storage.sync。ブラウザの同期で他の端末にもそろう）
  * - 条文ページ右上の「☆ お気に入り」ボタン（設定「お気に入りボタン」でオン・オフ。content script のみ）
  *
- * 保存するのは法令ID・法令名・法令番号・登録日時だけで、新しく登録したものを先頭に並べる。
+ * 同期ストレージは1項目8KB・全体で約100KB・最大512項目までなので、一覧を1つの配列にせず、
+ * 1件ずつ「egovFav:<法令ID>」のキーに分けて置く（配列だと30件ほどで1項目の上限に届くうえ、
+ * 2台で同時に登録すると後から書いた方の配列で上書きされて片方が消える）。
+ * 保存するのは法令名・法令番号・登録日時だけで、容量を節約するため短い名前（t/n/a）で持つ。
  */
 
 window.egovExt = window.egovExt || {};
 
 (function(ext) {
   /**
-   * お気に入りの保存先となる chrome.storage.local のキー名
+   * お気に入り1件ごとの chrome.storage.sync のキーの頭。後ろに法令IDを付ける
    * @type {string}
    */
-  ext.FAVORITES_STORAGE_KEY = 'egovFavorites';
+  ext.FAVORITE_KEY_PREFIX = 'egovFav:';
 
   /**
-   * 保存しておくお気に入りの上限。超えた分は古いものから外す
+   * お気に入りの上限。同期ストレージの容量（約100KB）と項目数（512）に余裕を残す
    * @type {number}
    */
-  ext.FAVORITES_MAX = 500;
+  ext.FAVORITES_MAX = 300;
+
+  /** 同期に切り替える前の版（未公開の開発版）が chrome.storage.local に置いていた一覧のキー */
+  const LEGACY_LOCAL_KEY = 'egovFavorites';
 
   /**
    * @typedef {Object} FavoriteLaw
@@ -29,6 +35,13 @@ window.egovExt = window.egovExt || {};
    * @property {string} title   - 法令名（例: 地方自治法）
    * @property {string} [lawNum] - 法令番号（例: 昭和二十二年法律第六十七号）
    * @property {number} addedAt - 登録日時（ミリ秒）
+   */
+
+  /**
+   * 登録・解除の結果
+   * @typedef {Object} FavoriteResult
+   * @property {boolean} ok
+   * @property {'full'|'quota'|'error'} [reason] - 失敗したとき。full: 上限の件数、quota: 同期ストレージの容量
    */
 
   /**
@@ -41,16 +54,71 @@ window.egovExt = window.egovExt || {};
   };
 
   /**
+   * 登録・解除に失敗したときの利用者向けの説明
+   * @param {FavoriteResult} result
+   * @returns {string}
+   */
+  ext.describeFavoriteError = function(result) {
+    if (result && result.reason === 'full') {
+      return `お気に入りは${ext.FAVORITES_MAX}件まで登録できます。使わないものを外してから登録してください`;
+    }
+    if (result && result.reason === 'quota') {
+      return 'ブラウザの同期の保存容量がいっぱいで登録できませんでした。使わないお気に入りを外してください';
+    }
+    return 'お気に入りを保存できませんでした。もう一度お試しください';
+  };
+
+  /**
+   * 法令IDから保存用のキーを作る
+   * @param {string} lawId
+   * @returns {string}
+   */
+  function keyOf(lawId) {
+    return ext.FAVORITE_KEY_PREFIX + String(lawId).toUpperCase();
+  }
+
+  /**
+   * 開発版で chrome.storage.local に置いていた一覧を、同期ストレージへ一度だけ移す
+   * @type {Promise<void>|null}
+   */
+  let legacyMigration = null;
+  function migrateLegacyFavorites() {
+    if (legacyMigration) return legacyMigration;
+    legacyMigration = (async () => {
+      try {
+        if (!chrome.storage.local) return;
+        const result = await chrome.storage.local.get(LEGACY_LOCAL_KEY);
+        const legacy = result && result[LEGACY_LOCAL_KEY];
+        if (!Array.isArray(legacy)) return;
+        const items = {};
+        legacy.slice(0, ext.FAVORITES_MAX).forEach(f => {
+          if (f && f.lawId) items[keyOf(f.lawId)] = { t: f.title || f.lawId, n: f.lawNum || '', a: f.addedAt || Date.now() };
+        });
+        if (Object.keys(items).length > 0) await chrome.storage.sync.set(items);
+        await chrome.storage.local.remove(LEGACY_LOCAL_KEY);
+      } catch (e) {
+        console.debug('egov-ext: 以前のお気に入りの移し替えに失敗しました:', e);
+      }
+    })();
+    return legacyMigration;
+  }
+
+  /**
    * 保存済みのお気に入りを返す（新しく登録したものが先頭）
    * @returns {Promise<FavoriteLaw[]>}
    */
   ext.loadFavorites = async function() {
+    await migrateLegacyFavorites();
     try {
-      const result = await chrome.storage.local.get(ext.FAVORITES_STORAGE_KEY);
-      const list = result && result[ext.FAVORITES_STORAGE_KEY];
-      if (Array.isArray(list)) {
-        return list.filter(f => f && typeof f.lawId === 'string' && f.lawId);
-      }
+      const all = await chrome.storage.sync.get(null);
+      return Object.keys(all || {})
+        .filter(key => key.startsWith(ext.FAVORITE_KEY_PREFIX) && all[key])
+        .map(key => {
+          const v = all[key];
+          const lawId = key.slice(ext.FAVORITE_KEY_PREFIX.length);
+          return { lawId, title: v.t || lawId, lawNum: v.n || '', addedAt: v.a || 0 };
+        })
+        .sort((a, b) => b.addedAt - a.addedAt);
     } catch (e) {
       console.error('egov-ext: お気に入りの読み込みに失敗しました:', e);
     }
@@ -58,52 +126,58 @@ window.egovExt = window.egovExt || {};
   };
 
   /**
-   * お気に入りを保存する
-   * @param {FavoriteLaw[]} list
-   * @returns {Promise<void>}
-   */
-  ext.saveFavorites = async function(list) {
-    try {
-      await chrome.storage.local.set({ [ext.FAVORITES_STORAGE_KEY]: list.slice(0, ext.FAVORITES_MAX) });
-    } catch (e) {
-      console.error('egov-ext: お気に入りの保存に失敗しました:', e);
-    }
-  };
-
-  /**
-   * お気に入りに加える。登録済みなら法令名・法令番号だけ新しくし、並び順は変えない
+   * お気に入りに加える。登録済みなら法令名・法令番号だけ新しくし、並び順（登録日時）は変えない
    * @param {{lawId: string, title?: string, lawNum?: string}} law
-   * @returns {Promise<FavoriteLaw[]>} 保存後の一覧
+   * @returns {Promise<FavoriteResult>}
    */
   ext.addFavorite = async function(law) {
-    const list = await ext.loadFavorites();
-    const lawId = String(law.lawId).toUpperCase();
-    const existing = list.find(f => f.lawId === lawId);
-    if (existing) {
-      if (law.title) existing.title = law.title;
-      if (law.lawNum) existing.lawNum = law.lawNum;
-    } else {
-      list.unshift({
-        lawId,
-        title: law.title || lawId,
-        lawNum: law.lawNum || '',
-        addedAt: Date.now()
+    const key = keyOf(law.lawId);
+    try {
+      const result = await chrome.storage.sync.get(key);
+      const current = result && result[key];
+      if (!current) {
+        const list = await ext.loadFavorites();
+        if (list.length >= ext.FAVORITES_MAX) return { ok: false, reason: 'full' };
+      }
+      await chrome.storage.sync.set({
+        [key]: {
+          t: law.title || (current && current.t) || String(law.lawId).toUpperCase(),
+          n: law.lawNum || (current && current.n) || '',
+          a: current && current.a ? current.a : Date.now()
+        }
       });
+      return { ok: true };
+    } catch (e) {
+      const quota = /quota/i.test(String(e && e.message));
+      // 容量の不足は画面で知らせるので、拡張機能の管理画面の「エラー」には積まない
+      (quota ? console.debug : console.error)('egov-ext: お気に入りの保存に失敗しました:', e);
+      return { ok: false, reason: quota ? 'quota' : 'error' };
     }
-    await ext.saveFavorites(list);
-    return list;
   };
 
   /**
    * お気に入りから外す
    * @param {string} lawId
-   * @returns {Promise<FavoriteLaw[]>} 保存後の一覧
+   * @returns {Promise<FavoriteResult>}
    */
   ext.removeFavorite = async function(lawId) {
-    const id = String(lawId).toUpperCase();
-    const list = (await ext.loadFavorites()).filter(f => f.lawId !== id);
-    await ext.saveFavorites(list);
-    return list;
+    try {
+      await chrome.storage.sync.remove(keyOf(lawId));
+      return { ok: true };
+    } catch (e) {
+      console.error('egov-ext: お気に入りの削除に失敗しました:', e);
+      return { ok: false, reason: 'error' };
+    }
+  };
+
+  /**
+   * storage.onChanged の変更の中に、お気に入りの登録・解除が含まれているか
+   * @param {Object} changes
+   * @param {string} areaName
+   * @returns {boolean}
+   */
+  ext.isFavoritesChange = function(changes, areaName) {
+    return areaName === 'sync' && Object.keys(changes || {}).some(key => key.startsWith(ext.FAVORITE_KEY_PREFIX));
   };
 
   // ---------------------------------------------------------------------------
@@ -180,12 +254,37 @@ window.egovExt = window.egovExt || {};
     const willAdd = !btn.classList.contains('is-favorite');
     // 保存を待たずに見た目を先に変える（押した手応えを遅らせない）
     renderButtonState(btn, willAdd);
+    let result;
     if (willAdd) {
       const info = ext.readCurrentLawInfo();
-      await ext.addFavorite({ lawId, title: info.title, lawNum: info.lawNum });
+      result = await ext.addFavorite({ lawId, title: info.title, lawNum: info.lawNum });
     } else {
-      await ext.removeFavorite(lawId);
+      result = await ext.removeFavorite(lawId);
     }
+    if (!result.ok) {
+      // 保存できなかったら見た目を戻し、ボタンの中に理由を短く出す（数秒で元に戻す）
+      renderButtonState(btn, !willAdd);
+      showButtonError(btn, ext.describeFavoriteError(result));
+    }
+  }
+
+  /**
+   * 登録できなかったことをボタンの中に数秒だけ出す
+   * @param {HTMLButtonElement} btn
+   * @param {string} message - ボタンの title（マウスを乗せると出る説明）にする全文
+   */
+  function showButtonError(btn, message) {
+    const label = btn.querySelector('.egov-ext-fav-label');
+    if (!label) return;
+    btn.classList.add('has-error');
+    btn.title = message;
+    label.textContent = '登録できません';
+    clearTimeout(btn._egovErrorTimer);
+    btn._egovErrorTimer = setTimeout(() => {
+      btn.classList.remove('has-error');
+      label.textContent = 'お気に入り';
+      renderButtonState(btn, btn.classList.contains('is-favorite'));
+    }, 4000);
   }
 
   /**
@@ -229,10 +328,10 @@ window.egovExt = window.egovExt || {};
     }
     refreshFavoriteButton();
 
-    // ポップアップや別タブで登録・解除されたら、見た目を合わせる
+    // ポップアップ・別タブ・同期している別の端末で登録・解除されたら、見た目を合わせる
     if (!storageListenerAdded && chrome.storage && chrome.storage.onChanged) {
       chrome.storage.onChanged.addListener((changes, areaName) => {
-        if (areaName === 'local' && changes[ext.FAVORITES_STORAGE_KEY]) {
+        if (ext.isFavoritesChange(changes, areaName)) {
           refreshFavoriteButton();
         }
       });

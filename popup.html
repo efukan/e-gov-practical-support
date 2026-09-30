@@ -27,14 +27,23 @@
       </label>
     </header>
 
-    <!-- 法令名検索（e-Gov法令API の法令名・略称検索） -->
-    <div class="search-box" role="search">
-      <svg class="search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-        <circle cx="11" cy="11" r="7" />
-        <path d="M20 20l-3.5-3.5" />
-      </svg>
-      <input type="search" id="law-search" class="search-input" placeholder="法令名・略称で検索（例: 地方自治法、地自法）" autocomplete="off" spellcheck="false" aria-label="法令名・略称で検索" autofocus>
+    <!-- 法令名検索（e-Gov法令API の法令名・略称検索）。入力欄を押すと下に検索の履歴を出す -->
+    <div class="search-wrap" id="search-wrap">
+      <div class="search-box" role="search">
+        <svg class="search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <circle cx="11" cy="11" r="7" />
+          <path d="M20 20l-3.5-3.5" />
+        </svg>
+        <input type="search" id="law-search" class="search-input" placeholder="法令名・略称で検索（例: 地方自治法、地自法）" autocomplete="off" spellcheck="false" aria-label="法令名・略称で検索" aria-controls="search-history" aria-expanded="false" autofocus>
+      </div>
+      <div class="search-history" id="search-history" hidden>
+        <div class="search-history-heading">最近の検索</div>
+        <ul class="search-history-list" id="search-history-list"></ul>
+      </div>
     </div>
+
+    <!-- お気に入りを保存できなかったとき等のお知らせ（数秒で消える） -->
+    <p class="popup-notice" id="popup-notice" role="status" hidden></p>
 
     <!-- 検索結果（入力があるときだけ、お気に入りの代わりに出す） -->
     <section class="section-group" id="search-section" hidden>

@@ -4,7 +4,7 @@
     "description": "Extension name in English"
   },
   "extDesc": {
-    "message": "Preview referenced articles and definitions on hover in e-Gov Law Search. Arabic numerals, dimmed parentheses, citation lists.",
+    "message": "Preview articles and definitions on hover in e-Gov Law Search. Arabic numerals, dimmed parentheses, law search, favorites.",
     "description": "Extension description in English"
   }
 }

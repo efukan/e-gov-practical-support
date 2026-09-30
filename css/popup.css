@@ -92,6 +92,11 @@
   --md-comp-danger-bg: rgba(242, 184, 181, 0.12);
 }
 
+/* キーボードで下の行へ移ったとき、固定したヘッダーの裏に隠れないようにする */
+html {
+  scroll-padding-top: 64px;
+}
+
 body {
   font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", "Hiragino Sans", "Noto Sans JP", "Yu Gothic UI", Roboto, sans-serif;
   margin: 0;
@@ -118,12 +123,18 @@ body * {
   gap: 8px;
 }
 
-/* ヘッダー */
+/* ヘッダー。「機能の設定」を開いてスクロールしても上端に残す。
+   body の余白（12px）の分だけ外へ広げ、下を流れる中身が見出しの左右や上から透けないようにする */
 .header {
+  position: sticky;
+  top: 0;
+  z-index: 20;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding-bottom: 6px;
+  margin: -12px -12px 0;
+  padding: 12px 12px 6px;
+  background-color: var(--md-sys-color-background);
   border-bottom: 1px solid var(--md-sys-color-outline);
 }
 

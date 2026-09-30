@@ -27,6 +27,7 @@ async function createTestEnv(html, options = {}) {
         get: async () => ({ ...storage }),
         set: async (o) => Object.assign(storage, o)
       },
+      local: { get: async () => ({}), set: async () => {} },
       onChanged: { addListener() {} }
     },
     runtime: { onMessage: { addListener() {} }, openOptionsPage() {} },

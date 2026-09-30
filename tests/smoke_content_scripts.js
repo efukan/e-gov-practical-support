@@ -40,6 +40,7 @@ window.chrome = {
       get: async () => ({ ...storage }),
       set: async (o) => Object.assign(storage, o)
     },
+    local: { get: async () => ({}), set: async () => {} },
     onChanged: { addListener() {} }
   },
   runtime: { onMessage: { addListener() {} }, openOptionsPage() {} },
@@ -99,7 +100,7 @@ function check(name, fn) {
 }
 
 console.log('\n--- ユーティリティ ---');
-check('DEFAULT_SETTINGS に13キー（12機能＋定義語カラー）', () => Object.keys(ext.DEFAULT_SETTINGS).length === 13);
+check('DEFAULT_SETTINGS に14キー（13機能＋定義語カラー）', () => Object.keys(ext.DEFAULT_SETTINGS).length === 14);
 check('getLawIdFromUrl (パス形式)', () => ext.getLawIdFromUrl('https://laws.e-gov.go.jp/law/415AC0000000057') === '415AC0000000057');
 check('getLawIdFromUrl (小文字クエリ)', () => ext.getLawIdFromUrl('https://laws.e-gov.go.jp/document?lawid=321constitution') === '321CONSTITUTION');
 check('getLawIdFromUrl (大文字クエリ)', () => ext.getLawIdFromUrl('https://laws.e-gov.go.jp/document?lawId=321CONSTITUTION') === '321CONSTITUTION');

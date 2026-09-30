@@ -139,8 +139,8 @@ async function main() {
   const settingKeys = Object.keys(defaultSettings);
   const toggleKeys = settingKeys.filter(k => k !== 'definitionColor');
 
-  runTest('DEFAULT_SETTINGS に全13設定キー（12機能トグル＋定義語カラー）が定義され、全機能が初期状態で全て ON (true) であること', () => {
-    const expectedKeys = ['global', 'scrollspy', 'popup', 'definition', 'parentDefinition', 'newtab', 'dim', 'jump', 'horizontal', 'conjunction', 'fastrender', 'citation', 'definitionColor'];
+  runTest('DEFAULT_SETTINGS に全14設定キー（13機能トグル＋定義語カラー）が定義され、全機能が初期状態で全て ON (true) であること', () => {
+    const expectedKeys = ['global', 'scrollspy', 'popup', 'definition', 'parentDefinition', 'newtab', 'dim', 'jump', 'horizontal', 'conjunction', 'fastrender', 'citation', 'favorite', 'definitionColor'];
     assert.strictEqual(settingKeys.length, expectedKeys.length);
     expectedKeys.forEach(k => assert(settingKeys.includes(k), `キー '${k}' が DEFAULT_SETTINGS に存在する`));
     
@@ -243,6 +243,120 @@ async function main() {
     assert.strictEqual(sentMessages.length, 1, 'chrome.tabs.sendMessage が1回呼ばれた');
     assert.strictEqual(sentMessages[0].msg.type, 'SETTINGS_CHANGED', 'メッセージ種別が SETTINGS_CHANGED');
     assert.strictEqual(sentMessages[0].msg.settings.horizontal, false, '送信された設定の horizontal が false');
+  });
+
+  const favoritesJs = fs.readFileSync(path.join(ROOT_DIR, 'js', 'favorites.js'), 'utf8');
+  const utilsJsForFavorites = fs.readFileSync(path.join(ROOT_DIR, 'js', 'utils.js'), 'utf8');
+  const jumpJsForFavorites = fs.readFileSync(path.join(ROOT_DIR, 'js', 'jump.js'), 'utf8');
+
+  /** chrome.storage.local と onChanged の最小限の模擬 */
+  function createLocalStorageMock() {
+    const mem = {};
+    const listeners = [];
+    return {
+      mem,
+      local: {
+        get: async (key) => (key in mem ? { [key]: JSON.parse(JSON.stringify(mem[key])) } : {}),
+        set: async (obj) => {
+          const changes = {};
+          for (const k of Object.keys(obj)) {
+            changes[k] = { oldValue: mem[k], newValue: obj[k] };
+            mem[k] = JSON.parse(JSON.stringify(obj[k]));
+          }
+          listeners.forEach(l => l(changes, 'local'));
+        }
+      },
+      onChanged: { addListener: (l) => listeners.push(l) }
+    };
+  }
+
+  await runAsyncTest('お気に入りの追加・重複時の更新・削除（chrome.storage.local に新しい順で保存）', async () => {
+    const dom = new JSDOM('<!DOCTYPE html><html><body></body></html>', { runScripts: 'dangerously' });
+    const window = dom.window;
+    const storage = createLocalStorageMock();
+    window.chrome = { storage: { local: storage.local, onChanged: storage.onChanged } };
+    window.eval(favoritesJs);
+    const ext = window.egovExt;
+
+    assert.strictEqual((await ext.loadFavorites()).length, 0, '初期状態は空');
+    await ext.addFavorite({ lawId: '322AC0000000067', title: '地方自治法', lawNum: '昭和二十二年法律第六十七号' });
+    await ext.addFavorite({ lawId: '129ac0000000089', title: '民法' });
+    let list = await ext.loadFavorites();
+    assert.strictEqual(list.map(f => f.lawId).join(','), '129AC0000000089,322AC0000000067', '新しく登録したものが先頭、法令IDは大文字にそろう');
+
+    await ext.addFavorite({ lawId: '322AC0000000067', title: '地方自治法（新）' });
+    list = await ext.loadFavorites();
+    assert.strictEqual(list.length, 2, '同じ法令は二重に登録しない');
+    assert.strictEqual(list[1].title, '地方自治法（新）', '登録済みなら法令名だけ新しくする');
+    assert.strictEqual(list[1].lawNum, '昭和二十二年法律第六十七号', '渡されなかった法令番号は残す');
+
+    await ext.removeFavorite('322AC0000000067');
+    list = await ext.loadFavorites();
+    assert.strictEqual(list.map(f => f.lawId).join(','), '129AC0000000089', '外した法令が消える');
+    assert(Array.isArray(storage.mem.egovFavorites), 'egovFavorites キーに配列で保存される');
+    assert.strictEqual(ext.getLawPageUrl('129AC0000000089'), 'https://laws.e-gov.go.jp/law/129AC0000000089');
+  });
+
+  await runAsyncTest('条文ページのお気に入りボタン: 法令名の読み取り・登録/解除・他画面での変更への追従・設定オフで除去', async () => {
+    const dom = new JSDOM(`<!DOCTYPE html><html><head><title>地方自治法 | e-Gov 法令検索</title></head><body>
+      <h1 class="title title-law"><span class="lawlabel">地方自治法<span class="lawnumber">（昭和二十二年法律第六十七号）</span></span></h1>
+    </body></html>`, { runScripts: 'dangerously', url: 'https://laws.e-gov.go.jp/law/322AC0000000067' });
+    const window = dom.window;
+    const document = window.document;
+    const storage = createLocalStorageMock();
+    window.chrome = { storage: { local: storage.local, onChanged: storage.onChanged } };
+    window.eval(utilsJsForFavorites);
+    window.eval(jumpJsForFavorites);
+    window.eval(favoritesJs);
+    const ext = window.egovExt;
+    ext.settings = { global: true, jump: true, favorite: true };
+
+    ext.setupJumpSearch();
+    ext.setupFavoriteButton();
+    const btn = document.getElementById('egov-ext-fav-btn');
+    assert(btn, 'お気に入りボタンが置かれた');
+    assert.strictEqual(btn.nextElementSibling && btn.nextElementSibling.id, 'egov-ext-jump-container', '条文ジャンプ検索の左隣に置かれる');
+    const info = ext.readCurrentLawInfo();
+    assert.strictEqual(info.title, '地方自治法', '見出しから法令名を読む');
+    assert.strictEqual(info.lawNum, '昭和二十二年法律第六十七号', '見出しから法令番号を読む');
+
+    btn.click();
+    await new Promise(r => setTimeout(r, 20));
+    assert.strictEqual(btn.getAttribute('aria-pressed'), 'true', '押すと登録済みの表示になる');
+    assert.strictEqual(storage.mem.egovFavorites[0].title, '地方自治法', '法令名が保存される');
+
+    // ポップアップ側で外された場合もボタンの表示が戻る
+    await storage.local.set({ egovFavorites: [] });
+    await new Promise(r => setTimeout(r, 20));
+    assert.strictEqual(btn.getAttribute('aria-pressed'), 'false', '他の画面で外されたら表示が戻る');
+
+    ext.settings.favorite = false;
+    ext.setupFavoriteButton();
+    assert(!document.getElementById('egov-ext-fav-btn'), '設定をオフにするとボタンが消える');
+  });
+
+  runTest('ポップアップの法令名検索: 名前がそのもの・前方一致・法律を上に、廃止を下に並べる', () => {
+    const dom = new JSDOM('<!DOCTYPE html><html><body></body></html>', { runScripts: 'dangerously' });
+    const window = dom.window;
+    window.eval(fs.readFileSync(path.join(ROOT_DIR, 'js', 'popup.js'), 'utf8'));
+    const { toSearchItem, rankSearchItems } = window.egovExt._testPopup;
+    const law = (id, title, type, extra = {}) => ({
+      law_info: { law_id: id, law_type: type, law_num: '' },
+      revision_info: Object.assign({ law_title: title, repeal_status: 'None', abbrev: null }, extra)
+    });
+    const raw = [
+      law('A1', '民法の一部を改正する法律の施行に伴う関係政令の整備に関する政令', 'CabinetOrder'),
+      law('A2', '民法施行法', 'Act'),
+      law('A3', '旧民法', 'Act', { repeal_status: 'Repeal' }),
+      law('A4', '民法', 'Act'),
+      law('A5', '電子消費者契約に関する民法の特例に関する法律', 'Act', { abbrev: '電子契約法,電子消費者契約法' })
+    ];
+    const ranked = rankSearchItems(raw.map(toSearchItem), '民法');
+    assert.strictEqual(ranked.map(i => i.lawId).join(','), 'A4,A2,A1,A5,A3');
+    assert.strictEqual(ranked[4].repealLabel, '廃止', '廃止の法令には印が付く');
+
+    const byAbbrev = rankSearchItems(raw.map(toSearchItem), '電子契約法');
+    assert.strictEqual(byAbbrev[0].lawId, 'A5', '略称がそのものなら先頭');
   });
 
   // =============================================================================

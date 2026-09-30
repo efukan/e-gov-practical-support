@@ -117,6 +117,7 @@ window.egovExt = window.egovExt || {};
       // 3機能の書き換えをまとめて1回だけ巻き戻す
       ext.restoreAllOriginalHTML();
       if (ext.removeJumpSearch) ext.removeJumpSearch();
+      if (ext.removeFavoriteButton) ext.removeFavoriteButton();
       if (ext.clearReturnStack) ext.clearReturnStack();
       if (ext.disableCitations) ext.disableCitations();
       if (ext.disablePopup) ext.disablePopup();
@@ -499,6 +500,7 @@ window.egovExt = window.egovExt || {};
     document.body.classList.remove('egov-fastrender-enabled');
     ext.updateStatusBadge();
     if (ext.removeJumpSearch) ext.removeJumpSearch();
+    if (ext.removeFavoriteButton) ext.removeFavoriteButton();
     if (ext.clearReturnStack) ext.clearReturnStack();
     if (ext.disablePopup) ext.disablePopup();
     if (ext.referenceTooltip) ext.referenceTooltip.hide(true);
@@ -705,6 +707,17 @@ window.egovExt = window.egovExt || {};
       }
     } else {
       if (ext.disableCitations) ext.disableCitations();
+    }
+
+    // お気に入りボタン（条文ジャンプ検索の左隣。法令が変わったら登録状態を読み直す）
+    if (ext.settings.favorite && isLawPage && ext.setupFavoriteButton) {
+      try {
+        ext.setupFavoriteButton();
+      } catch (e) {
+        console.error("egov-ext: Error setting up favorite button:", e);
+      }
+    } else {
+      if (ext.removeFavoriteButton) ext.removeFavoriteButton();
     }
 
     // 条文ジャンプ検索

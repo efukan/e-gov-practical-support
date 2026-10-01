@@ -48,7 +48,7 @@ window.egovExt = window.egovExt || {};
    * 拡張機能自身が挿入した自作UI要素を指すセレクタ
    * @type {string}
    */
-  ext.SELF_UI_SELECTOR = '.egov-ext-tip, .egov-ext-header-container, #egov-ext-jump-container, #egov-ext-fav-btn, #egov-ext-quick-toggles, #egov-ext-status-badge, .egov-ext-citation-btn';
+  ext.SELF_UI_SELECTOR = '.egov-ext-tip, .egov-ext-header-container, #egov-ext-jump-container, #egov-ext-fav-btn, #egov-ext-quick-toggles, .egov-ext-citation-btn';
 
   /**
    * 非同期実行タスクの追跡管理オブジェクト（多重起動防止およびキャンセル排他制御用）
@@ -717,7 +717,7 @@ window.egovExt = window.egovExt || {};
   };
 
   /**
-   * ヘッダーコンテナ（ステータスバッジと条文ジャンプ検索ボックスを格納する親要素）を取得または作成する関数
+   * ヘッダーコンテナ（右上の切り替えボタン・お気に入りボタン・条文ジャンプ検索ボックスを格納する親要素）を取得または作成する関数
    * @returns {HTMLElement} ヘッダーのコンテナDIV要素
    */
   ext.getOrCreateHeaderContainer = function() {
@@ -738,45 +738,6 @@ window.egovExt = window.egovExt || {};
     const container = document.getElementById('egov-ext-header-container');
     if (container && container.children.length === 0) {
       container.remove();
-    }
-  };
-
-  /**
-   * 拡張機能の稼働状況を画面の右上のヘッダーエリアにバッジとして視覚表示する関数
-   * @param {number|null} [termsCount=null] - 登録された定義語の件数
-   */
-  ext.updateStatusBadge = function(termsCount = null) {
-    const existing = document.getElementById('egov-ext-status-badge');
-    if (existing) {
-      existing.remove();
-    }
-    
-    // グローバル無効または非条文ページ（検索結果やトップページ等）の場合はバッジを表示せずコンテナを整理する
-    const isLawPage = ext.checkIfLawPage();
-    if (!ext.settings.global || !isLawPage) {
-      ext.checkAndRemoveHeaderContainer();
-      return;
-    }
-    
-    const badge = document.createElement('div');
-    badge.id = 'egov-ext-status-badge';
-    badge.className = 'egov-ext-status-badge';
-    
-    const dot = document.createElement('span');
-    dot.style.width = '8px';
-    dot.style.height = '8px';
-    dot.style.borderRadius = '50%';
-    dot.style.background = '#4caf50'; // 稼働中は緑
-    dot.style.display = 'inline-block';
-    
-    badge.appendChild(dot);
-    badge.appendChild(document.createTextNode('e-Gov法令ひもとき: 稼働中'));
-    
-    const headerContainer = ext.getOrCreateHeaderContainer();
-    if (headerContainer.firstChild) {
-      headerContainer.insertBefore(badge, headerContainer.firstChild);
-    } else {
-      headerContainer.appendChild(badge);
     }
   };
 

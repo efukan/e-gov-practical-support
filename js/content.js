@@ -95,7 +95,6 @@ window.egovExt = window.egovExt || {};
    * 現在の settings の状態に合わせて、各機能の有効/無効化や初期化を制御する司令塔関数
    */
   function applySettings() {
-    ext.updateStatusBadge();
     if (ext.applyDefinitionColor) {
       ext.applyDefinitionColor(ext.settings.definitionColor);
     }
@@ -311,7 +310,7 @@ window.egovExt = window.egovExt || {};
       return true;
     }
 
-    if (el.closest && el.closest('.egov-ext-tip, .egov-ext-header-container, #egov-ext-jump-container, #egov-ext-status-badge, .egov-ext-citation-btn')) {
+    if (el.closest && el.closest('.egov-ext-tip, .egov-ext-header-container, #egov-ext-jump-container, .egov-ext-citation-btn')) {
       return true;
     }
 
@@ -502,7 +501,6 @@ window.egovExt = window.egovExt || {};
    */
   function cleanupNonLawPage() {
     document.body.classList.remove('egov-fastrender-enabled');
-    ext.updateStatusBadge();
     if (ext.removeJumpSearch) ext.removeJumpSearch();
     if (ext.removeFavoriteButton) ext.removeFavoriteButton();
     if (ext.removeQuickToggles) ext.removeQuickToggles();

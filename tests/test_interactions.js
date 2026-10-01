@@ -2617,18 +2617,13 @@ async function check(name, fn) {
       }
     }
 
-    // 3. /result においてステータスバッジやジャンプ検索窓がDOMに生成されないこと
-    extResult.updateStatusBadge();
-    if (winResult.document.getElementById('egov-ext-status-badge')) {
-      throw new Error('/result においてステータスバッジが表示されてしまっています');
-    }
-    if (winResult.document.getElementById('egov-ext-header-container')) {
-      throw new Error('/result においてヘッダーコンテナが残存しています');
-    }
-
+    // 3. /result において条文ジャンプ検索窓などの自作UIがDOMに生成されないこと
     extResult.setupJumpSearch();
     if (winResult.document.getElementById('egov-ext-jump-container')) {
       throw new Error('/result において条文ジャンプ検索ボックスが表示されてしまっています');
+    }
+    if (winResult.document.getElementById('egov-ext-header-container')) {
+      throw new Error('/result においてヘッダーコンテナが残存しています');
     }
 
     // 4. /result におけるリンククリックが「別タブで開く」ハンドラによって横取り（preventDefault）されないこと
@@ -2653,14 +2648,10 @@ async function check(name, fn) {
     extLaw.settings.jump = true;
     extLaw.settings.popup = true;
 
-    // 条文ページで初期化（バッジ・ジャンプ検索窓が生成される）
-    extLaw.updateStatusBadge();
+    // 条文ページで初期化（ジャンプ検索窓が生成される）
     extLaw.setupJumpSearch();
     extLaw.enablePopup();
 
-    if (!winLaw.document.getElementById('egov-ext-status-badge')) {
-      throw new Error('条文ページでステータスバッジが生成されていません');
-    }
     if (!winLaw.document.getElementById('egov-ext-jump-container')) {
       throw new Error('条文ページでジャンプ検索ボックスが生成されていません');
     }
@@ -2678,10 +2669,7 @@ async function check(name, fn) {
       extLaw._testContent.cleanupNonLawPage();
     }
 
-    // /result に遷移した後、バッジもジャンプ検索も綺麗に消滅していること
-    if (winLaw.document.getElementById('egov-ext-status-badge')) {
-      throw new Error('SPAで/result遷移後もステータスバッジが残存しています');
-    }
+    // /result に遷移した後、ジャンプ検索もヘッダーコンテナも綺麗に消滅していること
     if (winLaw.document.getElementById('egov-ext-jump-container')) {
       throw new Error('SPAで/result遷移後もジャンプ検索ボックスが残存しています');
     }

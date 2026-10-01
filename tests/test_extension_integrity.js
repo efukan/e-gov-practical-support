@@ -598,7 +598,7 @@ async function main() {
     assert(styleCss.includes('.egov-ext-preview-container .egov-ext-citation-btn'), 'preview-container 内の citation-btn 非表示ルールが定義されている');
   });
 
-  runTest('css/style.css 内のツールチップ z-index がステータスバッジ（ヘッダーコンテナ）より前面に設定されていること', () => {
+  runTest('css/style.css 内のツールチップ z-index がヘッダーコンテナ（右上の切り替えボタン・お気に入り・条文ジャンプ）より前面に設定されていること', () => {
     const styleCss = fs.readFileSync(path.join(ROOT_DIR, 'css', 'style.css'), 'utf8');
     const headerMatch = styleCss.match(/\.egov-ext-header-container\s*\{[\s\S]*?z-index:\s*(\d+)/);
     assert(headerMatch, '.egov-ext-header-container の z-index が定義されている');
@@ -670,7 +670,8 @@ async function main() {
 
     const requiredHiddenSelectors = [
       '.egov-ext-header-container',
-      '.egov-ext-status-badge',
+      '.egov-ext-quick-toggles',
+      '.egov-ext-fav-btn',
       '.egov-ext-jump-container',
       '.egov-ext-jump-modal',
       '.egov-ext-tip',

@@ -1508,7 +1508,6 @@ window.egovExt = window.egovExt || {};
     if (!targetContainer) {
       ext.cancelTask('definitionHighlight');
     }
-    ext.updateStatusBadge(ext.definitionMap.size);
     if (ext.definitionMap.size === 0) {
       ext.log('no defined terms extracted. Skipping highlighting.');
       return;
@@ -1785,7 +1784,6 @@ window.egovExt = window.egovExt || {};
     if (ext.definitionTooltip) {
       ext.definitionTooltip.hide(true);
     }
-    ext.updateStatusBadge(0);
   };
 
   /**

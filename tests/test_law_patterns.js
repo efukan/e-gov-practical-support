@@ -414,7 +414,6 @@ async function check(name, fn) {
     // ScrollSpy, JumpSearch がサイドバー不在でエラーなく完了すること
     ext.setupScrollSpy();
     ext.setupJumpSearch();
-    ext.updateStatusBadge();
 
     // 2条のみの本文が正常に処理されること
     const articles = document.querySelectorAll('._div_Article');

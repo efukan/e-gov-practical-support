@@ -929,6 +929,100 @@ body.egov-fastrender-enabled .main-content {
   flex-shrink: 0 !important;
 }
 
+/* ----- 8-0. 同じ法令の中の参照元（逆引き） (Back References) ----- */
+/* 条・項・号の番号の直後に置く「↩3」。本文を読む邪魔にならないよう、小さく淡くする */
+.egov-ext-backref-btn {
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 1px !important;
+  height: 16px !important;
+  margin: 0 4px 0 0 !important;
+  padding: 0 4px !important;
+  border: 1px solid #d6e2f3 !important;
+  border-radius: 8px !important;
+  background-color: #f3f7fd !important;
+  color: #4a6a9e !important;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Hiragino Sans", "Noto Sans JP", sans-serif !important;
+  font-size: 10px !important;
+  font-weight: 700 !important;
+  line-height: 1 !important;
+  vertical-align: 2px !important;
+  cursor: pointer !important;
+  box-sizing: border-box !important;
+  transition: background-color 0.15s, border-color 0.15s, color 0.15s !important;
+}
+
+.egov-ext-backref-btn:hover,
+.egov-ext-backref-btn:focus-visible {
+  background-color: #e3ecfb !important;
+  border-color: #a9c3ea !important;
+  color: #1042a4 !important;
+}
+
+.egov-ext-backref-icon {
+  font-size: 10px !important;
+}
+
+/* 参照元の一覧（吹き出しの中） */
+.egov-ext-backref-list {
+  list-style: none !important;
+  padding: 0 !important;
+  margin: 0 !important;
+}
+
+.egov-ext-backref-list li {
+  margin: 0 0 6px 0 !important;
+  padding: 0 !important;
+  list-style: none !important;
+}
+
+.egov-ext-backref-list li:last-child {
+  margin-bottom: 0 !important;
+}
+
+.egov-ext-backref-item {
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: flex-start !important;
+  gap: 2px !important;
+  width: 100% !important;
+  padding: 6px 10px !important;
+  border: 1px solid #eef2f6 !important;
+  border-radius: 6px !important;
+  background-color: #f7f9fc !important;
+  color: #333 !important;
+  font-family: inherit !important;
+  text-align: left !important;
+  cursor: pointer !important;
+  transition: background-color 0.2s ease !important;
+}
+
+.egov-ext-backref-item:hover,
+.egov-ext-backref-item:focus-visible {
+  background-color: #edf2f9 !important;
+  border-color: #cbdcf2 !important;
+}
+
+.egov-ext-backref-path {
+  font-weight: bold !important;
+  color: #1a1a1a !important;
+  font-size: 12px !important;
+  line-height: 1.4 !important;
+}
+
+.egov-ext-backref-snippet {
+  color: #555 !important;
+  font-size: 11px !important;
+  line-height: 1.5 !important;
+}
+
+.egov-ext-backref-snippet mark {
+  background-color: #fff3c4 !important;
+  color: #1a1a1a !important;
+  padding: 0 1px !important;
+  border-radius: 2px !important;
+}
+
 /* 被引用法令の一覧（ポップアップ内） */
 .egov-ext-citation-list {
   list-style: none !important;
@@ -1121,6 +1215,7 @@ div.egov-ext-preview-title {
   .egov-ext-tip,
   .egov-ext-return,
   .egov-ext-citation-btn,
+  .egov-ext-backref-btn,
   .egov-ext-citation-modal,
   .egov-ext-citation-overlay,
   .egov-ext-toast,

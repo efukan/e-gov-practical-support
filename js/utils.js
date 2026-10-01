@@ -48,7 +48,7 @@ window.egovExt = window.egovExt || {};
    * 拡張機能自身が挿入した自作UI要素を指すセレクタ
    * @type {string}
    */
-  ext.SELF_UI_SELECTOR = '.egov-ext-tip, .egov-ext-header-container, #egov-ext-jump-container, #egov-ext-fav-btn, #egov-ext-quick-toggles, #egov-ext-search-btn, #egov-ext-settings-btn, .egov-ext-citation-btn';
+  ext.SELF_UI_SELECTOR = '.egov-ext-tip, .egov-ext-header-container, #egov-ext-jump-container, #egov-ext-fav-btn, #egov-ext-quick-toggles, #egov-ext-search-btn, #egov-ext-settings-btn, .egov-ext-citation-btn, .egov-ext-backref-btn';
 
   /**
    * 非同期実行タスクの追跡管理オブジェクト（多重起動防止およびキャンセル排他制御用）
@@ -1210,7 +1210,7 @@ window.egovExt = window.egovExt || {};
     if (!container) return;
 
     // ポップアップ・プレビュー内に混入した引用ボタンなどの自作UI要素を確実に除去
-    const unwantedElements = container.querySelectorAll('.egov-ext-citation-btn, [class*="citation-btn"]');
+    const unwantedElements = container.querySelectorAll('.egov-ext-citation-btn, [class*="citation-btn"], .egov-ext-backref-btn');
     unwantedElements.forEach(el => el.remove());
 
     const isHorizontalOn = !ext.settings || ext.settings.horizontal !== false;

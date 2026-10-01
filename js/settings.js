@@ -42,6 +42,8 @@ window.egovExt = window.egovExt || {};
     favorite: true,
     // 条文ページ右上の切り替えボタンの組（算用数字・括弧・接続詞・定義語をその場でオン・オフ）
     quickToggle: true,
+    // 同じ法令の中の参照元（逆引き）。条・項・号の番号の横に、そこを参照している箇所の数の印を付ける
+    backref: true,
     definitionColor: '#00695c'
   });
 

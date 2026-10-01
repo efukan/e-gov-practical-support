@@ -121,6 +121,7 @@ window.egovExt = window.egovExt || {};
       if (ext.removeSettingsButton) ext.removeSettingsButton();
       if (ext.clearReturnStack) ext.clearReturnStack();
       if (ext.disableCitations) ext.disableCitations();
+      if (ext.disableBackrefs) ext.disableBackrefs();
       if (ext.disablePopup) ext.disablePopup();
       if (ext.scrollSpyObserver) {
         ext.scrollSpyObserver.disconnect();
@@ -508,6 +509,7 @@ window.egovExt = window.egovExt || {};
     if (ext.removeSettingsButton) ext.removeSettingsButton();
     if (ext.clearReturnStack) ext.clearReturnStack();
     if (ext.disablePopup) ext.disablePopup();
+    if (ext.disableBackrefs) ext.disableBackrefs();
     if (ext.referenceTooltip) ext.referenceTooltip.hide(true);
     if (ext.definitionTooltip) ext.definitionTooltip.hide(true);
     if (ext.citationTooltip) ext.citationTooltip.hide(true);
@@ -712,6 +714,17 @@ window.egovExt = window.egovExt || {};
       }
     } else {
       if (ext.disableCitations) ext.disableCitations();
+    }
+
+    // 同じ法令の中の参照元（条・項・号の番号の横の「↩3」）。本文が描き直されたら付け直す
+    if (ext.settings.backref && isLawPage && ext.enableBackrefs) {
+      try {
+        ext.enableBackrefs(forceReset);
+      } catch (e) {
+        console.error("egov-ext: Error enabling backrefs:", e);
+      }
+    } else {
+      if (ext.disableBackrefs) ext.disableBackrefs();
     }
 
     // お気に入りボタン（条文ジャンプ検索の左隣。法令が変わったら登録状態を読み直す）

@@ -297,6 +297,25 @@
           <div class="card-left">
             <div class="card-icon-container">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M9 14L4 9l5-5" />
+                  <path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11" />
+                </svg>
+            </div>
+            <div class="card-text">
+              <span class="label">同じ法令の中の参照元</span>
+              <span class="desc">条・項・号の番号の横に、同じ法令の中でそこを参照している箇所の数（「↩3」など）を出します。マウスを乗せると参照元の一覧（参照元の条項と、参照している文の前後）が出て、押すとそこへ移動します。「前項」「同項第一号」など e-Gov が本文に付けているリンクから数えるので、通信はしません。他の法令からの引用は「被引用（引用元）表示」で確かめられます。</span>
+            </div>
+          </div>
+          <label class="switch">
+            <input type="checkbox" id="feature-backref" checked>
+            <span class="slider"></span>
+          </label>
+        </div>
+
+        <div class="setting-card">
+          <div class="card-left">
+            <div class="card-icon-container">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                 <polygon points="12 2.8 14.9 8.7 21.4 9.6 16.7 14.2 17.8 20.6 12 17.6 6.2 20.6 7.3 14.2 2.6 9.6 9.1 8.7" />
               </svg>
             </div>

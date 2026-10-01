@@ -45,6 +45,7 @@
         "js/jump.js",
         "js/favorites.js",
         "js/quick_toggle.js",
+        "js/backref.js",
         "js/definition.js",
         "js/content.js"
       ],

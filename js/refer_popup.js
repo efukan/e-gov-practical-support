@@ -105,6 +105,9 @@ window.egovExt = window.egovExt || {};
     return parts.join('');
   }
 
+  // 参照元の一覧（backref.js）で、参照元の条項の名前を作るのに使う
+  ext.formatPathFromObjectId = formatPathFromObjectId;
+
   /**
    * 同一法令内リンクから参照箇所の表示文字列（例: "第131条第1項第4号", "第27条から第29条まで"）を解決する
    * @param {HTMLElement} targetEl
@@ -212,7 +215,7 @@ window.egovExt = window.egovExt || {};
     }
 
     // クローンした要素から「引用」ボタンを確実に除去（ポップアップ内での不要表示・誤操作を防止）
-    const citationBtns = clone.querySelectorAll('.egov-ext-citation-btn, [class*="citation-btn"]');
+    const citationBtns = clone.querySelectorAll('.egov-ext-citation-btn, [class*="citation-btn"], .egov-ext-backref-btn');
     citationBtns.forEach(btn => btn.remove());
 
     const container = document.createElement('div');

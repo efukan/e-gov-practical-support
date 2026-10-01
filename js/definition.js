@@ -1936,7 +1936,7 @@ window.egovExt = window.egovExt || {};
 
         const clone = def.element.cloneNode(true);
         // クローンから引用ボタンなどの自作UI要素を除去
-        clone.querySelectorAll('.egov-ext-citation-btn, [class*="citation-btn"]').forEach(btn => btn.remove());
+        clone.querySelectorAll('.egov-ext-citation-btn, [class*="citation-btn"], .egov-ext-backref-btn').forEach(btn => btn.remove());
         // 項の前置きで宣言された語は、その項の文だけを出す（新しい表示では号が項の中に入れ子で、
         // 残すと第二条の 35 号がまるごと出る）
         if (def.leadOnly) {

@@ -139,8 +139,8 @@ async function main() {
   const settingKeys = Object.keys(defaultSettings);
   const toggleKeys = settingKeys.filter(k => k !== 'definitionColor');
 
-  runTest('DEFAULT_SETTINGS に全15設定キー（14機能トグル＋定義語カラー）が定義され、全機能が初期状態で全て ON (true) であること', () => {
-    const expectedKeys = ['global', 'scrollspy', 'popup', 'definition', 'parentDefinition', 'newtab', 'dim', 'jump', 'horizontal', 'conjunction', 'fastrender', 'citation', 'favorite', 'quickToggle', 'definitionColor'];
+  runTest('DEFAULT_SETTINGS に全16設定キー（15機能トグル＋定義語カラー）が定義され、全機能が初期状態で全て ON (true) であること', () => {
+    const expectedKeys = ['global', 'scrollspy', 'popup', 'definition', 'parentDefinition', 'newtab', 'dim', 'jump', 'horizontal', 'conjunction', 'fastrender', 'citation', 'favorite', 'quickToggle', 'backref', 'definitionColor'];
     assert.strictEqual(settingKeys.length, expectedKeys.length);
     expectedKeys.forEach(k => assert(settingKeys.includes(k), `キー '${k}' が DEFAULT_SETTINGS に存在する`));
     
@@ -494,6 +494,62 @@ async function main() {
     assert.strictEqual(createdTabs[0].url, 'chrome-extension://self-id/popup.html?view=tab');
     assert.strictEqual(createdTabs[0].index, 4, '条文ページの右隣に開く');
     assert(!session.egovPopupFocusSearch, 'タブで開いたときは印を残さない');
+  });
+
+  runTest('同じ法令の中の参照元: 参照されている条・項・号の番号の横に件数の印を付け、自分の中への参照は数えない', () => {
+    // e-Gov の本文の作り（2026-10-01 に建築基準法で確かめた形）に合わせた最小の本文
+    const html = `<!DOCTYPE html><html><body><div id="provisionview" class="provisionview">
+      <article id="Mp-Ch_1-At_3" class="article"><div class="articlecontent">
+        <div id="Mp-Ch_1-At_3-Pr_1" class="paragraph"><div class="istitle"><span class="paragraphtitle">第三条　</span>
+          <p class="sentence">次に掲げるものは、<a href="#Mp-Ch_1-At_3-Pr_1-It_1">次の各号</a>のとおりとする。</p></div>
+          <div id="Mp-Ch_1-At_3-Pr_1-It_1" class="item istitle"><span class="itemtitle">一　</span><p class="sentence">建築物</p></div>
+          <div id="Mp-Ch_1-At_3-Pr_1-It_2" class="item istitle"><span class="itemtitle">二　</span><p class="sentence"><a href="#Mp-Ch_1-At_3-Pr_1-It_1">前号</a>の敷地</p></div>
+        </div>
+        <div id="Mp-Ch_1-At_3-Pr_2" class="paragraph space"><div class="istitle"><span class="paragraphtitle">２　</span>
+          <p class="sentence"><a href="#Mp-Ch_1-At_3-Pr_1">前項</a>の規定は、<a href="#Mp-Ch_1-At_3-Pr_1-It_2">同項第二号</a>に準用する。</p></div></div>
+      </div></article>
+      <article id="Mp-Ch_1-At_4" class="article"><div class="articlecontent">
+        <div id="Mp-Ch_1-At_4-Pr_1" class="paragraph"><div class="istitle"><span class="paragraphtitle">第四条　</span>
+          <p class="sentence"><a href="#Mp-Ch_1-At_3">第三条</a>の規定は、<span class="egov-ext-dimmed-text">（<a href="#Mp-Ch_1-At_3-Pr_1">同条第一項</a>を除く。）</span>
+          <a href="#Mp-Ch_1-At_4">この条</a>と<a href="#Mp-Ch_1">第一章</a>に適用する。</p></div></div>
+      </div></article>
+    </div></body></html>`;
+    const dom = new JSDOM(html, { runScripts: 'dangerously', url: 'https://laws.e-gov.go.jp/law/325AC0000000201' });
+    const window = dom.window;
+    const document = window.document;
+    window.chrome = { storage: createStorageMock() };
+    window.eval(settingsJs);
+    window.eval(utilsJsForFavorites);
+    window.eval(fs.readFileSync(path.join(ROOT_DIR, 'js', 'tooltip.js'), 'utf8'));
+    window.eval(fs.readFileSync(path.join(ROOT_DIR, 'js', 'refer_popup.js'), 'utf8'));
+    window.eval(fs.readFileSync(path.join(ROOT_DIR, 'js', 'backref.js'), 'utf8'));
+    const ext = window.egovExt;
+    ext.settings = Object.assign({}, ext.DEFAULT_SETTINGS);
+    ext.getLawContainer = () => document.getElementById('provisionview');
+
+    ext.enableBackrefs(true);
+    const badgeAfter = (sel) => {
+      const label = document.querySelector(sel);
+      const next = label && label.nextElementSibling;
+      return next && next.classList.contains('egov-ext-backref-btn') ? next.textContent : null;
+    };
+    // 第三条（＝第3条第1項）: 第3条第2項「前項」と、第4条第1項「第三条」「同条第一項」（同じ参照元は1件）→ 2件
+    assert.strictEqual(badgeAfter('#Mp-Ch_1-At_3-Pr_1 > .istitle > .paragraphtitle'), '↩2', '条と第1項への参照は条の番号にまとめ、同じ参照元は1件に数える');
+    // 第1号: 第2号の「前号」だけ。第1項の「次の各号」は自分の中への参照なので数えない
+    assert.strictEqual(badgeAfter('#Mp-Ch_1-At_3-Pr_1-It_1 > .itemtitle'), '↩1', '自分の号を指す「次の各号」は数えない');
+    assert.strictEqual(badgeAfter('#Mp-Ch_1-At_3-Pr_1-It_2 > .itemtitle'), '↩1', '号への参照');
+    assert.strictEqual(badgeAfter('#Mp-Ch_1-At_3-Pr_2 > .istitle > .paragraphtitle'), null, '参照されていない項には付けない');
+    assert.strictEqual(badgeAfter('#Mp-Ch_1-At_4-Pr_1 > .istitle > .paragraphtitle'), null, '自分の条を指す「この条」や章への参照は数えない');
+    assert.strictEqual(document.querySelectorAll('.egov-ext-backref-btn').length, 3, '印は3つ');
+    assert(document.querySelector('.egov-ext-backref-btn').getAttribute('aria-label').includes('件'), '読み上げ用の名前に件数が入る');
+    assert.strictEqual(ext.formatPathFromObjectId('Mp-Ch_1-At_4-Pr_1'), '第4条第1項', '参照元の名前は条項の形');
+
+    ext.enableBackrefs(true);
+    assert.strictEqual(document.querySelectorAll('.egov-ext-backref-btn').length, 3, '付け直しても増えない');
+
+    ext.settings.backref = false;
+    ext.enableBackrefs();
+    assert.strictEqual(document.querySelectorAll('.egov-ext-backref-btn').length, 0, '設定をオフにすると印が消える');
   });
 
   runTest('ポップアップの法令名検索: 名前がそのもの・前方一致・法律を上に、廃止を下に並べる', () => {

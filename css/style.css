@@ -514,11 +514,22 @@ body.egov-ext-dim-active a.egov-ext-dimmed-text {
   border-color: #1042a4 !important;
 }
 
+/* 表示を整える4つと、引用・参照の2つの間の仕切り */
+.egov-ext-quick-sep {
+  display: inline-block !important;
+  width: 1px !important;
+  height: 14px !important;
+  margin: 0 3px !important;
+  background: #d0d4da !important;
+  flex-shrink: 0 !important;
+}
+
 /* 幅の狭い画面では、左の「法令検索」のロゴ（右端が左から約267px）に重なるので出さない
    （ポップアップの「機能の設定」から切り替えられる）。右上の並び（切り替えボタン・お気に入り・条文ジャンプ・虫眼鏡・歯車）は
-   右から110pxの所から約640pxの幅なので、ロゴとの間を約80px取れるのは幅約1097px以上。少し余裕を見て1120px未満で隠す
+   右から110pxの所から約777pxの幅（切り替えボタンが6つのとき。2026-10-01 に測定）なので、
+   ロゴとの間を約80px取れるのは幅約1234px以上。1240px未満で隠す（1280pxではロゴとの間が約128px）
    （虫眼鏡と歯車は小さいので、狭い画面でも出したままにする） */
-@media (max-width: 1119px) {
+@media (max-width: 1239px) {
   .egov-ext-quick-toggles {
     display: none !important;
   }

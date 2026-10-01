@@ -406,7 +406,8 @@ async function main() {
     assert(group, '切り替えボタンの組が置かれた');
     assert.strictEqual(group.nextElementSibling && group.nextElementSibling.id, 'egov-ext-fav-btn', 'お気に入りボタンの左隣に置かれる');
     const buttons = Array.from(group.querySelectorAll('.egov-ext-quick-btn'));
-    assert.strictEqual(buttons.map(b => b.dataset.key).join(','), 'horizontal,dim,conjunction,definition');
+    assert.strictEqual(buttons.map(b => b.dataset.key).join(','), 'horizontal,dim,conjunction,definition,citation,backref');
+    assert.strictEqual(group.querySelectorAll('.egov-ext-quick-sep').length, 1, '表示の4つと引用・参照の2つの間に仕切りが1つ');
     assert(buttons.every(b => b.getAttribute('aria-pressed') === 'true'), '初期値はすべてオン');
 
     buttons[0].click();

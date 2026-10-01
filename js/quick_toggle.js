@@ -2,7 +2,8 @@
  * quick_toggle.js
  *
  * 条文ページ右上（お気に入りボタンの左隣）に置く、表示の切り替えボタンの組。
- * 算用数字・括弧の薄字化・接続詞の色分け・定義語の下線を、設定画面を開かずにその場でオン・オフする。
+ * 算用数字・括弧の薄字化・接続詞の色分け・定義語の下線と、被引用・同じ法令の中の参照元の表示を、
+ * 設定画面を開かずにその場でオン・オフする。
  * 設定「切り替えボタン」（quickToggle）でボタンの組ごと出さないようにできる。
  * あわせて、右上の並びの右端に、法令名検索（ツールバーのポップアップ）を開く虫眼鏡と、設定画面を開く歯車を置く
  * （こちらは設定に関わらず、条文ページなら出す）。
@@ -18,14 +19,17 @@ window.egovExt = window.egovExt || {};
   const GROUP_ID = 'egov-ext-quick-toggles';
 
   /**
-   * 並べる機能。key は DEFAULT_SETTINGS のキー
-   * @type {ReadonlyArray<{key: string, label: string, name: string}>}
+   * 並べる機能。key は DEFAULT_SETTINGS のキー。groupStart の前には細い仕切りを入れる
+   * （表示を整える4つと、引用・参照のつながりを見せる2つを分ける）
+   * @type {ReadonlyArray<{key: string, label: string, name: string, groupStart?: boolean}>}
    */
   ext.QUICK_TOGGLE_ITEMS = Object.freeze([
     { key: 'horizontal', label: '算用数字', name: '横書き数字変換（漢数字を算用数字に）' },
     { key: 'dim', label: '括弧', name: '括弧書きの薄字化' },
     { key: 'conjunction', label: '接続詞', name: '接続詞の色分け' },
-    { key: 'definition', label: '定義語', name: '定義語の下線とホバー辞書' }
+    { key: 'definition', label: '定義語', name: '定義語の下線とホバー辞書' },
+    { key: 'citation', label: '被引用', name: '被引用（他の法令からの引用）の「引用」ボタン', groupStart: true },
+    { key: 'backref', label: '参照元', name: '同じ法令の中の参照元（番号の横の「↩」）' }
   ]);
 
   /**
@@ -78,6 +82,12 @@ window.egovExt = window.egovExt || {};
       group.setAttribute('aria-label', '表示の切り替え');
 
       ext.QUICK_TOGGLE_ITEMS.forEach(item => {
+        if (item.groupStart) {
+          const sep = document.createElement('span');
+          sep.className = 'egov-ext-quick-sep';
+          sep.setAttribute('aria-hidden', 'true');
+          group.appendChild(sep);
+        }
         const btn = document.createElement('button');
         btn.type = 'button';
         btn.className = 'egov-ext-quick-btn';

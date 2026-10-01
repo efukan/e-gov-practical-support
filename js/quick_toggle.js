@@ -20,16 +20,17 @@ window.egovExt = window.egovExt || {};
 
   /**
    * 並べる機能。key は DEFAULT_SETTINGS のキー。groupStart の前には細い仕切りを入れる
-   * （表示を整える4つと、引用・参照のつながりを見せる2つを分ける）
-   * @type {ReadonlyArray<{key: string, label: string, name: string, groupStart?: boolean}>}
+   * （表示を整える4つと、引用・参照のつながりを見せる2つを分ける）。
+   * secondary の付いたもの（と、その前の仕切り）は、画面の幅が足りないときに先に隠す
+   * @type {ReadonlyArray<{key: string, label: string, name: string, groupStart?: boolean, secondary?: boolean}>}
    */
   ext.QUICK_TOGGLE_ITEMS = Object.freeze([
     { key: 'horizontal', label: '算用数字', name: '横書き数字変換（漢数字を算用数字に）' },
     { key: 'dim', label: '括弧', name: '括弧書きの薄字化' },
     { key: 'conjunction', label: '接続詞', name: '接続詞の色分け' },
     { key: 'definition', label: '定義語', name: '定義語の下線とホバー辞書' },
-    { key: 'citation', label: '被引用', name: '被引用（他の法令からの引用）の「引用」ボタン', groupStart: true },
-    { key: 'backref', label: '参照元', name: '同じ法令の中の参照元（番号の横の「↩」）' }
+    { key: 'citation', label: '被引用', name: '被引用（他の法令からの引用）の「引用」ボタン', groupStart: true, secondary: true },
+    { key: 'backref', label: '参照元', name: '同じ法令の中の参照元（番号の横の「↩」）', secondary: true }
   ]);
 
   /**
@@ -84,13 +85,13 @@ window.egovExt = window.egovExt || {};
       ext.QUICK_TOGGLE_ITEMS.forEach(item => {
         if (item.groupStart) {
           const sep = document.createElement('span');
-          sep.className = 'egov-ext-quick-sep';
+          sep.className = 'egov-ext-quick-sep' + (item.secondary ? ' egov-ext-quick-secondary' : '');
           sep.setAttribute('aria-hidden', 'true');
           group.appendChild(sep);
         }
         const btn = document.createElement('button');
         btn.type = 'button';
-        btn.className = 'egov-ext-quick-btn';
+        btn.className = 'egov-ext-quick-btn' + (item.secondary ? ' egov-ext-quick-secondary' : '');
         btn.dataset.key = item.key;
         const dot = document.createElement('span');
         dot.className = 'egov-ext-quick-dot';

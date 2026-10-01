@@ -408,6 +408,7 @@ async function main() {
     const buttons = Array.from(group.querySelectorAll('.egov-ext-quick-btn'));
     assert.strictEqual(buttons.map(b => b.dataset.key).join(','), 'horizontal,dim,conjunction,definition,citation,backref');
     assert.strictEqual(group.querySelectorAll('.egov-ext-quick-sep').length, 1, '表示の4つと引用・参照の2つの間に仕切りが1つ');
+    assert.strictEqual(Array.from(group.querySelectorAll('.egov-ext-quick-secondary')).map(e => e.dataset.key || 'sep').join(','), 'sep,citation,backref', '幅が足りないとき先に隠すのは、仕切りと「被引用」「参照元」');
     assert(buttons.every(b => b.getAttribute('aria-pressed') === 'true'), '初期値はすべてオン');
 
     buttons[0].click();

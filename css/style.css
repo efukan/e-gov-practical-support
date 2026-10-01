@@ -449,10 +449,12 @@ body.egov-ext-dim-active a.egov-ext-dimmed-text {
   display: inline-flex !important;
   align-items: center !important;
   height: 28px !important;
-  padding: 2px !important;
+  padding: 1px !important;
   gap: 2px !important;
-  /* 並びの中でいちばん幅が広いので、外枠は青にせず薄い灰色にして目立たせすぎない */
-  border: 1px solid #dadce0 !important;
+  /* 並びの中でいちばん幅が広いので、外枠は青にせず灰色にして目立たせすぎない。
+     外寸は右のボタンと同じ28px。枠が薄すぎると中のボタンの輪郭が外寸に見えて背が低く見えるので、
+     枠は少し濃いめの灰色にし、中のボタンは枠いっぱい近く（24px）まで広げる */
+  border: 1px solid #bdc1c6 !important;
   border-radius: 16px !important;
   background: rgba(255, 255, 255, 0.9) !important;
   backdrop-filter: blur(10px) !important;
@@ -466,7 +468,7 @@ body.egov-ext-dim-active a.egov-ext-dimmed-text {
   display: inline-flex !important;
   align-items: center !important;
   gap: 4px !important;
-  height: 22px !important;
+  height: 24px !important;
   margin: 0 !important;
   padding: 0 8px !important;
   border: none !important;

@@ -30,9 +30,9 @@ window.egovExt = window.egovExt || {};
     { key: 'dim', label: '括弧', name: '括弧書きの薄字化' },
     { key: 'conjunction', label: '接続詞', name: '接続詞の色分け' },
     { key: 'definition', label: '定義語', name: '定義語の下線とホバー辞書' },
-    { key: 'citation', label: '被引用', name: '被引用（他の法令からの引用）の「引用」ボタン', groupStart: true, secondary: true },
-    { key: 'backref', label: '参照元', name: '同じ法令の中の参照元（番号の横の「↩」）', secondary: true },
-    { key: 'marker', label: 'マーカー', name: 'マーカー・メモの表示（オフにしても保存したものは消えません）', groupStart: true, secondary: true, tertiary: true }
+    { key: 'citation', label: '被引用', name: '被引用（他の法令からの引用）の「引用」ボタン', groupStart: true, secondary: true, tertiary: true },
+    { key: 'backref', label: '参照元', name: '同じ法令の中の参照元（番号の横の「↩」）', secondary: true, tertiary: true },
+    { key: 'marker', label: 'マーカー', name: 'マーカー・メモの表示（オフにしても保存したものは消えません）', groupStart: true, secondary: true }
   ]);
 
   /** 幅が足りないときに隠す順の印（CSS の @media で使う） */

@@ -409,7 +409,7 @@ async function main() {
     assert.strictEqual(buttons.map(b => b.dataset.key).join(','), 'horizontal,dim,conjunction,definition,citation,backref,marker');
     assert.strictEqual(group.querySelectorAll('.egov-ext-quick-sep').length, 2, '表示の4つ・引用と参照の2つ・マーカーの間に仕切りが2つ');
     assert.strictEqual(Array.from(group.querySelectorAll('.egov-ext-quick-secondary')).map(e => e.dataset.key || 'sep').join(','), 'sep,citation,backref,sep,marker', '幅が足りないとき先に隠すのは、仕切りと「被引用」「参照元」「マーカー」');
-    assert.strictEqual(Array.from(group.querySelectorAll('.egov-ext-quick-tertiary')).map(e => e.dataset.key || 'sep').join(','), 'sep,marker', 'いちばん先に隠すのは「マーカー」と前の仕切り');
+    assert.strictEqual(Array.from(group.querySelectorAll('.egov-ext-quick-tertiary')).map(e => e.dataset.key || 'sep').join(','), 'sep,citation,backref', 'いちばん先に隠すのは「被引用」「参照元」と前の仕切り（「マーカー」の前の仕切りは残る）');
     assert(buttons.every(b => b.getAttribute('aria-pressed') === 'true'), '初期値はすべてオン');
 
     buttons[0].click();

@@ -55,3 +55,11 @@ chrome.storage.onChanged.addListener((changes, namespace) => {
     }
   }
 });
+
+// 条文ページ右上の歯車ボタン（js/quick_toggle.js）から、設定画面を開く。
+// content script からは chrome.runtime.openOptionsPage() を呼べないので、ここで代わりに開く
+chrome.runtime.onMessage.addListener((request, sender) => {
+  if (!request || request.type !== 'OPEN_OPTIONS_PAGE') return;
+  if (!sender || sender.id !== chrome.runtime.id) return; // この拡張の content script からの依頼だけ受ける
+  chrome.runtime.openOptionsPage().catch(e => console.error('Error opening options page:', e));
+});

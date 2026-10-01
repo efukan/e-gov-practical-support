@@ -4,6 +4,7 @@
  * 条文ページ右上（お気に入りボタンの左隣）に置く、表示の切り替えボタンの組。
  * 算用数字・括弧の薄字化・接続詞の色分け・定義語の下線を、設定画面を開かずにその場でオン・オフする。
  * 設定「切り替えボタン」（quickToggle）でボタンの組ごと出さないようにできる。
+ * あわせて、右上の並びの右端に設定画面を開く歯車ボタンを置く（こちらは設定に関わらず、条文ページなら出す）。
  *
  * 押したときは、ポップアップから切り替えたときと同じく設定を保存し、content.js の applySettings() で
  * 全機能を掛け直す（切り替えの経路を2つに分けない）。
@@ -98,6 +99,54 @@ window.egovExt = window.egovExt || {};
       }
     }
     renderGroup(group);
+  };
+
+  const SETTINGS_BUTTON_ID = 'egov-ext-settings-btn';
+
+  const GEAR_SVG = '<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">'
+    + '<circle cx="12" cy="12" r="3"/>'
+    + '<path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>'
+    + '</svg>';
+
+  /**
+   * 右上の並びの右端に、設定画面を開く歯車ボタンを置く。
+   * 並びの右端に来るよう CSS の order で後ろに回すので、DOM の中の位置は問わない
+   */
+  ext.setupSettingsButton = function() {
+    if (!ext.settings || !ext.settings.global || !(ext.checkIfLawPage && ext.checkIfLawPage())) {
+      ext.removeSettingsButton();
+      return;
+    }
+    let btn = document.getElementById(SETTINGS_BUTTON_ID);
+    if (btn && document.body.contains(btn)) return;
+    btn = document.createElement('button');
+    btn.id = SETTINGS_BUTTON_ID;
+    btn.type = 'button';
+    btn.className = 'egov-ext-settings-btn';
+    btn.title = 'e-Gov法令ひもときの設定を開く';
+    btn.setAttribute('aria-label', 'e-Gov法令ひもときの設定を開く');
+    btn.innerHTML = GEAR_SVG;
+    btn.addEventListener('click', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      // 設定画面は background.js が開く（content script からは直接開けない）
+      try {
+        const sent = chrome.runtime.sendMessage({ type: 'OPEN_OPTIONS_PAGE' });
+        if (sent && sent.catch) sent.catch(() => {});
+      } catch (err) {
+        console.debug('egov-ext: 設定画面を開けませんでした:', err);
+      }
+    });
+    ext.getOrCreateHeaderContainer().appendChild(btn);
+  };
+
+  /**
+   * 歯車ボタンをDOMから取り除く
+   */
+  ext.removeSettingsButton = function() {
+    const btn = document.getElementById(SETTINGS_BUTTON_ID);
+    if (btn) btn.remove();
+    if (ext.checkAndRemoveHeaderContainer) ext.checkAndRemoveHeaderContainer();
   };
 
   /**

@@ -420,6 +420,46 @@ async function main() {
     ext.settings.quickToggle = false;
     ext.setupQuickToggles();
     assert(!document.getElementById('egov-ext-quick-toggles'), '設定をオフにすると消える');
+
+    // 設定画面を開く歯車ボタン: 押すと background.js へ依頼を送る
+    const sent = [];
+    window.chrome.runtime = { sendMessage: async (msg) => { sent.push(msg); } };
+    ext.setupSettingsButton();
+    const gear = document.getElementById('egov-ext-settings-btn');
+    assert(gear, '歯車ボタンが置かれた');
+    assert(gear.getAttribute('aria-label'), '歯車ボタンに読み上げ用の名前がある');
+    gear.click();
+    assert.strictEqual(sent.length, 1, '押すとメッセージを1回送る');
+    assert.strictEqual(sent[0].type, 'OPEN_OPTIONS_PAGE', '設定画面を開く依頼を送る');
+    ext.settings.global = false;
+    ext.setupSettingsButton();
+    assert(!document.getElementById('egov-ext-settings-btn'), '拡張全体をオフにすると歯車も消える');
+  });
+
+  runTest('background.js: 設定画面を開く依頼は、この拡張自身からのものだけ受ける', () => {
+    const bgJs = fs.readFileSync(path.join(ROOT_DIR, 'js', 'background.js'), 'utf8');
+    let listener = null;
+    let opened = 0;
+    const chromeMock = {
+      action: { setIcon: () => Promise.resolve() },
+      runtime: {
+        id: 'self-id',
+        onStartup: { addListener() {} },
+        onInstalled: { addListener() {} },
+        onMessage: { addListener: (l) => { listener = l; } },
+        openOptionsPage: () => { opened++; return Promise.resolve(); },
+        lastError: null
+      },
+      storage: { sync: { get: (k, cb) => cb({}) }, onChanged: { addListener() {} } }
+    };
+    new Function('chrome', bgJs)(chromeMock);
+    assert(listener, 'onMessage のリスナーが登録される');
+    listener({ type: 'OPEN_OPTIONS_PAGE' }, { id: 'other-id' });
+    assert.strictEqual(opened, 0, 'ほかの拡張からの依頼では開かない');
+    listener({ type: 'SOMETHING_ELSE' }, { id: 'self-id' });
+    assert.strictEqual(opened, 0, '別の種類のメッセージでは開かない');
+    listener({ type: 'OPEN_OPTIONS_PAGE' }, { id: 'self-id' });
+    assert.strictEqual(opened, 1, 'この拡張からの依頼で設定画面を開く');
   });
 
   runTest('ポップアップの法令名検索: 名前がそのもの・前方一致・法律を上に、廃止を下に並べる', () => {

@@ -118,6 +118,7 @@ window.egovExt = window.egovExt || {};
       if (ext.removeJumpSearch) ext.removeJumpSearch();
       if (ext.removeFavoriteButton) ext.removeFavoriteButton();
       if (ext.removeQuickToggles) ext.removeQuickToggles();
+      if (ext.removeSettingsButton) ext.removeSettingsButton();
       if (ext.clearReturnStack) ext.clearReturnStack();
       if (ext.disableCitations) ext.disableCitations();
       if (ext.disablePopup) ext.disablePopup();
@@ -504,6 +505,7 @@ window.egovExt = window.egovExt || {};
     if (ext.removeJumpSearch) ext.removeJumpSearch();
     if (ext.removeFavoriteButton) ext.removeFavoriteButton();
     if (ext.removeQuickToggles) ext.removeQuickToggles();
+    if (ext.removeSettingsButton) ext.removeSettingsButton();
     if (ext.clearReturnStack) ext.clearReturnStack();
     if (ext.disablePopup) ext.disablePopup();
     if (ext.referenceTooltip) ext.referenceTooltip.hide(true);
@@ -732,6 +734,15 @@ window.egovExt = window.egovExt || {};
       }
     } else {
       if (ext.removeQuickToggles) ext.removeQuickToggles();
+    }
+
+    // 設定画面を開く歯車ボタン（右上の並びの右端。条文ページなら常に出す）
+    if (isLawPage && ext.setupSettingsButton) {
+      try {
+        ext.setupSettingsButton();
+      } catch (e) {
+        console.error("egov-ext: Error setting up settings button:", e);
+      }
     }
 
     // 条文ジャンプ検索

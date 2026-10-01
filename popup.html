@@ -65,6 +65,15 @@
       <p class="empty-note" id="annotation-empty" hidden>条文の語句を選ぶと出る帯から、マーカーを引いたりメモを書いたりできます。</p>
     </section>
 
+    <!-- すべての法令のマーカー・メモの一覧（notes.html）を開く。1件以上あるときだけ -->
+    <button type="button" class="notes-link-btn" id="open-notes" hidden>
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <path d="M8 6h13M8 12h13M8 18h13" />
+        <path d="M3 6h.01M3 12h.01M3 18h.01" />
+      </svg>
+      <span id="open-notes-label">すべてのマーカー・メモ</span>
+    </button>
+
     <!-- 機能の設定（折りたたみ。開閉はこの端末に記憶する） -->
     <details class="settings-panel" id="settings-panel">
       <summary class="settings-summary">

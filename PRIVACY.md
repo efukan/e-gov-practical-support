@@ -26,6 +26,7 @@ English version follows the Japanese version. (日本語版の後に英語版が
     *   **目的**: 施行令・施行規則などの政令・省令を表示したときに、親の法律の定義語を示すため、e-Gov 法令検索の公式API から取得した親の法律の条文から抜き出した定義語（語・条項番号・定義文）を、次回の表示で再取得しないよう保存します。
     *   **保存の範囲**: 保存されるのは公開されている法令の条文の一部のみで、閲覧履歴や個人情報は含まれません。利用者の端末内にのみ保存され（同期されません）、7日を過ぎたものは使われず、保存する法令は最大20件です。設定の「親の法律の定義語も表示」をオフにすると取得・保存を行いません。
     *   **検索の履歴**: ポップアップの法令名検索で使った語（最大10件）を、次回に選び直せるよう保存します。利用者の端末内にのみ保存され（同期されません）、外部へ送信されることはありません。履歴の右のゴミ箱で1件ずつ消せ、拡張機能を削除するとすべて消えます。
+    *   **法令名の控え**: マーカー・メモの一覧で法令名を出すため、マーカー・メモを付けた法令を開いたときに、その法令の名前と法令番号（公開されている情報）を利用者の端末内にのみ保存します（同期されません）。
     *   **マーカー・メモ**: 利用者が条文に付けたマーカーとメモ（条・項・号の識別子、選んだ語句とその前後の数文字、色、メモの文字、作成・更新日時）を保存します。初期値では利用者の端末内にのみ保存され（同期されません）、当開発元を含む外部へ送信されることはありません。利用者は設定画面から書き出し（JSON ファイル）・読み込みができ、マーカー・メモの札の「削除」で1件ずつ消せます。拡張機能を削除するとすべて消えます。保存先を「ブラウザの同期」にした場合は、上記の chrome.storage.sync に保存します。
 
 ### 3. 法令データの処理および外部通信について
@@ -65,6 +66,7 @@ The Extension uses the following permissions and APIs. These are used solely to 
     *   **Purpose**: When a cabinet order or ministerial ordinance (e.g., an enforcement order) is displayed, the Extension shows the terms defined in its parent Act. To avoid re-downloading, the defined terms extracted from the parent Act (term, article number and defining sentence), fetched from the official e-Gov API, are cached.
     *   **Scope**: Only excerpts of publicly available statutes are cached; no browsing history or personal data is included. The cache stays on the user's device only (not synchronized), entries older than 7 days are not used, and at most 20 statutes are kept. Turning off the "parent Act definitions" setting disables fetching and caching.
     *   **Search History**: The keywords used in the popup's law title search (up to 10) are stored so they can be selected again. They stay on the user's device only (not synchronized) and are never transmitted. Each entry can be deleted with the trash icon next to it, and all entries are deleted when the Extension is uninstalled.
+    *   **Law Titles**: To show law titles in the list of markers and notes, the title and law number (public information) of a law the user has added markers or notes to are stored on the user's device only (not synchronized) when that law is opened.
     *   **Markers and Notes**: The markers and notes the user adds to statutory text (the provision identifier, the selected words with a few characters before and after them, the color, the note text, and the creation and update times) are stored. By default they stay on the user's device only (not synchronized) and are never transmitted to the developer or anyone else. The user can export them to a JSON file and import them on the options page, and delete each one with the "削除" (Delete) button on its card. All of them are deleted when the Extension is uninstalled. If the user chooses "browser sync" as the storage location, they are stored in chrome.storage.sync described above.
 
 ### 3. Processing of Legal Document Data and Network Requests

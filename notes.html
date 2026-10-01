@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="color-scheme" content="light dark">
+  <title>マーカー・メモの一覧 - e-Gov法令ひもとき</title>
+  <link rel="stylesheet" href="css/options.css">
+  <link rel="stylesheet" href="css/notes.css">
+</head>
+<body>
+  <div class="container">
+    <!-- ヘッダー（スクロールしても上端に残す。options.css の .header） -->
+    <header class="header">
+      <div class="brand">
+        <div class="logo-icon">
+          <img src="icons/icon.svg" alt="logo">
+        </div>
+        <h1>マーカー・メモの一覧</h1>
+      </div>
+      <span class="notes-summary" id="notes-summary"></span>
+    </header>
+
+    <!-- 検索と絞り込み -->
+    <div class="notes-toolbar">
+      <div class="notes-search" role="search">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <circle cx="11" cy="11" r="7" />
+          <path d="M20 20l-3.5-3.5" />
+        </svg>
+        <input type="search" id="notes-search" placeholder="メモ・語句・条項・法令名で検索（例: 準防火、第6条、建築基準法）" aria-label="マーカー・メモを検索" autocomplete="off" spellcheck="false">
+      </div>
+      <div class="notes-filters" role="group" aria-label="絞り込み">
+        <button type="button" class="notes-chip" data-filter="all" aria-pressed="true">すべて</button>
+        <button type="button" class="notes-chip" data-filter="c1" aria-pressed="false"><span class="notes-mark is-color-1" aria-hidden="true"></span>黄</button>
+        <button type="button" class="notes-chip" data-filter="c2" aria-pressed="false"><span class="notes-mark is-color-2" aria-hidden="true"></span>緑</button>
+        <button type="button" class="notes-chip" data-filter="c3" aria-pressed="false"><span class="notes-mark is-color-3" aria-hidden="true"></span>桃</button>
+        <button type="button" class="notes-chip" data-filter="provision" aria-pressed="false"><span class="notes-mark is-note" aria-hidden="true"></span>項・号へのメモ</button>
+        <label class="notes-check"><input type="checkbox" id="notes-memo-only"> メモがあるものだけ</label>
+      </div>
+    </div>
+
+    <p class="notes-status" id="notes-status" role="status" aria-live="polite"></p>
+    <div class="notes-list" id="notes-list"></div>
+    <p class="notes-empty" id="notes-empty" hidden></p>
+  </div>
+  <script src="js/favorites.js"></script>
+  <script src="js/annotation_store.js"></script>
+  <script src="js/notes.js"></script>
+</body>
+</html>

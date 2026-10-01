@@ -37,6 +37,13 @@ window.egovExt = window.egovExt || {};
   /** 書き出したファイルの形式名 */
   const EXPORT_FORMAT = 'egov-himotoki-annotations';
 
+  /**
+   * 法令名の控え（法令ID → {t: 法令名, n: 法令番号}）を置く chrome.storage.local のキー。
+   * マーカー・メモには容量を節約するため法令名を入れていないので、一覧で法令名を出すためにこの端末で覚えておく
+   */
+  const LAW_TITLES_KEY = 'egovLawTitles';
+  const LAW_TITLES_MAX = 1000;
+
   const encoder = typeof TextEncoder !== 'undefined' ? new TextEncoder() : null;
 
   /**
@@ -319,15 +326,120 @@ window.egovExt = window.egovExt || {};
     }
   };
 
+  // ---------------------------------------------------------------------------
+  // 法令名の控え
+  // ---------------------------------------------------------------------------
+
   /**
-   * すべてのマーカー・メモを書き出す形にする
-   * @returns {Promise<{format: string, version: number, exportedAt: string, laws: Object<string, Object[]>}>}
+   * 法令名を覚えておく（マーカー・メモを付けた法令を開いたとき・読み込んだときに呼ぶ）
+   * @param {string} lawId
+   * @param {string} title
+   * @param {string} [lawNum]
+   */
+  ext.rememberLawTitle = async function(lawId, title, lawNum) {
+    if (!lawId || !title) return;
+    try {
+      const result = await chrome.storage.local.get(LAW_TITLES_KEY);
+      const titles = (result && result[LAW_TITLES_KEY]) || {};
+      const current = titles[lawId];
+      if (current && current.t === title && (current.n || '') === (lawNum || current.n || '')) return;
+      titles[lawId] = { t: title, n: lawNum || (current && current.n) || '', s: Date.now() };
+      const ids = Object.keys(titles);
+      if (ids.length > LAW_TITLES_MAX) {
+        ids.sort((x, y) => (titles[x].s || 0) - (titles[y].s || 0)).slice(0, ids.length - LAW_TITLES_MAX).forEach(id => delete titles[id]);
+      }
+      await chrome.storage.local.set({ [LAW_TITLES_KEY]: titles });
+    } catch (e) {
+      console.debug('egov-ext: 法令名を覚えられませんでした:', e);
+    }
+  };
+
+  /**
+   * 覚えている法令名（法令ID → {t, n}）
+   * @returns {Promise<Object<string, {t: string, n: string}>>}
+   */
+  ext.getLawTitles = async function() {
+    try {
+      const result = await chrome.storage.local.get(LAW_TITLES_KEY);
+      return (result && result[LAW_TITLES_KEY]) || {};
+    } catch (e) {
+      return {};
+    }
+  };
+
+  /**
+   * 法令名が分からないときに、法令IDから法令番号を組み立てる（例: 325AC0000000201 → 昭和25年法律第201号）。
+   * 法令IDの頭は「元号（1 明治・2 大正・3 昭和・4 平成・5 令和）＋年2桁＋種別」
+   * @param {string} lawId
+   * @returns {string}
+   */
+  ext.describeLawId = function(lawId) {
+    const m = String(lawId || '').match(/^([1-5])(\d{2})(AC|CO|IO)0*(\d+)$/);
+    if (!m) return `法令ID ${lawId}`;
+    const era = { 1: '明治', 2: '大正', 3: '昭和', 4: '平成', 5: '令和' }[m[1]];
+    const kind = { AC: '法律', CO: '政令', IO: '勅令' }[m[3]];
+    return `${era}${Number(m[2])}年${kind}第${Number(m[4])}号`;
+  };
+
+  // ---------------------------------------------------------------------------
+  // 一覧の検索
+  // ---------------------------------------------------------------------------
+
+  const KANJI_DIGITS = { '〇': 0, '一': 1, '二': 2, '三': 3, '四': 4, '五': 5, '六': 6, '七': 7, '八': 8, '九': 9 };
+  const KANJI_UNITS = { '十': 10, '百': 100, '千': 1000 };
+
+  /** 漢数字の並び（「七十七」「二〇二六」など）を算用数字にする */
+  function kanjiRunToArabic(run) {
+    if (!/[十百千万]/.test(run)) {
+      return run.split('').map(c => (KANJI_DIGITS[c] !== undefined ? KANJI_DIGITS[c] : c)).join('');
+    }
+    let total = 0;
+    let section = 0;
+    let digit = 0;
+    for (const c of run) {
+      if (KANJI_DIGITS[c] !== undefined) {
+        digit = KANJI_DIGITS[c];
+      } else if (KANJI_UNITS[c]) {
+        section += (digit || 1) * KANJI_UNITS[c];
+        digit = 0;
+      } else if (c === '万') {
+        total += (section + digit || 1) * 10000;
+        section = 0;
+        digit = 0;
+      }
+    }
+    return String(total + section + digit);
+  }
+
+  /**
+   * 検索のために文字をそろえる（全角英数は半角に、大文字は小文字に、空白は除き、漢数字は算用数字に）。
+   * 「第７７条」「第七十七条」「第77条」を同じものとして探せるようにする
+   * @param {string} text
+   * @returns {string}
+   */
+  ext.normalizeForSearch = function(text) {
+    return String(text || '')
+      .normalize('NFKC')
+      .toLowerCase()
+      .replace(/\s+/g, '')
+      .replace(/[〇一二三四五六七八九十百千万]+/g, kanjiRunToArabic);
+  };
+
+  /**
+   * すべてのマーカー・メモを書き出す形にする（法令名の控えも添える）
+   * @returns {Promise<{format: string, version: number, exportedAt: string, laws: Object<string, Object[]>, titles: Object}>}
    */
   ext.exportAnnotations = async function() {
     const byLaw = await ext.loadAllAnnotations();
+    const known = await ext.getLawTitles();
     const laws = {};
-    byLaw.forEach((list, lawId) => { if (list.length) laws[lawId] = list; });
-    return { format: EXPORT_FORMAT, version: 1, exportedAt: new Date().toISOString(), laws };
+    const titles = {};
+    byLaw.forEach((list, lawId) => {
+      if (!list.length) return;
+      laws[lawId] = list;
+      if (known[lawId]) titles[lawId] = { t: known[lawId].t, n: known[lawId].n || '' };
+    });
+    return { format: EXPORT_FORMAT, version: 1, exportedAt: new Date().toISOString(), laws, titles };
   };
 
   /**
@@ -362,6 +474,15 @@ window.egovExt = window.egovExt || {};
     });
     const written = await writeAll(byLaw, mode);
     if (!written.ok) return written;
+    // 書き出したときの法令名の控えも取り込む（この端末で開いたことのない法令の名前を出せるように）
+    if (data.titles && typeof data.titles === 'object') {
+      for (const lawId of Object.keys(data.titles)) {
+        const meta = data.titles[lawId];
+        if (meta && typeof meta.t === 'string' && /^[0-9A-Za-z_]+$/.test(lawId)) {
+          await ext.rememberLawTitle(lawId, meta.t.slice(0, 200), String(meta.n || '').slice(0, 100));
+        }
+      }
+    }
     return { ok: true, added, updated };
   };
 

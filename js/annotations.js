@@ -458,10 +458,21 @@ window.egovExt = window.egovExt || {};
     }
   }
 
+  /**
+   * いまの法令の名前を覚えておく（全法令のマーカー・メモの一覧で法令名を出すため）。
+   * 見出しがまだ描かれていなければ、タブの題名から取る
+   */
+  function rememberCurrentLaw() {
+    if (!currentLawId || !ext.rememberLawTitle || !ext.readCurrentLawInfo) return;
+    const info = ext.readCurrentLawInfo();
+    if (info && info.title) ext.rememberLawTitle(currentLawId, info.title, info.lawNum);
+  }
+
   /** 保存して、すぐ描き直す（保存を待つ間に消えないよう、手元の一覧にも先に入れる） */
   async function addAnnotation(ann) {
     const result = await ext.saveAnnotation(currentLawId, ann);
     if (result.ok) {
+      rememberCurrentLaw();
       annotations = annotations.filter(a => a.id !== ann.id).concat([ann]);
       render();
     }
@@ -723,6 +734,7 @@ window.egovExt = window.egovExt || {};
     const list = await ext.loadAnnotations(lawId);
     if (lawId !== currentLawId) return;
     annotations = list;
+    if (list.length > 0) rememberCurrentLaw();
     renderAfterTextTasks();
   }
 

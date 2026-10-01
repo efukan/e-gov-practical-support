@@ -63,6 +63,13 @@ async function setupAnnotationPanel() {
     });
   });
 
+  const openList = document.getElementById('annotation-open-list');
+  if (openList) {
+    openList.addEventListener('click', () => {
+      chrome.tabs.create({ url: chrome.runtime.getURL('notes.html') });
+    });
+  }
+
   exportBtn.addEventListener('click', async () => {
     const data = await ext.exportAnnotations();
     const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });

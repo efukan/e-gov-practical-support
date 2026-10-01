@@ -525,6 +525,39 @@ html.is-tab-view body {
   border: 1px solid #d4ad1e;
 }
 
+/* すべてのマーカー・メモの一覧を開くボタン */
+.notes-link-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  height: 30px;
+  padding: 0 10px;
+  border: 1px dashed var(--md-sys-color-outline-hover);
+  border-radius: 8px;
+  background: transparent;
+  color: var(--md-sys-color-primary);
+  font-family: inherit;
+  font-size: 11px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.notes-link-btn:hover {
+  background-color: var(--md-comp-btn-bg);
+}
+
+.notes-link-btn:focus-visible {
+  outline: 2px solid var(--md-sys-color-primary);
+  outline-offset: 2px;
+}
+
+.notes-link-btn svg {
+  width: 13px;
+  height: 13px;
+  flex-shrink: 0;
+}
+
 /* 機能の設定（折りたたみ） */
 .settings-panel {
   border-top: 1px solid var(--md-sys-color-outline);

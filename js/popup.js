@@ -394,6 +394,29 @@ window.egovExt = window.egovExt || {};
       searchSection.hidden = !isSearching;
       favoritesSection.hidden = isSearching;
       annotationsSection.hidden = isSearching || !annotationsAvailable;
+      openNotesBtn.hidden = isSearching || !hasAnyAnnotations;
+    }
+
+    // ---- すべての法令のマーカー・メモの一覧（notes.html） ----
+
+    const openNotesBtn = document.getElementById('open-notes');
+    let hasAnyAnnotations = false;
+
+    async function renderNotesLink() {
+      if (!openNotesBtn || !ext.loadAllAnnotations) return;
+      const all = await ext.loadAllAnnotations();
+      let count = 0;
+      all.forEach(list => { count += list.length; });
+      hasAnyAnnotations = count > 0;
+      document.getElementById('open-notes-label').textContent = `すべてのマーカー・メモ（${count}）`;
+      openNotesBtn.hidden = !hasAnyAnnotations || !searchSection.hidden;
+    }
+
+    if (openNotesBtn) {
+      openNotesBtn.addEventListener('click', () => {
+        chrome.tabs.create({ url: chrome.runtime.getURL('notes.html') });
+        window.close();
+      });
     }
 
     // ---- この法令のマーカー・メモ ----
@@ -764,7 +787,8 @@ window.egovExt = window.egovExt || {};
     await Promise.all([
       ext.initSettingsUI({ allTabs: false, syncFromStorage: false }),
       renderFavorites(),
-      renderAnnotations()
+      renderAnnotations(),
+      renderNotesLink()
     ]);
 
     const openOptionsBtn = document.getElementById('open-options');

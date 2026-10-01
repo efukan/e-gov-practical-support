@@ -15,6 +15,7 @@ const TEMP_DIR = path.join(PROJECT_ROOT, '.firefox_package_tmp');
 const ASSETS_TO_COPY = [
   'options.html',
   'popup.html',
+  'notes.html',
   'LICENSE',
   '_locales',
   'css',

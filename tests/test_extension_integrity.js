@@ -621,6 +621,50 @@ async function main() {
     assert.strictEqual((await ext.importAnnotations({ hello: 1 })).reason, 'format', '別の形のファイルは読まない');
   });
 
+  await runAsyncTest('マーカー・メモの一覧: 条項の順に並べ、漢数字・全角を同じに扱って検索し、色・種類で絞り込む。法令名は書き出し・読み込みで引き継ぐ', async () => {
+    const dom = new JSDOM('<!DOCTYPE html><html><body></body></html>', { runScripts: 'dangerously' });
+    const window = dom.window;
+    const storage = createStorageMock();
+    window.chrome = { storage };
+    window.eval(annotationStoreJs);
+    window.eval(fs.readFileSync(path.join(ROOT_DIR, 'js', 'notes.js'), 'utf8'));
+    const ext = window.egovExt;
+    const n = ext._testNotes;
+
+    const ids = ['Mp-Ch_1-At_7-Pr_1', 'Mp-Ch_1-At_6-Pr_2', 'Mp-Ch_1-At_6_2-Pr_1', 'Mp-Ch_1-At_6-Pr_1-It_2', '325AC0000000201-Sp-At_1-Pr_1', 'Mp-Ch_1-At_6-Pr_1'];
+    const sorted = ids.slice().sort((a, b) => n.compareKeys(n.provisionOrderKey(a), n.provisionOrderKey(b)));
+    assert.strictEqual(sorted.join(' '), 'Mp-Ch_1-At_6-Pr_1 Mp-Ch_1-At_6-Pr_1-It_2 Mp-Ch_1-At_6-Pr_2 Mp-Ch_1-At_6_2-Pr_1 Mp-Ch_1-At_7-Pr_1 325AC0000000201-Sp-At_1-Pr_1', '条・項・号の順、第6条の2は第6条の後、附則は最後');
+
+    assert.strictEqual(ext.normalizeForSearch('第七十七条の３５　ＡＢＣ'), '第77条の35abc', '漢数字・全角数字・全角英字・空白をそろえる');
+    const law = { title: '建築基準法', lawNum: '昭和二十五年法律第二百一号' };
+    const marker = { k: 'text', c: 2, q: '第７７条の３５', l: '第6条第2項', m: '準防火地域に注意' };
+    const note = { k: 'provision', c: 1, q: '', l: '第7条第1項', m: '' };
+    const st = (query, filter, memoOnly) => ({ normalizedQuery: ext.normalizeForSearch(query || ''), filter: filter || 'all', memoOnly: !!memoOnly });
+    assert(n.matches(marker, law, st('第七十七条')), '漢数字で探しても、全角数字で覚えた語句に当たる');
+    assert(n.matches(marker, law, st('第6条')), '条項の名前で当たる');
+    assert(n.matches(marker, law, st('建築基準')), '法令名で当たる');
+    assert(n.matches(marker, law, st('準防火')), 'メモで当たる');
+    assert(n.matches(note, law, st('第二百一号')), '法令番号で当たる（漢数字のまま）');
+    assert(!n.matches(marker, law, st('民法')), '当たらない語');
+    assert(n.matches(marker, law, st('', 'c2')) && !n.matches(marker, law, st('', 'c1')), '色で絞り込む');
+    assert(n.matches(note, law, st('', 'provision')) && !n.matches(marker, law, st('', 'provision')), '項・号へのメモだけに絞り込む');
+    assert(!n.matches(note, law, st('', 'all', true)), 'メモがあるものだけ');
+
+    assert.strictEqual(ext.describeLawId('325AC0000000201'), '昭和25年法律第201号', '法令名が分からないときは法令IDから法令番号を組み立てる');
+    assert.strictEqual(ext.describeLawId('506CO0000000012'), '令和6年政令第12号');
+    assert(ext.describeLawId('415M60000400057').startsWith('法令ID'), '組み立てられない形は法令IDのまま');
+
+    await ext.rememberLawTitle('325AC0000000201', '建築基準法', '昭和二十五年法律第二百一号');
+    await ext.saveAnnotation('325AC0000000201', { id: 'x1', k: 'text', p: 'Mp-Ch_1-At_6-Pr_1', l: '第6条第1項', q: '建築物', c: 1, m: '' });
+    const exported = await ext.exportAnnotations();
+    assert.strictEqual(exported.titles['325AC0000000201'].t, '建築基準法', '書き出しに法令名を添える');
+    // 別の端末を想定して空にしてから読み込む
+    Object.keys(storage.local.mem).forEach(k => delete storage.local.mem[k]);
+    assert.strictEqual(Object.keys(await ext.getLawTitles()).length, 0);
+    await ext.importAnnotations(exported);
+    assert.strictEqual((await ext.getLawTitles())['325AC0000000201'].t, '建築基準法', '読み込むと法令名も覚える');
+  });
+
   runTest('マーカー・メモの照合: 漢数字と算用数字の違い・空白をそろえて見つけ直し、同じ語句が2つあれば前後で選ぶ', () => {
     const html = `<!DOCTYPE html><html><body><div id="provisionview">
       <div id="Mp-Ch_1-At_6-Pr_1" class="paragraph"><div class="istitle"><span class="paragraphtitle">第六条　</span><button class="egov-ext-backref-btn">↩3</button>
@@ -969,6 +1013,9 @@ async function main() {
         'manifest.json',
         'popup.html',
         'options.html',
+        'notes.html',
+        'js/notes.js',
+        'css/notes.css',
         'icons/icon16.png',
         'icons/icon48.png',
         'icons/icon128.png',

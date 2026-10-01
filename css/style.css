@@ -516,7 +516,7 @@ body.egov-ext-dim-active a.egov-ext-dimmed-text {
 
 /* 幅の狭い画面では、左の「法令検索」のロゴ（右端が左から約267px）に重なるので出さない
    （ポップアップの「機能の設定」から切り替えられる）。右上の並び（切り替えボタン・お気に入り・条文ジャンプ・虫眼鏡・歯車）は
-   右から110pxの所から約652pxの幅なので、ロゴとの間を約80px取れるのは幅約1109px以上。1120px未満で隠す
+   右から110pxの所から約640pxの幅なので、ロゴとの間を約80px取れるのは幅約1097px以上。少し余裕を見て1120px未満で隠す
    （虫眼鏡と歯車は小さいので、狭い画面でも出したままにする） */
 @media (max-width: 1119px) {
   .egov-ext-quick-toggles {
@@ -578,8 +578,9 @@ body.egov-ext-dim-active a.egov-ext-dimmed-text {
   align-items: center !important;
   justify-content: center !important;
   gap: 4px !important;
-  /* 「お気に入りに追加」「お気に入り済み」で幅が変わって隣の入力欄が動かないよう、幅をそろえる */
-  min-width: 132px !important;
+  /* 「お気に入り追加」「お気に入り済み」で幅が変わって隣の入力欄が動かないよう、幅をそろえる
+     （どちらも7文字で、素の幅は122px） */
+  min-width: 122px !important;
   height: 28px !important;
   padding: 0 10px 0 8px !important;
   margin: 0 !important;

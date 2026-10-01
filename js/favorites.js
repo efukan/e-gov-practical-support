@@ -3,7 +3,7 @@
  *
  * 法令のお気に入り。content script とポップアップの両方から読み込まれる。
  * - 保存・読み込み（chrome.storage.sync。ブラウザの同期で他の端末にもそろう）
- * - 条文ページ右上の「☆ お気に入りに追加」ボタン（設定「お気に入りボタン」でオン・オフ。content script のみ）
+ * - 条文ページ右上の「☆ お気に入り追加」ボタン（設定「お気に入りボタン」でオン・オフ。content script のみ）
  *
  * 同期ストレージは1項目8KB・全体で約100KB・最大512項目までなので、一覧を1つの配列にせず、
  * 1件ずつ「egovFav:<法令ID>」のキーに分けて置く（配列だと30件ほどで1項目の上限に届くうえ、
@@ -181,7 +181,7 @@ window.egovExt = window.egovExt || {};
   };
 
   // ---------------------------------------------------------------------------
-  // 条文ページ右上の「☆ お気に入りに追加」ボタン（content script 用）
+  // 条文ページ右上の「☆ お気に入り追加」ボタン（content script 用）
   // ---------------------------------------------------------------------------
 
   const BUTTON_ID = 'egov-ext-fav-btn';
@@ -225,7 +225,7 @@ window.egovExt = window.egovExt || {};
     // 色だけでなく文言でも登録済みかどうかが分かるようにする
     const label = btn.querySelector('.egov-ext-fav-label');
     if (label && !btn.classList.contains('has-error')) {
-      label.textContent = isFavorite ? 'お気に入り済み' : 'お気に入りに追加';
+      label.textContent = isFavorite ? 'お気に入り済み' : 'お気に入り追加';
     }
     btn.title = isFavorite
       ? 'お気に入りから外す'
@@ -319,7 +319,7 @@ window.egovExt = window.egovExt || {};
       btn.id = BUTTON_ID;
       btn.type = 'button';
       btn.className = 'egov-ext-fav-btn';
-      btn.innerHTML = STAR_SVG + '<span class="egov-ext-fav-label">お気に入りに追加</span>';
+      btn.innerHTML = STAR_SVG + '<span class="egov-ext-fav-label">お気に入り追加</span>';
       btn.addEventListener('click', handleButtonClick);
       renderButtonState(btn, false);
 

@@ -38,7 +38,7 @@ window.egovExt = window.egovExt || {};
     conjunction: true,
     fastrender: true,
     citation: true,
-    // 条文ページ右上の「☆ お気に入りに追加」ボタン。お気に入りの一覧はポップアップから開く
+    // 条文ページ右上の「☆ お気に入り追加」ボタン。お気に入りの一覧はポップアップから開く
     favorite: true,
     // 条文ページ右上の切り替えボタンの組（算用数字・括弧・接続詞・定義語をその場でオン・オフ）
     quickToggle: true,

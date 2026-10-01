@@ -451,12 +451,13 @@ body.egov-ext-dim-active a.egov-ext-dimmed-text {
   height: 28px !important;
   padding: 2px !important;
   gap: 2px !important;
-  border: 1px solid #1042a4 !important;
+  /* 並びの中でいちばん幅が広いので、外枠は青にせず薄い灰色にして目立たせすぎない */
+  border: 1px solid #dadce0 !important;
   border-radius: 16px !important;
   background: rgba(255, 255, 255, 0.9) !important;
   backdrop-filter: blur(10px) !important;
   -webkit-backdrop-filter: blur(10px) !important;
-  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1) !important;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.06) !important;
   pointer-events: auto !important;
   box-sizing: border-box !important;
 }

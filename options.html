@@ -352,8 +352,55 @@
 
       </div>
     </section>
+
+    <!-- マーカー・メモ -->
+    <section class="section-group" id="annotation-section">
+      <h2 class="section-title">マーカー・メモ</h2>
+      <div class="settings-list">
+        <div class="setting-card">
+          <div class="card-left">
+            <div class="card-icon-container">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M15 4l5 5L9 20H4v-5z" />
+                <path d="M13 6l5 5" />
+              </svg>
+            </div>
+            <div class="card-text">
+              <span class="label">マーカー・メモ</span>
+              <span class="desc">条文の語句を選ぶと出る帯から、黄・緑・桃のマーカーを引いたり、メモを書いたりできます。「この項にメモ」で項・号そのものにもメモを残せ、番号の横に付箋の印が付きます。色の付いた所や付箋を押すと、メモの書き直し・色の変更・削除ができます。オフにすると表示しなくなりますが、保存したものは消えません。</span>
+            </div>
+          </div>
+          <label class="switch">
+            <input type="checkbox" id="feature-marker" checked>
+            <span class="slider"></span>
+          </label>
+        </div>
+      </div>
+
+      <div class="annotation-panel">
+        <div class="annotation-mode" role="radiogroup" aria-labelledby="annotation-mode-title">
+          <span class="annotation-panel-title" id="annotation-mode-title">保存先</span>
+          <label class="annotation-radio">
+            <input type="radio" name="annotation-mode" value="local">
+            <span><strong>この端末の中だけ</strong>（初期値）<br><span class="annotation-radio-desc">量の上限はほぼありません。外へは一切送りません。別の端末へは「書き出す」「読み込む」で移せます。</span></span>
+          </label>
+          <label class="annotation-radio">
+            <input type="radio" name="annotation-mode" value="sync">
+            <span><strong>ブラウザの同期で、他の端末とそろえる</strong><br><span class="annotation-radio-desc">同じアカウントでログインした他の端末にも出ます。ブラウザの同期の容量が小さいため、マーカー・メモ全体で約60KB・180件まで、メモは1件500字までです。メモの中身はブラウザの会社（Google など）の同期のサーバーを通ります。</span></span>
+          </label>
+        </div>
+        <p class="annotation-usage" id="annotation-usage"></p>
+        <div class="annotation-actions">
+          <button type="button" class="annotation-btn" id="annotation-export">書き出す（JSON ファイル）</button>
+          <label class="annotation-btn" for="annotation-import">読み込む</label>
+          <input type="file" id="annotation-import" accept="application/json,.json" hidden>
+        </div>
+        <p class="annotation-status" id="annotation-status" role="status" aria-live="polite"></p>
+      </div>
+    </section>
   </div>
   <script src="js/settings.js"></script>
+  <script src="js/annotation_store.js"></script>
   <script src="js/options.js"></script>
 </body>
 </html>

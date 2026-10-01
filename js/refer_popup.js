@@ -215,7 +215,7 @@ window.egovExt = window.egovExt || {};
     }
 
     // クローンした要素から「引用」ボタンを確実に除去（ポップアップ内での不要表示・誤操作を防止）
-    const citationBtns = clone.querySelectorAll('.egov-ext-citation-btn, [class*="citation-btn"], .egov-ext-backref-btn');
+    const citationBtns = clone.querySelectorAll('.egov-ext-citation-btn, [class*="citation-btn"], .egov-ext-backref-btn, .egov-ext-note-flag');
     citationBtns.forEach(btn => btn.remove());
 
     const container = document.createElement('div');

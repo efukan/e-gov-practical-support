@@ -393,6 +393,88 @@ window.egovExt = window.egovExt || {};
     function showSearchMode(isSearching) {
       searchSection.hidden = !isSearching;
       favoritesSection.hidden = isSearching;
+      annotationsSection.hidden = isSearching || !annotationsAvailable;
+    }
+
+    // ---- この法令のマーカー・メモ ----
+
+    const annotationsSection = document.getElementById('annotations-section');
+    const annotationList = document.getElementById('annotation-list');
+    const annotationEmpty = document.getElementById('annotation-empty');
+    const annotationCount = document.getElementById('annotation-count');
+    /** いま開いているタブが e-Gov の条文ページで、マーカー・メモがオンか */
+    let annotationsAvailable = false;
+
+    /**
+     * いま開いているタブの法令のマーカー・メモを一覧にする。
+     * 本文の中で見つからなかったもの（改正などで文が変わった可能性）は、条文ページに聞いて印を付ける
+     */
+    async function renderAnnotations() {
+      annotationsAvailable = false;
+      annotationsSection.hidden = true;
+      if (!ext.loadAnnotations || !annotationsSection) return;
+      let tab = null;
+      try {
+        [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+      } catch (e) {}
+      const match = tab && tab.url && tab.url.match(/^https?:\/\/laws\.e-gov\.go\.jp\/law\/([0-9A-Za-z_]+)/);
+      const settings = ext.loadSettings ? await ext.loadSettings() : {};
+      if (!match || !settings.global || !settings.marker) return;
+      const lawId = match[1].toUpperCase();
+      const list = await ext.loadAnnotations(lawId);
+
+      let orphans = new Map();
+      try {
+        const status = await chrome.tabs.sendMessage(tab.id, { type: 'EGOV_ANNOTATION_STATUS' });
+        if (status && status.lawId === lawId && Array.isArray(status.orphans)) orphans = new Map(status.orphans);
+      } catch (e) {}
+
+      annotationsAvailable = true;
+      annotationList.textContent = '';
+      list.slice().sort((x, y) => (y.u || y.a || 0) - (x.u || x.a || 0)).forEach(ann => {
+        const li = document.createElement('li');
+        li.className = 'law-item';
+        const open = document.createElement('button');
+        open.type = 'button';
+        open.className = 'law-open';
+        open.title = `${ann.l || ''}へ移動`;
+
+        const title = document.createElement('span');
+        title.className = 'law-title annotation-title';
+        const mark = document.createElement('span');
+        mark.className = ann.k === 'provision' ? 'annotation-mark is-note' : `annotation-mark is-color-${ann.c || 1}`;
+        mark.setAttribute('aria-hidden', 'true');
+        title.appendChild(mark);
+        title.appendChild(document.createTextNode(ann.k === 'provision' ? `${ann.l || ''}へのメモ` : (ann.q || '')));
+        open.appendChild(title);
+
+        const meta = document.createElement('span');
+        meta.className = 'law-meta';
+        if (orphans.has(ann.id)) {
+          const tag = document.createElement('span');
+          tag.className = 'law-tag-repealed';
+          tag.textContent = orphans.get(ann.id) === 'missing' ? '今の表示に無い' : '本文で見つからない';
+          tag.title = orphans.get(ann.id) === 'missing'
+            ? 'この条・項・号が今の表示にありません（畳まれた附則・別の時点の表示など）'
+            : '覚えておいた語句が本文で見つかりません（改正で文が変わった可能性があります）';
+          meta.appendChild(tag);
+        }
+        const memo = (ann.m || '').replace(/\s+/g, ' ');
+        meta.appendChild(document.createTextNode(ann.k === 'provision'
+          ? (memo || '（まだ何も書いていません）')
+          : `${ann.l || ''}${memo ? '・' + memo : ''}`));
+        open.appendChild(meta);
+
+        open.addEventListener('click', async () => {
+          try { await chrome.tabs.sendMessage(tab.id, { type: 'EGOV_GOTO_ANNOTATION', id: ann.id }); } catch (e) {}
+          window.close();
+        });
+        li.appendChild(open);
+        annotationList.appendChild(li);
+      });
+      annotationCount.textContent = list.length > 0 ? `（${list.length}）` : '';
+      annotationEmpty.hidden = list.length > 0;
+      annotationsSection.hidden = !searchSection.hidden;
     }
 
     /**
@@ -681,7 +763,8 @@ window.egovExt = window.egovExt || {};
 
     await Promise.all([
       ext.initSettingsUI({ allTabs: false, syncFromStorage: false }),
-      renderFavorites()
+      renderFavorites(),
+      renderAnnotations()
     ]);
 
     const openOptionsBtn = document.getElementById('open-options');

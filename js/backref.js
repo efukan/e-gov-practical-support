@@ -68,6 +68,11 @@ window.egovExt = window.egovExt || {};
     return null;
   }
 
+  // マーカー・メモ（annotations.js）でも、条・項・号の要素と番号の要素を同じ決まりで見つける
+  ext.PROVISION_ID_RE = PROVISION_ID_RE;
+  ext.closestProvision = closestProvision;
+  ext.numberLabelOf = numberLabelOf;
+
   /**
    * 本文のリンクから、番号の要素ごとの参照元を集める。
    * 参照元が参照先の中にある（「次の各号」が自分の号を指す）、またはその逆（号から自分の条を指す）は数えない。

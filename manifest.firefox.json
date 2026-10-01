@@ -46,6 +46,8 @@
         "js/favorites.js",
         "js/quick_toggle.js",
         "js/backref.js",
+        "js/annotation_store.js",
+        "js/annotations.js",
         "js/definition.js",
         "js/content.js"
       ],

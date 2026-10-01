@@ -139,8 +139,8 @@ async function main() {
   const settingKeys = Object.keys(defaultSettings);
   const toggleKeys = settingKeys.filter(k => k !== 'definitionColor');
 
-  runTest('DEFAULT_SETTINGS に全16設定キー（15機能トグル＋定義語カラー）が定義され、全機能が初期状態で全て ON (true) であること', () => {
-    const expectedKeys = ['global', 'scrollspy', 'popup', 'definition', 'parentDefinition', 'newtab', 'dim', 'jump', 'horizontal', 'conjunction', 'fastrender', 'citation', 'favorite', 'quickToggle', 'backref', 'definitionColor'];
+  runTest('DEFAULT_SETTINGS に全17設定キー（16機能トグル＋定義語カラー）が定義され、全機能が初期状態で全て ON (true) であること', () => {
+    const expectedKeys = ['global', 'scrollspy', 'popup', 'definition', 'parentDefinition', 'newtab', 'dim', 'jump', 'horizontal', 'conjunction', 'fastrender', 'citation', 'favorite', 'quickToggle', 'backref', 'marker', 'definitionColor'];
     assert.strictEqual(settingKeys.length, expectedKeys.length);
     expectedKeys.forEach(k => assert(settingKeys.includes(k), `キー '${k}' が DEFAULT_SETTINGS に存在する`));
     
@@ -552,6 +552,128 @@ async function main() {
     ext.settings.backref = false;
     ext.enableBackrefs();
     assert.strictEqual(document.querySelectorAll('.egov-ext-backref-btn').length, 0, '設定をオフにすると印が消える');
+  });
+
+  const annotationStoreJs = fs.readFileSync(path.join(ROOT_DIR, 'js', 'annotation_store.js'), 'utf8');
+
+  await runAsyncTest('マーカー・メモの保存: 端末の中への保存・削除、同期の枠と長さの上限、保存先の切り替え、書き出しと読み込み', async () => {
+    const dom = new JSDOM('<!DOCTYPE html><html><body></body></html>', { runScripts: 'dangerously' });
+    const window = dom.window;
+    const storage = createStorageMock();
+    window.chrome = { storage };
+    window.eval(annotationStoreJs);
+    const ext = window.egovExt;
+    const LAW = '325AC0000000201';
+    const mk = (id, extra) => Object.assign({ id, k: 'text', p: 'Mp-Ch_1-At_6-Pr_1', l: '第6条第1項', q: '建築物', b: '', f: '', o: 0, c: 1, m: '' }, extra || {});
+
+    assert.strictEqual(await ext.getAnnotationMode(), 'local', '初期値は端末の中');
+    assert.strictEqual((await ext.saveAnnotation(LAW, mk('a1'))).ok, true);
+    assert.strictEqual((await ext.saveAnnotation(LAW, mk('a2', { c: 2, m: 'メモ' }))).ok, true);
+    assert.strictEqual((await ext.loadAnnotations(LAW)).length, 2, '2件読める');
+    assert(Array.isArray(storage.local.mem['egovNotes:' + LAW]), '端末の中に法令ごとの配列で置く');
+    assert(!Object.keys(storage.sync.mem).some(k => k.startsWith('egovMk:')), '同期ストレージには置かない');
+    await ext.saveAnnotation(LAW, mk('a2', { m: '書き直し' }));
+    assert.strictEqual((await ext.loadAnnotations(LAW)).find(a => a.id === 'a2').m, '書き直し', '同じ ID は置き換える');
+    await ext.removeAnnotation(LAW, 'a1');
+    assert.strictEqual((await ext.loadAnnotations(LAW)).length, 1, '消せる');
+
+    // 端末の中のメモは長くてもよいが、同期にすると500字まで
+    await ext.saveAnnotation(LAW, mk('long', { m: 'あ'.repeat(600) }));
+    let switched = await ext.setAnnotationMode('sync');
+    assert.strictEqual(switched.ok, false, '500字を超えるメモがあると同期に切り替えない');
+    assert.strictEqual(switched.reason, 'tooLong');
+    assert.strictEqual(await ext.getAnnotationMode(), 'local', '切り替わっていない');
+    await ext.removeAnnotation(LAW, 'long');
+
+    switched = await ext.setAnnotationMode('sync');
+    assert.strictEqual(switched.ok, true, '同期に切り替えられる');
+    assert.strictEqual(await ext.getAnnotationMode(), 'sync');
+    assert(storage.sync.mem['egovMk:' + LAW + ':a2'], '同期には1件ずつ別の項目で置く');
+    assert(!('egovNotes:' + LAW in storage.local.mem), '移したら端末の中からは消す');
+    assert.strictEqual((await ext.loadAnnotations(LAW)).length, 1, '同期から読める');
+    assert.strictEqual((await ext.saveAnnotation(LAW, mk('a3', { m: 'い'.repeat(501) }))).reason, 'tooLong', '同期のときは501字のメモを保存しない');
+
+    // 同期の枠を超えると保存しない
+    ext.ANNOTATION_SYNC_MAX_ITEMS = 2;
+    assert.strictEqual((await ext.saveAnnotation(LAW, mk('a3'))).ok, true);
+    assert.strictEqual((await ext.saveAnnotation(LAW, mk('a4'))).reason, 'full', '件数の枠を超えたら full');
+    ext.ANNOTATION_SYNC_MAX_ITEMS = 180;
+    const usage = await ext.getAnnotationSyncUsage();
+    assert.strictEqual(usage.items, 2);
+    assert(usage.bytes > 0 && usage.bytes === Object.keys(storage.sync.mem).filter(k => k.startsWith('egovMk:'))
+      .reduce((sum, k) => sum + ext.annotationByteSize(k, storage.sync.mem[k]), 0), '使用量はキーと値の UTF-8 バイト数の合計');
+    assert.strictEqual(ext.annotationByteSize('k', 'あ'), 1 + 5, '日本語は1文字3バイトで数える（"あ" は5バイト）');
+
+    // 書き出し → 端末の中に戻す → 読み込み（同じ ID は直した日時の新しいほう）
+    const exported = await ext.exportAnnotations();
+    assert.strictEqual(exported.format, 'egov-himotoki-annotations');
+    assert.strictEqual(exported.laws[LAW].length, 2);
+    assert.strictEqual((await ext.setAnnotationMode('local')).ok, true, '端末の中に戻せる');
+    assert(!Object.keys(storage.sync.mem).some(k => k.startsWith('egovMk:')), '戻したら同期からは消す');
+    await ext.removeAnnotation(LAW, 'a3');
+    const old = JSON.parse(JSON.stringify(exported));
+    old.laws[LAW].forEach(a => { a.u = 1; a.m = '古い'; });
+    const imported = await ext.importAnnotations(old);
+    assert.strictEqual(imported.ok, true);
+    assert.strictEqual(imported.added, 1, '消したものは戻る');
+    assert.strictEqual(imported.updated, 0, '手元のほうが新しいものは置き換えない');
+    assert.strictEqual((await ext.importAnnotations({ hello: 1 })).reason, 'format', '別の形のファイルは読まない');
+  });
+
+  runTest('マーカー・メモの照合: 漢数字と算用数字の違い・空白をそろえて見つけ直し、同じ語句が2つあれば前後で選ぶ', () => {
+    const html = `<!DOCTYPE html><html><body><div id="provisionview">
+      <div id="Mp-Ch_1-At_6-Pr_1" class="paragraph"><div class="istitle"><span class="paragraphtitle">第六条　</span><button class="egov-ext-backref-btn">↩3</button>
+        <p class="sentence">建築主は、第７７条の３５の規定により、<span class="egov-ext-dimmed-text">（建築物を除く。）</span>建築物を建築する。</p></div></div>
+      <div id="Mp-Ch_1-At_6-Pr_2" class="paragraph"><div class="istitle"><span class="paragraphtitle">２　</span>
+        <p class="sentence">前項の規定は、適用しない。</p></div></div>
+    </div></body></html>`;
+    const dom = new JSDOM(html, { runScripts: 'dangerously', url: 'https://laws.e-gov.go.jp/law/325AC0000000201' });
+    const window = dom.window;
+    const document = window.document;
+    window.chrome = { storage: createStorageMock(), runtime: { onMessage: { addListener() {} } } };
+    window.eval(settingsJs);
+    window.eval(utilsJsForFavorites);
+    window.eval(fs.readFileSync(path.join(ROOT_DIR, 'js', 'backref.js'), 'utf8'));
+    window.eval(annotationStoreJs);
+    window.eval(fs.readFileSync(path.join(ROOT_DIR, 'js', 'annotations.js'), 'utf8'));
+    const ext = window.egovExt;
+    const t = ext._testAnnotations;
+
+    assert.strictEqual(t.normalizeWithMap('第七十七条の三十五　の規定').norm, '第77条の35の規定', '漢数字は算用数字に、空白は除く');
+    assert.strictEqual(t.normalizeWithMap('第７７条').norm, '第77条', '全角の数字は半角に');
+
+    const pr1 = document.getElementById('Mp-Ch_1-At_6-Pr_1');
+    // 覚えたときは漢数字（算用数字化の前）でも、今の本文（算用数字）で見つかる
+    let range = ext.findAnnotationRange({ q: '第七十七条の三十五', b: '建築主は、', f: 'の規定' }, pr1);
+    assert(range, '漢数字で覚えた語句が、算用数字の本文で見つかる');
+    assert.strictEqual(range.toString(), '第７７条の３５', '本文の該当箇所に範囲が付く');
+
+    // 「建築物」は括弧の中と外に2つある。後ろの数文字で外のほうを選ぶ
+    range = ext.findAnnotationRange({ q: '建築物', b: '除く。）', f: 'を建築する' }, pr1);
+    assert(range && range.startContainer.parentElement.tagName === 'P', '前後の数文字で、括弧の外の「建築物」を選ぶ');
+    range = ext.findAnnotationRange({ q: '建築物', b: '（', f: 'を除く' }, pr1);
+    assert(range && range.startContainer.parentElement.classList.contains('egov-ext-dimmed-text'), '括弧の中の「建築物」も選べる');
+
+    // 拡張が足した「↩3」の文字は本文として数えない
+    assert(!t.collectSegments(pr1).raw.includes('↩'), '印の文字は本文に含めない');
+
+    // 描いたときに見つからないものは記録する
+    t.setState('325AC0000000201', [
+      { id: 'ok', k: 'text', p: 'Mp-Ch_1-At_6-Pr_2', q: '前項', b: '', f: 'の規定', c: 1, m: '' },
+      { id: 'changed', k: 'text', p: 'Mp-Ch_1-At_6-Pr_2', q: '削られた語', c: 1, m: '' },
+      { id: 'missing', k: 'text', p: 'Mp-Ch_9-At_99-Pr_1', q: '何か', c: 1, m: '' },
+      { id: 'note', k: 'provision', p: 'Mp-Ch_1-At_6-Pr_2', l: '第6条第2項', q: '', c: 1, m: '要確認' }
+    ]);
+    t.render();
+    const orphans = t.getOrphans();
+    assert.strictEqual(orphans.get('changed'), 'changed', '語句が見つからないものは changed');
+    assert.strictEqual(orphans.get('missing'), 'missing', '条・項・号が無いものは missing');
+    assert(!orphans.has('ok') && !orphans.has('note'), '見つかったものは記録しない');
+    const flag = document.querySelector('#Mp-Ch_1-At_6-Pr_2 .egov-ext-note-flag');
+    assert(flag, '項へのメモは番号の横に付箋の印を置く');
+    assert(flag.title.includes('要確認'), '付箋にマウスを乗せるとメモの中身が出る');
+    ext.disableAnnotations();
+    assert(!document.querySelector('.egov-ext-note-flag'), 'オフにすると付箋が消える');
   });
 
   runTest('ポップアップの法令名検索: 名前がそのもの・前方一致・法律を上に、廃止を下に並べる', () => {

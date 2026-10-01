@@ -44,6 +44,8 @@ window.egovExt = window.egovExt || {};
     quickToggle: true,
     // 同じ法令の中の参照元（逆引き）。条・項・号の番号の横に、そこを参照している箇所の数の印を付ける
     backref: true,
+    // 条文へのマーカー・メモ（語句に色を付ける・項や号にメモを残す）。オフにしても保存したものは消えない
+    marker: true,
     definitionColor: '#00695c'
   });
 

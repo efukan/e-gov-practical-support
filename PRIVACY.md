@@ -1,6 +1,6 @@
 # Privacy Policy for e-Gov Law Himotoki (e-Gov法令ひもとき)
 
-*Last Updated: October 1, 2026 / 最終更新日: 2026年10月1日*
+*Last Updated: October 1, 2026 / 最終更新日: 2026年10月1日*（マーカー・メモを追記 / Markers and notes added）
 
 English version follows the Japanese version. (日本語版の後に英語版が続きます)
 
@@ -20,11 +20,13 @@ English version follows the Japanese version. (日本語版の後に英語版が
 *   **`storage` (chrome.storage.sync)**
     *   **目的**: ユーザーが設定画面（オプションページ）やポップアップで切り替えた各機能のON/OFF状態（例：横書き変換の有効化、括弧薄字化の有効化、定義語カラー設定など）を保持および同期するため。
     *   **お気に入り**: 利用者が「☆ お気に入り追加」で登録した法令の一覧（法令ID・法令名・法令番号・登録日時）も、複数の端末で同じ一覧を使えるよう、ここに保存します。一覧はポップアップの ☆ で外すと消えます。
+    *   **マーカー・メモ（利用者が同期を選んだときだけ）**: 設定画面でマーカー・メモの保存先を「ブラウザの同期」にした場合に限り、マーカー・メモ（下記）をここに保存し、他の端末とそろえます。この場合、利用者が書いたメモの中身がブラウザ提供会社の同期のサーバーを通ります。初期値は「この端末の中だけ」で、同期はしません。
     *   **同期の仕組み**: 設定データとお気に入りは、ブラウザ公式の同期ストレージ機能（`chrome.storage.sync`）を通じて、利用者がログインしているブラウザ提供会社（Google社等）の安全なインフラを介して他の端末へ同期されます。同期されるのは機能のオン／オフ等の設定情報と、利用者が自分で登録したお気に入りの法令（公開されている法令のIDと名前）のみであり、閲覧履歴や閲覧した法令テキスト、個人情報が含まれることはありません。当開発元を含む第三者がこれにアクセス・収集することはありません。ブラウザの同期機能をオフにしている場合は、端末内にのみ保存されます。
 *   **`storage` (chrome.storage.local)**
     *   **目的**: 施行令・施行規則などの政令・省令を表示したときに、親の法律の定義語を示すため、e-Gov 法令検索の公式API から取得した親の法律の条文から抜き出した定義語（語・条項番号・定義文）を、次回の表示で再取得しないよう保存します。
     *   **保存の範囲**: 保存されるのは公開されている法令の条文の一部のみで、閲覧履歴や個人情報は含まれません。利用者の端末内にのみ保存され（同期されません）、7日を過ぎたものは使われず、保存する法令は最大20件です。設定の「親の法律の定義語も表示」をオフにすると取得・保存を行いません。
     *   **検索の履歴**: ポップアップの法令名検索で使った語（最大10件）を、次回に選び直せるよう保存します。利用者の端末内にのみ保存され（同期されません）、外部へ送信されることはありません。履歴の右のゴミ箱で1件ずつ消せ、拡張機能を削除するとすべて消えます。
+    *   **マーカー・メモ**: 利用者が条文に付けたマーカーとメモ（条・項・号の識別子、選んだ語句とその前後の数文字、色、メモの文字、作成・更新日時）を保存します。初期値では利用者の端末内にのみ保存され（同期されません）、当開発元を含む外部へ送信されることはありません。利用者は設定画面から書き出し（JSON ファイル）・読み込みができ、マーカー・メモの札の「削除」で1件ずつ消せます。拡張機能を削除するとすべて消えます。保存先を「ブラウザの同期」にした場合は、上記の chrome.storage.sync に保存します。
 
 ### 3. 法令データの処理および外部通信について
 本拡張機能は、ユーザーが閲覧している e-Gov 法令検索（`laws.e-gov.go.jp`）のウェブページ上で動作します。
@@ -57,11 +59,13 @@ The Extension uses the following permissions and APIs. These are used solely to 
 *   **`storage` (chrome.storage.sync)**
     *   **Purpose**: To save and synchronize user preferences and feature ON/OFF toggles (e.g., enabling horizontal conversion, parenthesis dimming, conjunction highlighting, definition color settings) set on the options or popup pages.
     *   **Favorites**: The list of statutes the user has saved with the "☆ お気に入り追加" (Add to favorites) button (Law ID, title, law number and the time it was added) is also stored here so that the same list is available on the user's other devices. Entries are removed with the ☆ button in the popup.
+    *   **Markers and notes (only if the user chooses sync)**: Only when the user sets the storage location for markers and notes to "browser sync" on the options page are the markers and notes (see below) stored here and synchronized with the user's other devices. In that case, the text of the user's notes passes through the browser vendor's sync servers. The default is "this device only", with no synchronization.
     *   **Sync Mechanism**: Settings data and favorites are synchronized using the browser's official sync storage (`chrome.storage.sync`) via Google's secure infrastructure across devices logged into the same account. Only functional preference toggles and the favorites the user has saved (IDs and titles of publicly available statutes) are synchronized; no browsing history, legal document text or personal data is included. No third party, including the developer, has access to or collects this data. If browser synchronization is disabled, this data is stored locally on the device only.
 *   **`storage` (chrome.storage.local)**
     *   **Purpose**: When a cabinet order or ministerial ordinance (e.g., an enforcement order) is displayed, the Extension shows the terms defined in its parent Act. To avoid re-downloading, the defined terms extracted from the parent Act (term, article number and defining sentence), fetched from the official e-Gov API, are cached.
     *   **Scope**: Only excerpts of publicly available statutes are cached; no browsing history or personal data is included. The cache stays on the user's device only (not synchronized), entries older than 7 days are not used, and at most 20 statutes are kept. Turning off the "parent Act definitions" setting disables fetching and caching.
     *   **Search History**: The keywords used in the popup's law title search (up to 10) are stored so they can be selected again. They stay on the user's device only (not synchronized) and are never transmitted. Each entry can be deleted with the trash icon next to it, and all entries are deleted when the Extension is uninstalled.
+    *   **Markers and Notes**: The markers and notes the user adds to statutory text (the provision identifier, the selected words with a few characters before and after them, the color, the note text, and the creation and update times) are stored. By default they stay on the user's device only (not synchronized) and are never transmitted to the developer or anyone else. The user can export them to a JSON file and import them on the options page, and delete each one with the "削除" (Delete) button on its card. All of them are deleted when the Extension is uninstalled. If the user chooses "browser sync" as the storage location, they are stored in chrome.storage.sync described above.
 
 ### 3. Processing of Legal Document Data and Network Requests
 The Extension operates on the official e-Gov Law Search webpages (`laws.e-gov.go.jp`).

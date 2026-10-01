@@ -122,6 +122,7 @@ window.egovExt = window.egovExt || {};
       if (ext.clearReturnStack) ext.clearReturnStack();
       if (ext.disableCitations) ext.disableCitations();
       if (ext.disableBackrefs) ext.disableBackrefs();
+      if (ext.disableAnnotations) ext.disableAnnotations();
       if (ext.disablePopup) ext.disablePopup();
       if (ext.scrollSpyObserver) {
         ext.scrollSpyObserver.disconnect();
@@ -510,6 +511,7 @@ window.egovExt = window.egovExt || {};
     if (ext.clearReturnStack) ext.clearReturnStack();
     if (ext.disablePopup) ext.disablePopup();
     if (ext.disableBackrefs) ext.disableBackrefs();
+    if (ext.disableAnnotations) ext.disableAnnotations();
     if (ext.referenceTooltip) ext.referenceTooltip.hide(true);
     if (ext.definitionTooltip) ext.definitionTooltip.hide(true);
     if (ext.citationTooltip) ext.citationTooltip.hide(true);
@@ -725,6 +727,17 @@ window.egovExt = window.egovExt || {};
       }
     } else {
       if (ext.disableBackrefs) ext.disableBackrefs();
+    }
+
+    // マーカー・メモ（参照元の印の後に置く。本文の書き換えが終わったら描き直す）
+    if (ext.settings.marker && isLawPage && ext.enableAnnotations) {
+      try {
+        ext.enableAnnotations(forceReset || lawIdChanged);
+      } catch (e) {
+        console.error("egov-ext: Error enabling annotations:", e);
+      }
+    } else {
+      if (ext.disableAnnotations) ext.disableAnnotations();
     }
 
     // お気に入りボタン（条文ジャンプ検索の左隣。法令が変わったら登録状態を読み直す）

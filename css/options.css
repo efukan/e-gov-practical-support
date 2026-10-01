@@ -510,3 +510,98 @@ body.global-off .setting-card {
   padding: 0 3px;
   border-radius: 2px;
 }
+
+/* マーカー・メモの保存先・書き出し・読み込み */
+.annotation-panel {
+  background-color: var(--md-sys-color-surface);
+  border: 1px solid var(--md-sys-color-outline);
+  border-radius: 12px;
+  padding: 14px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.annotation-panel-title {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--md-sys-color-text-main);
+}
+
+.annotation-mode {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.annotation-radio {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  font-size: 12.5px;
+  color: var(--md-sys-color-text-main);
+  line-height: 1.5;
+  cursor: pointer;
+}
+
+.annotation-radio input {
+  margin-top: 3px;
+  accent-color: var(--md-sys-color-primary);
+}
+
+.annotation-radio-desc {
+  font-size: 11px;
+  color: var(--md-sys-color-text-muted);
+}
+
+.annotation-usage {
+  margin: 0;
+  font-size: 12px;
+  color: var(--md-sys-color-text-muted);
+}
+
+.annotation-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.annotation-btn {
+  display: inline-flex;
+  align-items: center;
+  height: 32px;
+  padding: 0 14px;
+  border: 1px solid var(--md-sys-color-outline-hover);
+  border-radius: 8px;
+  background-color: var(--md-sys-color-surface);
+  color: var(--md-sys-color-primary);
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.annotation-btn:hover {
+  background-color: var(--md-comp-icon-hover-bg);
+}
+
+.annotation-btn:focus-visible,
+#annotation-import:focus-visible + .annotation-btn {
+  outline: 2px solid var(--md-sys-color-primary);
+  outline-offset: 2px;
+}
+
+.annotation-status {
+  margin: 0;
+  font-size: 12px;
+  color: var(--md-sys-color-text-main);
+  line-height: 1.5;
+}
+
+.annotation-status:empty {
+  display: none;
+}
+
+.annotation-status.is-error {
+  color: #b3261e;
+}

@@ -504,6 +504,27 @@ html.is-tab-view body {
   border-radius: 8px;
 }
 
+/* この法令のマーカー・メモ */
+/* 色の丸は文字と同じ行に置く（長い語句は .law-title の2行までの切り詰めに任せる） */
+.annotation-mark {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  margin-right: 6px;
+  vertical-align: -1px;
+  border-radius: 50%;
+}
+
+.annotation-mark.is-color-1 { background: #ffd54f; }
+.annotation-mark.is-color-2 { background: #81c784; }
+.annotation-mark.is-color-3 { background: #f48fb1; }
+
+.annotation-mark.is-note {
+  border-radius: 2px;
+  background: #fff6cc;
+  border: 1px solid #d4ad1e;
+}
+
 /* 機能の設定（折りたたみ） */
 .settings-panel {
   border-top: 1px solid var(--md-sys-color-outline);

@@ -58,6 +58,13 @@
       <p class="empty-note" id="favorite-empty" hidden>条文のページ右上の「☆ お気に入り追加」か、検索結果の ☆ で登録すると、ここから開けます。</p>
     </section>
 
+    <!-- この法令のマーカー・メモ（e-Gov の条文ページを開いているときだけ） -->
+    <section class="section-group" id="annotations-section" hidden>
+      <h2 class="section-title">この法令のマーカー・メモ<span class="section-count" id="annotation-count"></span></h2>
+      <ul class="law-list" id="annotation-list"></ul>
+      <p class="empty-note" id="annotation-empty" hidden>条文の語句を選ぶと出る帯から、マーカーを引いたりメモを書いたりできます。</p>
+    </section>
+
     <!-- 機能の設定（折りたたみ。開閉はこの端末に記憶する） -->
     <details class="settings-panel" id="settings-panel">
       <summary class="settings-summary">
@@ -209,6 +216,22 @@
               </label>
             </div>
 
+            <div class="setting-card" title="条文の語句を選ぶと出る帯から、マーカーを引いたりメモを書いたりする（オフにしても保存したものは消えない）">
+              <div class="card-left">
+                <div class="card-icon-container">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M15 4l5 5L9 20H4v-5z" />
+                    <path d="M13 6l5 5" />
+                  </svg>
+                </div>
+                <span class="label">マーカー・メモ</span>
+              </div>
+              <label class="switch">
+                <input type="checkbox" id="feature-marker" checked>
+                <span class="slider"></span>
+              </label>
+            </div>
+
             <div class="setting-card" title="法令内で定義された用語に下線を引き、ホバー時に定義条文を表示">
               <div class="card-left">
                 <div class="card-icon-container">
@@ -341,6 +364,7 @@
   </div>
   <script src="js/settings.js"></script>
   <script src="js/favorites.js"></script>
+  <script src="js/annotation_store.js"></script>
   <script src="js/popup.js"></script>
 </body>
 </html>

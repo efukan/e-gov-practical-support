@@ -1041,6 +1041,248 @@ body.egov-fastrender-enabled .main-content {
   border-radius: 2px !important;
 }
 
+/* ----- 8-0b. マーカー・メモ (Markers & Notes) ----- */
+/* 色は CSS Custom Highlight API（CSS.highlights）で付ける。本文の DOM は変えない。
+   メモのあるマーカーには点線の下線を付け、押すとメモが開くことが分かるようにする */
+::highlight(egov-mk-1),
+::highlight(egov-mk-1-m) {
+  background-color: rgba(255, 213, 79, 0.55);
+}
+
+::highlight(egov-mk-2),
+::highlight(egov-mk-2-m) {
+  background-color: rgba(129, 199, 132, 0.5);
+}
+
+::highlight(egov-mk-3),
+::highlight(egov-mk-3-m) {
+  background-color: rgba(244, 143, 177, 0.5);
+}
+
+::highlight(egov-mk-1-m),
+::highlight(egov-mk-2-m),
+::highlight(egov-mk-3-m) {
+  text-decoration: underline dotted rgba(60, 64, 67, 0.75);
+}
+
+/* ポップアップの一覧から移動したとき、一瞬だけ目立たせる */
+::highlight(egov-mk-flash) {
+  background-color: rgba(16, 66, 164, 0.28);
+}
+
+/* 項・号へのメモの付箋（番号の横） */
+.egov-ext-note-flag {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  width: 18px !important;
+  height: 16px !important;
+  margin: 0 4px 0 0 !important;
+  padding: 0 !important;
+  border: 1px solid #e8c95a !important;
+  border-radius: 4px !important;
+  background-color: #fff6cc !important;
+  color: #8a6d00 !important;
+  vertical-align: 2px !important;
+  cursor: pointer !important;
+  box-sizing: border-box !important;
+}
+
+.egov-ext-note-flag:hover,
+.egov-ext-note-flag:focus-visible {
+  background-color: #ffeb99 !important;
+  border-color: #d4ad1e !important;
+}
+
+/* 語句を選んだときの帯 */
+.egov-ext-mk-toolbar {
+  position: fixed !important;
+  z-index: 10002 !important;
+  display: flex !important;
+  align-items: center !important;
+  gap: 4px !important;
+  padding: 4px 6px !important;
+  border: 1px solid #d0d4da !important;
+  border-radius: 10px !important;
+  background: #ffffff !important;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.18) !important;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Hiragino Sans", "Noto Sans JP", sans-serif !important;
+  font-size: 12px !important;
+  line-height: 1 !important;
+}
+
+.egov-ext-mk-toolbar[hidden] {
+  display: none !important;
+}
+
+.egov-ext-mk-color {
+  width: 20px !important;
+  height: 20px !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  border: 2px solid #ffffff !important;
+  border-radius: 50% !important;
+  box-shadow: 0 0 0 1px #c4c7cc !important;
+  cursor: pointer !important;
+}
+
+.egov-ext-mk-color-1 { background: #ffd54f !important; }
+.egov-ext-mk-color-2 { background: #81c784 !important; }
+.egov-ext-mk-color-3 { background: #f48fb1 !important; }
+
+.egov-ext-mk-color:hover,
+.egov-ext-mk-color:focus-visible,
+.egov-ext-mk-color[aria-pressed="true"] {
+  box-shadow: 0 0 0 2px #1042a4 !important;
+}
+
+.egov-ext-mk-sep {
+  width: 1px !important;
+  height: 16px !important;
+  margin: 0 2px !important;
+  background: #d0d4da !important;
+}
+
+.egov-ext-mk-action {
+  height: 24px !important;
+  margin: 0 !important;
+  padding: 0 8px !important;
+  border: 1px solid #c2daf8 !important;
+  border-radius: 6px !important;
+  background: #f3f7fd !important;
+  color: #1042a4 !important;
+  font-family: inherit !important;
+  font-size: 12px !important;
+  font-weight: 700 !important;
+  white-space: nowrap !important;
+  cursor: pointer !important;
+}
+
+.egov-ext-mk-action:hover,
+.egov-ext-mk-action:focus-visible {
+  background: #e3ecfb !important;
+}
+
+.egov-ext-mk-msg {
+  max-width: 260px !important;
+  color: #b3261e !important;
+  font-size: 11px !important;
+  line-height: 1.4 !important;
+}
+
+.egov-ext-mk-msg:empty {
+  display: none !important;
+}
+
+/* マーカー・メモの札 */
+.egov-ext-mk-card {
+  position: fixed !important;
+  z-index: 10003 !important;
+  width: 300px !important;
+  padding: 10px 12px !important;
+  border: 1px solid #d0d4da !important;
+  border-radius: 10px !important;
+  background: #ffffff !important;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2) !important;
+  color: #1f1f1f !important;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Hiragino Sans", "Noto Sans JP", sans-serif !important;
+  font-size: 12px !important;
+  line-height: 1.5 !important;
+  box-sizing: border-box !important;
+}
+
+.egov-ext-mk-card-head {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  margin-bottom: 6px !important;
+}
+
+.egov-ext-mk-card-title {
+  font-weight: 700 !important;
+  color: #1042a4 !important;
+}
+
+.egov-ext-mk-card-close {
+  width: 22px !important;
+  height: 22px !important;
+  border: none !important;
+  border-radius: 50% !important;
+  background: transparent !important;
+  color: #5f6368 !important;
+  font-size: 16px !important;
+  line-height: 1 !important;
+  cursor: pointer !important;
+}
+
+.egov-ext-mk-card-close:hover {
+  background: #f1f3f4 !important;
+}
+
+.egov-ext-mk-card-quote {
+  margin-bottom: 6px !important;
+  color: #3c4043 !important;
+}
+
+.egov-ext-mk-card-colors {
+  display: flex !important;
+  gap: 6px !important;
+  margin-bottom: 8px !important;
+}
+
+.egov-ext-mk-card-memo {
+  display: block !important;
+  width: 100% !important;
+  min-height: 72px !important;
+  padding: 6px 8px !important;
+  border: 1px solid #c4c7cc !important;
+  border-radius: 6px !important;
+  font-family: inherit !important;
+  font-size: 12px !important;
+  line-height: 1.5 !important;
+  resize: vertical !important;
+  box-sizing: border-box !important;
+}
+
+.egov-ext-mk-card-memo:focus {
+  outline: 2px solid #1042a4 !important;
+  outline-offset: -1px !important;
+}
+
+.egov-ext-mk-card-foot {
+  display: flex !important;
+  align-items: center !important;
+  gap: 8px !important;
+  margin-top: 6px !important;
+}
+
+.egov-ext-mk-card-msg {
+  flex: 1 !important;
+  color: #5f6368 !important;
+  font-size: 11px !important;
+}
+
+.egov-ext-mk-card-count {
+  color: #80868b !important;
+  font-size: 11px !important;
+}
+
+.egov-ext-mk-card-delete {
+  height: 24px !important;
+  padding: 0 10px !important;
+  border: 1px solid #f2b8b5 !important;
+  border-radius: 6px !important;
+  background: #fdf0ef !important;
+  color: #b3261e !important;
+  font-family: inherit !important;
+  font-size: 12px !important;
+  cursor: pointer !important;
+}
+
+.egov-ext-mk-card-delete:hover {
+  background: #fbe0de !important;
+}
+
 /* 被引用法令の一覧（ポップアップ内） */
 .egov-ext-citation-list {
   list-style: none !important;
@@ -1234,6 +1476,9 @@ div.egov-ext-preview-title {
   .egov-ext-return,
   .egov-ext-citation-btn,
   .egov-ext-backref-btn,
+  .egov-ext-note-flag,
+  .egov-ext-mk-toolbar,
+  .egov-ext-mk-card,
   .egov-ext-citation-modal,
   .egov-ext-citation-overlay,
   .egov-ext-toast,

@@ -56,10 +56,42 @@ chrome.storage.onChanged.addListener((changes, namespace) => {
   }
 });
 
-// 条文ページ右上の歯車ボタン（js/quick_toggle.js）から、設定画面を開く。
-// content script からは chrome.runtime.openOptionsPage() を呼べないので、ここで代わりに開く
+/** 虫眼鏡から開いたことをポップアップに伝える chrome.storage.session のキー（値は依頼した時刻） */
+const FOCUS_SEARCH_KEY = 'egovPopupFocusSearch';
+
+/**
+ * ツールバーのポップアップを、法令名検索の欄にカーソルを入れた状態で開く。
+ * action.openPopup() は Chrome 127 以降で使える。開けなかったとき（古い版・Firefox の条件など）は、
+ * 同じ画面（popup.html）を、条文ページの右隣の新しいタブで開く
+ * @param {chrome.runtime.MessageSender} sender
+ */
+async function openLawSearch(sender) {
+  const tab = sender.tab;
+  try {
+    if (chrome.storage.session) await chrome.storage.session.set({ [FOCUS_SEARCH_KEY]: Date.now() });
+  } catch (e) {}
+  try {
+    if (!chrome.action.openPopup) throw new Error('action.openPopup is not available');
+    await chrome.action.openPopup(tab && typeof tab.windowId === 'number' ? { windowId: tab.windowId } : undefined);
+  } catch (e) {
+    console.debug('egov-ext: ポップアップを開けなかったので、新しいタブで開きます:', e);
+    try {
+      if (chrome.storage.session) await chrome.storage.session.remove(FOCUS_SEARCH_KEY);
+    } catch (err) {}
+    const createProps = { url: chrome.runtime.getURL('popup.html?view=tab') };
+    if (tab && typeof tab.index === 'number') createProps.index = tab.index + 1;
+    if (tab && typeof tab.id === 'number') createProps.openerTabId = tab.id;
+    chrome.tabs.create(createProps);
+  }
+}
+
+// 条文ページ右上の歯車・虫眼鏡ボタン（js/quick_toggle.js）からの依頼。
+// content script からは設定画面もポップアップも直接開けないので、ここで代わりに開く
 chrome.runtime.onMessage.addListener((request, sender) => {
-  if (!request || request.type !== 'OPEN_OPTIONS_PAGE') return;
-  if (!sender || sender.id !== chrome.runtime.id) return; // この拡張の content script からの依頼だけ受ける
-  chrome.runtime.openOptionsPage().catch(e => console.error('Error opening options page:', e));
+  if (!request || !sender || sender.id !== chrome.runtime.id) return; // この拡張の content script からの依頼だけ受ける
+  if (request.type === 'OPEN_OPTIONS_PAGE') {
+    chrome.runtime.openOptionsPage().catch(e => console.error('Error opening options page:', e));
+  } else if (request.type === 'OPEN_LAW_SEARCH') {
+    openLawSearch(sender);
+  }
 });

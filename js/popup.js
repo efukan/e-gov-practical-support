@@ -8,6 +8,7 @@
  * - 検索の履歴（入力欄を押したときや ↓ で、入力欄の下に出す。ゴミ箱で1件ずつ消せる）
  * - お気に入りの一覧（js/favorites.js が保存を担う）
  * - 「機能の設定」の折りたたみ、詳細設定を開くボタン
+ * - 条文ページの虫眼鏡から開かれたときは、検索欄にカーソルを入れる（開けなかったときは新しいタブで開かれる）
  */
 
 window.egovExt = window.egovExt || {};
@@ -29,6 +30,33 @@ window.egovExt = window.egovExt || {};
 
   /** 覚えておく検索の履歴の件数 */
   const HISTORY_MAX = 10;
+
+  /** 条文ページの虫眼鏡から開いたことを background.js が知らせる chrome.storage.session のキー（値は依頼した時刻） */
+  const FOCUS_SEARCH_KEY = 'egovPopupFocusSearch';
+
+  /** 虫眼鏡からの依頼として扱う時間（ms）。これより古い印は、開いたあとに残ったものとみなす */
+  const FOCUS_SEARCH_WINDOW_MS = 10000;
+
+  /** ポップアップを開けなかったときに、新しいタブで開いたか（background.js が popup.html?view=tab で開く） */
+  const IS_TAB_VIEW = new URLSearchParams(location.search).get('view') === 'tab';
+
+  /**
+   * 条文ページの虫眼鏡から開かれたか。印は1回で消す
+   * @returns {Promise<boolean>}
+   */
+  async function consumeFocusSearchRequest() {
+    if (IS_TAB_VIEW) return true;
+    try {
+      if (!chrome.storage.session) return false;
+      const result = await chrome.storage.session.get(FOCUS_SEARCH_KEY);
+      const requestedAt = result && result[FOCUS_SEARCH_KEY];
+      if (!requestedAt) return false;
+      await chrome.storage.session.remove(FOCUS_SEARCH_KEY);
+      return Date.now() - requestedAt < FOCUS_SEARCH_WINDOW_MS;
+    } catch (e) {
+      return false;
+    }
+  }
 
   /** 「機能の設定」の開閉を覚えておく localStorage のキー */
   const SETTINGS_OPEN_KEY = 'egovPopupSettingsOpen';
@@ -212,6 +240,7 @@ window.egovExt = window.egovExt || {};
   }
 
   document.addEventListener('DOMContentLoaded', async () => {
+    if (IS_TAB_VIEW) document.documentElement.classList.add('is-tab-view');
     const searchInput = document.getElementById('law-search');
     const searchSection = document.getElementById('search-section');
     const searchStatus = document.getElementById('search-status');
@@ -257,6 +286,11 @@ window.egovExt = window.egovExt || {};
      */
     async function openLaw(lawId, fromSearch) {
       if (fromSearch) await addSearchHistory(searchInput.value);
+      if (IS_TAB_VIEW) {
+        // 新しいタブで開いた検索画面なら、そのタブを法令のページに切り替える
+        location.href = ext.getLawPageUrl(lawId);
+        return;
+      }
       chrome.tabs.create({ url: ext.getLawPageUrl(lawId) });
       window.close();
     }
@@ -655,6 +689,12 @@ window.egovExt = window.egovExt || {};
       openOptionsBtn.addEventListener('click', () => {
         chrome.runtime.openOptionsPage();
       });
+    }
+
+    // 条文ページの虫眼鏡から開かれたときは、検索欄にカーソルを入れて最近の検索を出しておく
+    if (await consumeFocusSearchRequest()) {
+      searchInput.focus();
+      showHistory();
     }
   });
 

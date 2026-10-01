@@ -421,36 +421,52 @@ async function main() {
     ext.setupQuickToggles();
     assert(!document.getElementById('egov-ext-quick-toggles'), '設定をオフにすると消える');
 
-    // 設定画面を開く歯車ボタン: 押すと background.js へ依頼を送る
+    // 法令名検索を開く虫眼鏡と、設定画面を開く歯車: 押すと background.js へ依頼を送る
     const sent = [];
     window.chrome.runtime = { sendMessage: async (msg) => { sent.push(msg); } };
     ext.setupSettingsButton();
+    const search = document.getElementById('egov-ext-search-btn');
     const gear = document.getElementById('egov-ext-settings-btn');
-    assert(gear, '歯車ボタンが置かれた');
-    assert(gear.getAttribute('aria-label'), '歯車ボタンに読み上げ用の名前がある');
+    assert(search && gear, '虫眼鏡と歯車のボタンが置かれた');
+    assert(search.getAttribute('aria-label') && gear.getAttribute('aria-label'), 'どちらにも読み上げ用の名前がある');
+    search.click();
     gear.click();
-    assert.strictEqual(sent.length, 1, '押すとメッセージを1回送る');
-    assert.strictEqual(sent[0].type, 'OPEN_OPTIONS_PAGE', '設定画面を開く依頼を送る');
+    assert.strictEqual(sent.map(m => m.type).join(','), 'OPEN_LAW_SEARCH,OPEN_OPTIONS_PAGE', '虫眼鏡は検索、歯車は設定画面を開く依頼を送る');
+    ext.setupSettingsButton();
+    assert.strictEqual(document.querySelectorAll('#egov-ext-search-btn, #egov-ext-settings-btn').length, 2, '2回呼んでも増えない');
     ext.settings.global = false;
     ext.setupSettingsButton();
-    assert(!document.getElementById('egov-ext-settings-btn'), '拡張全体をオフにすると歯車も消える');
+    assert(!document.getElementById('egov-ext-settings-btn') && !document.getElementById('egov-ext-search-btn'), '拡張全体をオフにすると虫眼鏡も歯車も消える');
   });
 
-  runTest('background.js: 設定画面を開く依頼は、この拡張自身からのものだけ受ける', () => {
+  await runAsyncTest('background.js: 設定画面・法令名検索を開く依頼は、この拡張自身からのものだけ受ける', async () => {
     const bgJs = fs.readFileSync(path.join(ROOT_DIR, 'js', 'background.js'), 'utf8');
     let listener = null;
     let opened = 0;
+    let popupOpenedWith = null;
+    let popupFails = false;
+    const createdTabs = [];
+    const session = {};
     const chromeMock = {
-      action: { setIcon: () => Promise.resolve() },
+      action: {
+        setIcon: () => Promise.resolve(),
+        openPopup: async (opts) => { if (popupFails) throw new Error('not allowed'); popupOpenedWith = opts; }
+      },
       runtime: {
         id: 'self-id',
         onStartup: { addListener() {} },
         onInstalled: { addListener() {} },
         onMessage: { addListener: (l) => { listener = l; } },
         openOptionsPage: () => { opened++; return Promise.resolve(); },
+        getURL: (p) => 'chrome-extension://self-id/' + p,
         lastError: null
       },
-      storage: { sync: { get: (k, cb) => cb({}) }, onChanged: { addListener() {} } }
+      tabs: { create: (props) => { createdTabs.push(props); } },
+      storage: {
+        sync: { get: (k, cb) => cb({}) },
+        session: { set: async (o) => Object.assign(session, o), remove: async (k) => { delete session[k]; } },
+        onChanged: { addListener() {} }
+      }
     };
     new Function('chrome', bgJs)(chromeMock);
     assert(listener, 'onMessage のリスナーが登録される');
@@ -460,6 +476,24 @@ async function main() {
     assert.strictEqual(opened, 0, '別の種類のメッセージでは開かない');
     listener({ type: 'OPEN_OPTIONS_PAGE' }, { id: 'self-id' });
     assert.strictEqual(opened, 1, 'この拡張からの依頼で設定画面を開く');
+
+    const pageTab = { id: 7, index: 3, windowId: 42 };
+    listener({ type: 'OPEN_LAW_SEARCH' }, { id: 'other-id', tab: pageTab });
+    await new Promise(r => setTimeout(r, 10));
+    assert.strictEqual(popupOpenedWith, null, 'ほかの拡張からの依頼ではポップアップを開かない');
+
+    listener({ type: 'OPEN_LAW_SEARCH' }, { id: 'self-id', tab: pageTab });
+    await new Promise(r => setTimeout(r, 10));
+    assert.strictEqual(popupOpenedWith && popupOpenedWith.windowId, 42, '条文ページのあるウィンドウでポップアップを開く');
+    assert(session.egovPopupFocusSearch, '検索欄にカーソルを入れる印を残す');
+
+    popupFails = true;
+    listener({ type: 'OPEN_LAW_SEARCH' }, { id: 'self-id', tab: pageTab });
+    await new Promise(r => setTimeout(r, 10));
+    assert.strictEqual(createdTabs.length, 1, 'ポップアップを開けなければ新しいタブで開く');
+    assert.strictEqual(createdTabs[0].url, 'chrome-extension://self-id/popup.html?view=tab');
+    assert.strictEqual(createdTabs[0].index, 4, '条文ページの右隣に開く');
+    assert(!session.egovPopupFocusSearch, 'タブで開いたときは印を残さない');
   });
 
   runTest('ポップアップの法令名検索: 名前がそのもの・前方一致・法律を上に、廃止を下に並べる', () => {

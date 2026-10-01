@@ -736,7 +736,7 @@ window.egovExt = window.egovExt || {};
       if (ext.removeQuickToggles) ext.removeQuickToggles();
     }
 
-    // 設定画面を開く歯車ボタン（右上の並びの右端。条文ページなら常に出す）
+    // 法令名検索を開く虫眼鏡と、設定画面を開く歯車（右上の並びの右端。条文ページなら常に出す）
     if (isLawPage && ext.setupSettingsButton) {
       try {
         ext.setupSettingsButton();

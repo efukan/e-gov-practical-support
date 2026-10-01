@@ -112,6 +112,15 @@ body * {
   box-sizing: border-box;
 }
 
+/* ポップアップを開けず、新しいタブで開いたとき（popup.html?view=tab）。ページの中央に置く */
+html.is-tab-view {
+  background-color: var(--md-sys-color-background);
+}
+
+html.is-tab-view body {
+  margin: 24px auto;
+}
+
 /* display を指定した要素でも hidden 属性で隠れるようにする */
 [hidden] {
   display: none !important;

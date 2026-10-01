@@ -4,7 +4,8 @@
  * 条文ページ右上（お気に入りボタンの左隣）に置く、表示の切り替えボタンの組。
  * 算用数字・括弧の薄字化・接続詞の色分け・定義語の下線を、設定画面を開かずにその場でオン・オフする。
  * 設定「切り替えボタン」（quickToggle）でボタンの組ごと出さないようにできる。
- * あわせて、右上の並びの右端に設定画面を開く歯車ボタンを置く（こちらは設定に関わらず、条文ページなら出す）。
+ * あわせて、右上の並びの右端に、法令名検索（ツールバーのポップアップ）を開く虫眼鏡と、設定画面を開く歯車を置く
+ * （こちらは設定に関わらず、条文ページなら出す）。
  *
  * 押したときは、ポップアップから切り替えたときと同じく設定を保存し、content.js の applySettings() で
  * 全機能を掛け直す（切り替えの経路を2つに分けない）。
@@ -108,44 +109,72 @@ window.egovExt = window.egovExt || {};
     + '<path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>'
     + '</svg>';
 
+  const SEARCH_BUTTON_ID = 'egov-ext-search-btn';
+
+  const SEARCH_SVG = '<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">'
+    + '<circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>';
+
   /**
-   * 右上の並びの右端に、設定画面を開く歯車ボタンを置く。
-   * 並びの右端に来るよう CSS の order で後ろに回すので、DOM の中の位置は問わない
+   * 右上の並びの右端に置く、丸いアイコンのボタンを作る。押すと background.js へ依頼を送る
+   * （content script からは設定画面もポップアップも直接開けない）
+   * @param {string} id
+   * @param {string} className
+   * @param {string} label - title と読み上げ用の名前
+   * @param {string} svg
+   * @param {string} messageType - background.js へ送る依頼の種類
+   * @returns {HTMLButtonElement}
+   */
+  function createRoundButton(id, className, label, svg, messageType) {
+    const btn = document.createElement('button');
+    btn.id = id;
+    btn.type = 'button';
+    btn.className = 'egov-ext-round-btn ' + className;
+    btn.title = label;
+    btn.setAttribute('aria-label', label);
+    btn.innerHTML = svg;
+    btn.addEventListener('click', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      try {
+        const sent = chrome.runtime.sendMessage({ type: messageType });
+        if (sent && sent.catch) sent.catch(() => {});
+      } catch (err) {
+        console.debug('egov-ext: 依頼を送れませんでした:', messageType, err);
+      }
+    });
+    return btn;
+  }
+
+  /**
+   * 右上の並びの右端に、法令名検索（ツールバーのポップアップ）を開く虫眼鏡と、設定画面を開く歯車を置く。
+   * 並びの右端に来るよう CSS の order で後ろに回すので、DOM の中の位置は問わない。設定に関わらず、条文ページなら出す
    */
   ext.setupSettingsButton = function() {
     if (!ext.settings || !ext.settings.global || !(ext.checkIfLawPage && ext.checkIfLawPage())) {
       ext.removeSettingsButton();
       return;
     }
-    let btn = document.getElementById(SETTINGS_BUTTON_ID);
-    if (btn && document.body.contains(btn)) return;
-    btn = document.createElement('button');
-    btn.id = SETTINGS_BUTTON_ID;
-    btn.type = 'button';
-    btn.className = 'egov-ext-settings-btn';
-    btn.title = 'e-Gov法令ひもときの設定を開く';
-    btn.setAttribute('aria-label', 'e-Gov法令ひもときの設定を開く');
-    btn.innerHTML = GEAR_SVG;
-    btn.addEventListener('click', (e) => {
-      e.preventDefault();
-      e.stopPropagation();
-      // 設定画面は background.js が開く（content script からは直接開けない）
-      try {
-        const sent = chrome.runtime.sendMessage({ type: 'OPEN_OPTIONS_PAGE' });
-        if (sent && sent.catch) sent.catch(() => {});
-      } catch (err) {
-        console.debug('egov-ext: 設定画面を開けませんでした:', err);
-      }
-    });
-    ext.getOrCreateHeaderContainer().appendChild(btn);
+    const container = ext.getOrCreateHeaderContainer();
+    const search = document.getElementById(SEARCH_BUTTON_ID);
+    if (!search || !document.body.contains(search)) {
+      container.appendChild(createRoundButton(SEARCH_BUTTON_ID, 'egov-ext-search-btn',
+        '法令名で検索（拡張機能のポップアップを開く）', SEARCH_SVG, 'OPEN_LAW_SEARCH'));
+    }
+    const gear = document.getElementById(SETTINGS_BUTTON_ID);
+    if (!gear || !document.body.contains(gear)) {
+      container.appendChild(createRoundButton(SETTINGS_BUTTON_ID, 'egov-ext-settings-btn',
+        'e-Gov法令ひもときの設定を開く', GEAR_SVG, 'OPEN_OPTIONS_PAGE'));
+    }
   };
 
   /**
-   * 歯車ボタンをDOMから取り除く
+   * 虫眼鏡と歯車のボタンをDOMから取り除く
    */
   ext.removeSettingsButton = function() {
-    const btn = document.getElementById(SETTINGS_BUTTON_ID);
-    if (btn) btn.remove();
+    [SEARCH_BUTTON_ID, SETTINGS_BUTTON_ID].forEach(id => {
+      const btn = document.getElementById(id);
+      if (btn) btn.remove();
+    });
     if (ext.checkAndRemoveHeaderContainer) ext.checkAndRemoveHeaderContainer();
   };
 

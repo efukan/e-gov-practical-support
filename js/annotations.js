@@ -276,17 +276,58 @@ window.egovExt = window.egovExt || {};
     });
   }
 
+  /** 本文を書き換える処理（算用数字化・薄字化・接続詞・定義語の下線）が動いているか */
+  function textTasksRunning() {
+    return !!ext.activeTasks && Object.keys(ext.activeTasks)
+      .some(n => n !== 'definitionExtract' && ext.activeTasks[n] && ext.activeTasks[n].done);
+  }
+
   /**
-   * 本文を書き換える処理（算用数字化など。大きな法令では数十秒かかる）が終わったら描き直す
+   * 付けた色の範囲が、まだ覚えた語句を指しているか。
+   * 書き換えで本文の文字が差し替わると、範囲は縮んだり別の所へずれたりする
+   * @param {Object} ann
+   * @param {Range} range
+   * @returns {boolean}
+   */
+  function isRangeIntact(ann, range) {
+    if (!range || range.collapsed) return false;
+    return normalizeWithMap(range.toString()).norm === normalizeWithMap(ann.q || '').norm;
+  }
+
+  const REPAIR_INTERVAL_MS = 300;
+  let repairTimer = null;
+
+  /**
+   * 書き換えが動いている間、少しずつ確かめて、消えた色だけをすぐ付け直す。
+   * 書き換えは本文の上から順に進むので、全部が終わるのを待つと、大きな法令では色が出るまで 10 秒ほどかかる
+   */
+  function watchWhileTextTasksRun() {
+    if (repairTimer !== null) return;
+    repairTimer = setInterval(() => {
+      if (!enabled || !textTasksRunning()) {
+        clearInterval(repairTimer);
+        repairTimer = null;
+        return;
+      }
+      const broken = annotations.some(ann => {
+        const range = rangesById.get(ann.id);
+        return range && !isRangeIntact(ann, range);
+      });
+      if (broken) render();
+    }, REPAIR_INTERVAL_MS);
+  }
+
+  /**
+   * いま描き、本文を書き換える処理（大きな法令では数十秒かかる）が終わったらもう一度描く。
+   * 書き換えの途中で消えた色は watchWhileTextTasksRun が付け直す
    */
   function renderAfterTextTasks() {
     const token = ++renderToken;
     render();
     if (!ext.waitForTasks || !ext.activeTasks) return;
+    if (textTasksRunning()) watchWhileTextTasksRun();
     // 書き換えは本文の差し替えなので、その前に付けた色の範囲は消える。終わるのを待って描き直す。
     // 大きな法令では 60 秒で待ちきれないことがあるので、まだ動いていれば待ち直す（5 回まで）
-    const textTasksRunning = () => Object.keys(ext.activeTasks)
-      .some(n => n !== 'definitionExtract' && ext.activeTasks[n] && ext.activeTasks[n].done);
     const waitAndRender = (round) => {
       const names = Object.keys(ext.activeTasks).filter(n => n !== 'definitionExtract');
       ext.waitForTasks(names, 60000).then(() => {
@@ -795,6 +836,7 @@ window.egovExt = window.egovExt || {};
   ext.disableAnnotations = function() {
     enabled = false;
     renderToken++;
+    if (repairTimer !== null) { clearInterval(repairTimer); repairTimer = null; }
     hideToolbar();
     closeCard();
     rangesById.clear();

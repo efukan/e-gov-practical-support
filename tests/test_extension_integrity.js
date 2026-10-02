@@ -846,7 +846,7 @@ async function main() {
     assert(!document.querySelector('.egov-ext-note-flag'), 'オフにすると付箋が消える');
   });
 
-  await runAsyncTest('マーカー・メモの描き直し: e-Gov が本文を描き足して書き換えが続くときも、書き換えが終わってから色を付け直す', async () => {
+  await runAsyncTest('マーカー・メモの描き直し: 書き換えの途中で消えた色はすぐ付け直し、書き換えが終わったらもう一度付け直す', async () => {
     const html = `<!DOCTYPE html><html><body><div id="provisionview">
       <div id="Mp-Ch_1-At_6-Pr_2" class="paragraph"><div class="istitle"><span class="paragraphtitle">２　</span>
         <p class="sentence">前項の規定は、適用しない。</p></div></div>
@@ -875,6 +875,10 @@ async function main() {
     const p = document.querySelector('#Mp-Ch_1-At_6-Pr_2 .sentence');
     p.replaceChild(document.createTextNode('前項の規定は、適用しない。'), p.firstChild);
     assert.strictEqual(t.getRange('a1').toString(), '', '差し替えで前の範囲は消える');
+    // 書き換えが全部終わるのを待たず、少しの間に消えた色だけ付け直す
+    await new Promise(r => setTimeout(r, 400));
+    assert.strictEqual(t.getRange('a1').toString(), '前項', '書き換えの途中でも、消えた色はすぐ付け直す');
+    p.replaceChild(document.createTextNode('前項の規定は、適用しない。'), p.firstChild);
     ext.activeTasks.horizontal_leaf = null;
     finish();
     await new Promise(r => setTimeout(r, 20));

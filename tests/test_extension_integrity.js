@@ -99,6 +99,15 @@ async function main() {
     }
   });
 
+  runTest('条文ページに差し込む要素に aria-hidden を使わないこと（e-Gov の CSS が [aria-hidden=true] を display:none にするため）', () => {
+    const scripts = new Set();
+    manifest.content_scripts.forEach(cs => (cs.js || []).forEach(f => scripts.add(f)));
+    for (const f of scripts) {
+      const src = fs.readFileSync(path.join(ROOT_DIR, f), 'utf8');
+      assert(!/aria-hidden="|['"]aria-hidden['"]\s*,/.test(src), `${f} に aria-hidden が無いこと`);
+    }
+  });
+
   runTest('manifest.json と package.json のバージョン番号完全一致および popup.html バージョンタグ整合性', () => {
     const pkg = JSON.parse(fs.readFileSync(path.join(ROOT_DIR, 'package.json'), 'utf8'));
     assert.strictEqual(manifest.version, pkg.version, `manifest.version (${manifest.version}) と package.json version (${pkg.version}) が一致すること`);

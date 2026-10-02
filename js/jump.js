@@ -42,11 +42,10 @@ window.egovExt = window.egovExt || {};
     container.className = 'egov-ext-jump-container';
     container.setAttribute('role', 'search');
 
-    // アイコン
+    // アイコン（絵文字は CSS の ::before で出し、読み上げには含めない。
+    // e-Gov のページは [aria-hidden='true'] を display:none にするので、aria-hidden は使えない）
     const icon = document.createElement('span');
     icon.className = 'egov-ext-jump-icon';
-    icon.textContent = '🔍';
-    icon.setAttribute('aria-hidden', 'true');
 
     // 入力欄
     const input = document.createElement('input');

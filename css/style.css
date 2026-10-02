@@ -401,6 +401,10 @@ body.egov-ext-dim-active a.egov-ext-dimmed-text {
   opacity: 1 !important;
 }
 
+.egov-ext-jump-icon::before {
+  content: '🔍' / '' !important;
+}
+
 .egov-ext-jump-container:focus-within .egov-ext-jump-icon {
   color: #0a2d73 !important;
 }

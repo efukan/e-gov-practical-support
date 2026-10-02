@@ -186,7 +186,7 @@ window.egovExt = window.egovExt || {};
 
   const BUTTON_ID = 'egov-ext-fav-btn';
 
-  const STAR_SVG = '<svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true" focusable="false">'
+  const STAR_SVG = '<svg viewBox="0 0 24 24" width="14" height="14" focusable="false">'
     + '<polygon points="12 2.8 14.9 8.7 21.4 9.6 16.7 14.2 17.8 20.6 12 17.6 6.2 20.6 7.3 14.2 2.6 9.6 9.1 8.7" '
     + 'stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg>';
 

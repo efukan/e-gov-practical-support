@@ -254,7 +254,6 @@ window.egovExt = window.egovExt || {};
         btn.setAttribute('aria-label', `この法令の中で、ここを参照している箇所 ${entries.length}件`);
         const icon = document.createElement('span');
         icon.className = 'egov-ext-backref-icon';
-        icon.setAttribute('aria-hidden', 'true');
         icon.textContent = '↩';
         btn.appendChild(icon);
         btn.appendChild(document.createTextNode(String(entries.length)));

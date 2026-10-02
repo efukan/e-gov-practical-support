@@ -93,7 +93,6 @@ window.egovExt = window.egovExt || {};
         if (item.groupStart) {
           const sep = document.createElement('span');
           sep.className = 'egov-ext-quick-sep' + tierClasses(item);
-          sep.setAttribute('aria-hidden', 'true');
           group.appendChild(sep);
         }
         const btn = document.createElement('button');
@@ -102,7 +101,6 @@ window.egovExt = window.egovExt || {};
         btn.dataset.key = item.key;
         const dot = document.createElement('span');
         dot.className = 'egov-ext-quick-dot';
-        dot.setAttribute('aria-hidden', 'true');
         btn.appendChild(dot);
         btn.appendChild(document.createTextNode(item.label));
         btn.addEventListener('click', handleClick);
@@ -122,14 +120,16 @@ window.egovExt = window.egovExt || {};
 
   const SETTINGS_BUTTON_ID = 'egov-ext-settings-btn';
 
-  const GEAR_SVG = '<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">'
+  // 図には aria-hidden を付けない。e-Gov のページの CSS が [aria-hidden='true'] を display:none !important にするため。
+  // 読み上げはボタンの aria-label で足りる
+  const GEAR_SVG = '<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" focusable="false">'
     + '<circle cx="12" cy="12" r="3"/>'
     + '<path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>'
     + '</svg>';
 
   const SEARCH_BUTTON_ID = 'egov-ext-search-btn';
 
-  const SEARCH_SVG = '<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">'
+  const SEARCH_SVG = '<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" focusable="false">'
     + '<circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>';
 
   /**

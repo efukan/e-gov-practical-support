@@ -216,7 +216,7 @@ window.egovExt = window.egovExt || {};
     document.querySelectorAll('.egov-ext-note-flag').forEach(el => el.remove());
   }
 
-  const NOTE_SVG = '<svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">'
+  const NOTE_SVG = '<svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" focusable="false">'
     + '<path d="M4 4h16v11l-5 5H4z"/><path d="M15 20v-5h5"/><path d="M8 9h8M8 13h5"/></svg>';
 
   /**

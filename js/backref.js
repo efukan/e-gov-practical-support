@@ -4,6 +4,7 @@
  * 同じ法令の中の参照元（逆引き）。
  * 条・項・号の番号の横に「↩3」のような印を付け、その条・項・号を同じ法令のどこが参照しているかを示す。
  * 印にマウスを乗せると参照元の一覧（参照元の条項と、参照している文の前後）が出て、押すとそこへ移動する。
+ * 一覧の行にマウスを乗せる（キーボードで選ぶ）と、その参照元を含む条の全文を横に出す（移動しなくても読める）。
  * 設定「法令内の参照元」（backref）でオン・オフする。
  *
  * 材料は e-Gov が本文に付けているリンク（「前項」「同項第一号」「第六条第二項」など。href が #Mp-…）だけで、
@@ -24,6 +25,12 @@ window.egovExt = window.egovExt || {};
    * @type {WeakMap<HTMLElement, Array<{sourceEl: HTMLElement, link: HTMLAnchorElement}>>}
    */
   const entriesByButton = new WeakMap();
+
+  /**
+   * 一覧の行ごとの参照元（横に出す条文の材料）
+   * @type {WeakMap<HTMLElement, {sourceEl: HTMLElement, link: HTMLAnchorElement}>}
+   */
+  const entryByItem = new WeakMap();
 
   /** 最後に印を付けた法令IDと、そのときの本文のリンクの数（同じなら作り直さない） */
   let builtForLawId = null;
@@ -193,10 +200,11 @@ window.egovExt = window.egovExt || {};
       item.appendChild(path);
       item.appendChild(buildSnippet(entry.link));
 
+      entryByItem.set(item, entry);
       item.addEventListener('click', (e) => {
         e.preventDefault();
         e.stopPropagation();
-        if (ext.backrefTooltip) ext.backrefTooltip.hide(0);
+        if (ext.backrefTooltip) ext.backrefTooltip.hide(true);
         // 参照条文ポップアップの「ジャンプ」と同じ移動（読んでいた位置を控え、着いた所を一瞬光らせる）
         if (ext.fastSmoothScroll) ext.fastSmoothScroll(entry.sourceEl);
         else entry.sourceEl.scrollIntoView({ block: 'start' });
@@ -208,15 +216,138 @@ window.egovExt = window.egovExt || {};
     return frag;
   }
 
+  /**
+   * 参照元を含む条の全文を、横に出す吹き出しの中身として作る。
+   * ページの本文を写し取り、参照元の項・号に印を付け、参照しているリンクの語を強調する。
+   * 写しの中の id は消す（ページの id と重ならないように）
+   * @param {{sourceEl: HTMLElement, link: HTMLAnchorElement}} entry
+   * @returns {HTMLElement|null}
+   */
+  function buildSourcePreview(entry) {
+    const { sourceEl, link } = entry;
+    if (!sourceEl || !sourceEl.isConnected) return null;
+    const articleEl = sourceEl.closest('article, ._div_Article, .Article') || sourceEl;
+    const linkIndex = Array.prototype.indexOf.call(articleEl.querySelectorAll('a'), link);
+
+    const clone = articleEl.cloneNode(true);
+    const target = sourceEl === articleEl ? clone
+      : Array.prototype.find.call(clone.querySelectorAll('[id]'), el => el.id === sourceEl.id) || null;
+    if (target) target.classList.add('egov-ext-backref-preview-target');
+    const ref = linkIndex >= 0 ? clone.querySelectorAll('a')[linkIndex] : null;
+    if (ref) ref.classList.add('egov-ext-backref-preview-ref');
+    // e-Gov の条オプション・この拡張が足したボタン類は写さない
+    clone.querySelectorAll('.articleoptions, .articleoptiondisclosure, button, input, select, textarea')
+      .forEach(el => el.remove());
+    [clone, ...clone.querySelectorAll('[id], [tabindex], [aria-describedby]')].forEach(el => {
+      el.removeAttribute('id');
+      el.removeAttribute('tabindex');
+      el.removeAttribute('aria-describedby');
+    });
+    // <article> のままだと「高速レンダリング」の content-visibility が掛かるので、div に入れ替える
+    const body = document.createElement('div');
+    body.className = 'egov-ext-tip-body';
+    const wrap = document.createElement('div');
+    wrap.className = 'egov-ext-backref-preview-article';
+    while (clone.firstChild) wrap.appendChild(clone.firstChild);
+    if (target === clone) wrap.classList.add('egov-ext-backref-preview-target');
+    body.appendChild(wrap);
+
+    const container = document.createElement('div');
+    container.className = 'egov-ext-preview-container egov-ext-backref-preview';
+    const header = document.createElement('div');
+    header.className = 'egov-ext-tip-header';
+    const title = document.createElement('div');
+    title.className = 'egov-ext-tip-header-title';
+    title.textContent = `参照元（${sourceLabel(sourceEl)}）`;
+    header.appendChild(title);
+    if (ext.createTipActionButton) {
+      header.appendChild(ext.createTipActionButton({
+        icon: 'jump',
+        label: 'ジャンプ',
+        title: 'この参照元の場所へ移動',
+        onClick: () => {
+          if (ext.backrefTooltip) ext.backrefTooltip.hide(true);
+          if (ext.fastSmoothScroll) ext.fastSmoothScroll(sourceEl);
+          else sourceEl.scrollIntoView({ block: 'start' });
+        }
+      }));
+    }
+    container.appendChild(header);
+    container.appendChild(body);
+    return container;
+  }
+
+  /**
+   * 横に出した条文の中で、参照元の項・号が見えるところまで送る（条の頭から近ければ送らない）
+   */
+  function scrollPreviewToTarget() {
+    const tip = ext.backrefPreviewTooltip;
+    if (!tip) return;
+    const scroller = tip.el.querySelector('.egov-ext-tip-scroll');
+    const target = tip.el.querySelector('.egov-ext-backref-preview-target');
+    if (!scroller || !target) return;
+    const header = tip.el.querySelector('.egov-ext-tip-header');
+    const offset = target.getBoundingClientRect().top - scroller.getBoundingClientRect().top
+      - (header ? header.offsetHeight : 0) - 8;
+    if (offset > 0) scroller.scrollTop += offset;
+  }
+
+  /**
+   * 一覧の行に対して、参照元の条文を横に出す
+   * @param {HTMLElement} item
+   * @param {boolean} immediate
+   */
+  function showSourcePreview(item, immediate) {
+    const entry = entryByItem.get(item);
+    const tip = ext.backrefPreviewTooltip;
+    if (!entry || !tip) return;
+    if (ext.attachTooltip) ext.attachTooltip(tip);
+    tip.cancelHide();
+    tip.show(item, () => {
+      const content = buildSourcePreview(entry);
+      if (content) (window.requestAnimationFrame || (fn => setTimeout(fn, 0)))(scrollPreviewToTarget);
+      return content;
+    }, immediate);
+  }
+
   /** 吹き出しを共通基盤に登録する（初回のみ） */
   function setupBackrefTooltip() {
     if (ext.backrefTooltip || !ext.createTooltip || !ext.bindHoverTooltip) return;
     ext.backrefTooltip = ext.createTooltip({ variant: 'citation' });
+    ext.backrefPreviewTooltip = ext.createTooltip({
+      variant: 'preview',
+      placement: 'side',
+      parent: ext.backrefTooltip,
+      showDelay: 250,
+      hideDelay: 300
+    });
     ext.bindHoverTooltip({
       selector: '.' + BUTTON_CLASS,
       tooltip: ext.backrefTooltip,
       isEnabled: () => !!(ext.settings && ext.settings.global && ext.settings.backref && (!ext.checkIfLawPage || ext.checkIfLawPage())),
       resolveContent: buildBackrefList
+    });
+
+    // 一覧の行にマウスを乗せる・キーボードで選ぶと、その参照元の条文を横に出す
+    const listEl = ext.backrefTooltip.el;
+    const previewEl = ext.backrefPreviewTooltip.el;
+    listEl.addEventListener('mouseover', (e) => {
+      const item = e.target.closest('.egov-ext-backref-item');
+      if (item) showSourcePreview(item, false);
+    });
+    listEl.addEventListener('focusin', (e) => {
+      const item = e.target.closest('.egov-ext-backref-item');
+      if (item) showSourcePreview(item, true);
+    });
+    listEl.addEventListener('mouseout', (e) => {
+      const item = e.target.closest('.egov-ext-backref-item');
+      if (!item) return;
+      const related = e.relatedTarget;
+      // 同じ行の中の移動や、横に出した条文への移動では閉じない
+      if (related && (item.contains(related) || previewEl.contains(related))) return;
+      // 別の行へ移ったときは、その行の mouseover が出し直す
+      if (related && related.closest && related.closest('.egov-ext-backref-item')) return;
+      ext.backrefPreviewTooltip.hide();
     });
   }
 
@@ -266,6 +397,9 @@ window.egovExt = window.egovExt || {};
     builtForLawId = lawId;
     builtLinkCount = linkCount;
   };
+
+  /** テスト用 */
+  ext._testBackref = { buildBackrefList, showSourcePreview };
 
   /**
    * 付けた印を取り除き、吹き出しを閉じる

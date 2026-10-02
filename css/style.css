@@ -1052,6 +1052,51 @@ body.egov-fastrender-enabled .main-content {
   border-radius: 2px !important;
 }
 
+/* 一覧の行にマウスを乗せると横に出す、参照元を含む条の全文 */
+.egov-ext-backref-preview .egov-ext-tip-header {
+  position: sticky !important;
+  top: 0 !important;
+  z-index: 1 !important;
+  background: var(--tip-bg) !important;
+}
+
+.egov-ext-backref-preview .egov-ext-tip-body {
+  font-size: 12.5px !important;
+  line-height: 1.7 !important;
+  color: var(--tip-fg) !important;
+}
+
+.egov-ext-backref-preview .articleheading {
+  display: block !important;
+  font-style: normal !important;
+  font-size: 11.5px !important;
+  color: var(--tip-muted) !important;
+  margin-bottom: 2px !important;
+}
+
+.egov-ext-backref-preview .paragraph + .paragraph {
+  margin-top: 6px !important;
+}
+
+.egov-ext-backref-preview .item {
+  margin-top: 3px !important;
+}
+
+/* 参照元の項・号。被引用のプレビューの「指定された項・号」と同じ印 */
+.egov-ext-backref-preview .egov-ext-backref-preview-target {
+  background-color: rgba(16, 66, 164, 0.07) !important;
+  border-left: 3px solid #1042a4 !important;
+  padding-left: 6px !important;
+  border-radius: 2px !important;
+}
+
+/* 参照しているリンクの語。一覧の抜き出しと同じ色 */
+.egov-ext-backref-preview .egov-ext-backref-preview-ref {
+  background-color: rgba(255, 213, 79, 0.5) !important;
+  border-radius: 2px !important;
+  padding: 0 1px !important;
+}
+
 /* ----- 8-0b. マーカー・メモ (Markers & Notes) ----- */
 /* 色は CSS Custom Highlight API（CSS.highlights）で付ける。本文の DOM は変えない。
    メモのあるマーカーには点線の下線を付け、押すとメモが開くことが分かるようにする */

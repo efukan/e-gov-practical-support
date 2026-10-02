@@ -645,6 +645,33 @@ async function main() {
     assert(document.querySelector('.egov-ext-backref-btn').getAttribute('aria-label').includes('件'), '読み上げ用の名前に件数が入る');
     assert.strictEqual(ext.formatPathFromObjectId('Mp-Ch_1-At_4-Pr_1'), '第4条第1項', '参照元の名前は条項の形');
 
+    // 一覧の行から、参照元を含む条の全文を横に出す（移動しない）
+    const art3Btn = document.querySelector('#Mp-Ch_1-At_3-Pr_1 > .istitle > .egov-ext-backref-btn');
+    const listHost = document.createElement('div');
+    listHost.className = 'egov-ext-tip';
+    listHost.appendChild(ext._testBackref.buildBackrefList(art3Btn));
+    document.body.appendChild(listHost);
+    const items = Array.from(listHost.querySelectorAll('.egov-ext-backref-item'));
+    assert.deepStrictEqual(items.map(i => i.querySelector('.egov-ext-backref-path').textContent), ['第3条第2項', '第4条第1項']);
+    const scrollBefore = window.scrollY;
+    ext._testBackref.showSourcePreview(items[1], true);
+    const preview = ext.backrefPreviewTooltip.el;
+    assert(preview.classList.contains('visible'), '横に条文を出す');
+    assert.strictEqual(preview.querySelector('.egov-ext-tip-header-title').textContent, '参照元（第4条第1項）');
+    const target = preview.querySelector('.egov-ext-backref-preview-target');
+    assert(target && target.classList.contains('paragraph'), '参照元の項に印を付ける');
+    assert.strictEqual(preview.querySelector('.egov-ext-backref-preview-ref').textContent, '第三条', '参照しているリンクの語を強調する');
+    assert(preview.textContent.includes('第四条') && preview.textContent.includes('第一章に適用する'), '条の全文を出す');
+    assert.strictEqual(preview.querySelectorAll('[id]').length, 0, '写しの中に id を残さない（ページの id と重ならない）');
+    assert.strictEqual(preview.querySelectorAll('article').length, 0, '<article> のままにしない');
+    assert.deepStrictEqual(Array.from(preview.querySelectorAll('button')).map(b => b.textContent), ['ジャンプ'], '写しに参照元の印などのボタンを残さない');
+    assert.strictEqual(document.querySelectorAll('#Mp-Ch_1-At_4-Pr_1').length, 1, 'ページの本文はそのまま');
+    assert.strictEqual(window.scrollY, scrollBefore, '出すだけでは移動しない');
+    // 自分の条の中からの参照（第3条第2項「前項」）では、同じ条を出して第2項に印を付ける
+    ext._testBackref.showSourcePreview(items[0], true);
+    assert(preview.querySelector('.egov-ext-backref-preview-target').textContent.includes('同項第二号'), '同じ条の中の参照元にも印を付ける');
+    listHost.remove();
+
     ext.enableBackrefs(true);
     assert.strictEqual(document.querySelectorAll('.egov-ext-backref-btn').length, 3, '付け直しても増えない');
 

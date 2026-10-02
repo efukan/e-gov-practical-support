@@ -43,11 +43,9 @@
       </summary>
       <div class="settings-body">
 
-        <!-- レイアウト調整セクション -->
         <section class="section-group">
-          <h2 class="section-title">レイアウト調整</h2>
+          <h2 class="section-title">条文の見た目</h2>
           <div class="settings-grid">
-        
             <div class="setting-card" title="漢数字（第一条、千二百など）を算用数字に変換して横書き表示">
               <div class="card-left">
                 <div class="card-icon-container">
@@ -58,7 +56,7 @@
                     <path d="M16 14v4" />
                   </svg>
                 </div>
-                <span class="label">横書き数字変換</span>
+                <span class="label">算用数字</span>
               </div>
               <label class="switch">
                 <input type="checkbox" id="feature-horizontal" checked>
@@ -83,25 +81,6 @@
               </label>
             </div>
 
-            <div class="setting-card" title="スクロール位置に合わせて左側目次の現在地をリアルタイム強調">
-              <div class="card-left">
-                <div class="card-icon-container">
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                    <path d="M3 12h4" stroke-width="3" />
-                    <path d="M3 6h2M3 18h2" opacity="0.5" />
-                    <path d="M10 6h11" opacity="0.5" />
-                    <path d="M10 12h11" stroke-width="2.5" />
-                    <path d="M10 18h11" opacity="0.5" />
-                  </svg>
-                </div>
-                <span class="label">目次の自動追従</span>
-              </div>
-              <label class="switch">
-                <input type="checkbox" id="feature-scrollspy" checked>
-                <span class="slider"></span>
-              </label>
-            </div>
-
             <div class="setting-card" title="並列（並びに/及び）と選択（又は/若しくは）の重要接続詞を色分け">
               <div class="card-left">
                 <div class="card-icon-container">
@@ -120,15 +99,46 @@
                 <span class="slider"></span>
               </label>
             </div>
-        
+
+            <div class="setting-card" title="スクロール位置に合わせて左側目次の現在地をリアルタイム強調">
+              <div class="card-left">
+                <div class="card-icon-container">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M3 12h4" stroke-width="3" />
+                    <path d="M3 6h2M3 18h2" opacity="0.5" />
+                    <path d="M10 6h11" opacity="0.5" />
+                    <path d="M10 12h11" stroke-width="2.5" />
+                    <path d="M10 18h11" opacity="0.5" />
+                  </svg>
+                </div>
+                <span class="label">目次の追従</span>
+              </div>
+              <label class="switch">
+                <input type="checkbox" id="feature-scrollspy" checked>
+                <span class="slider"></span>
+              </label>
+            </div>
+
+            <div class="setting-card" title="画面外の未表示要素の描画負荷を軽減し初期表示とスクロールを高速化">
+              <div class="card-left">
+                <div class="card-icon-container">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" />
+                  </svg>
+                </div>
+                <span class="label">高速レンダリング</span>
+              </div>
+              <label class="switch">
+                <input type="checkbox" id="feature-fastrender" checked>
+                <span class="slider"></span>
+              </label>
+            </div>
           </div>
         </section>
 
-        <!-- 実務支援ツールセクション -->
         <section class="section-group">
-          <h2 class="section-title">実務支援ツール</h2>
+          <h2 class="section-title">その場で引く</h2>
           <div class="settings-grid">
-        
             <div class="setting-card" title="本法令および他法令への参照条文にホバーするとその場で本文プレビュー表示">
               <div class="card-left">
                 <div class="card-icon-container">
@@ -146,6 +156,57 @@
               </label>
             </div>
 
+            <div class="setting-card" title="法令内で定義された用語に下線を引き、ホバー時に定義条文を表示">
+              <div class="card-left">
+                <div class="card-icon-container">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" />
+                    <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" />
+                    <path d="M9 6h6M9 10h5" opacity="0.6" />
+                  </svg>
+                </div>
+                <span class="label">定義語ホバー辞書</span>
+              </div>
+              <label class="switch">
+                <input type="checkbox" id="feature-definition" checked>
+                <span class="slider"></span>
+              </label>
+            </div>
+
+            <div class="setting-card is-sub" data-depends-on="definition" title="政令・省令で、親の法律（「以下「法」という」の法律）が定義した語にも下線を引く">
+              <div class="card-left">
+                <div class="card-icon-container">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" />
+                    <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" />
+                    <path d="M12 7v6M9 10l3-3 3 3" opacity="0.7" />
+                  </svg>
+                </div>
+                <span class="label">親の法律の定義語</span>
+              </div>
+              <label class="switch">
+                <input type="checkbox" id="feature-parentDefinition" checked>
+                <span class="slider"></span>
+              </label>
+            </div>
+
+            <div class="setting-card is-sub" data-depends-on="definition" title="定義語に薄い背景色（マーカー）を付ける。オフにすると色と点線の下線だけになる">
+              <div class="card-left">
+                <div class="card-icon-container">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M4 20h16" />
+                    <rect x="5" y="9" width="14" height="7" rx="1.5" fill="currentColor" opacity="0.18" stroke="none" />
+                    <path d="M8 6h8M9 13h6" />
+                  </svg>
+                </div>
+                <span class="label">定義語の背景色</span>
+              </div>
+              <label class="switch">
+                <input type="checkbox" id="feature-definitionMarker">
+                <span class="slider"></span>
+              </label>
+            </div>
+
             <div class="setting-card" title="各条文タイトルの横に引用ボタンを配置し他法令からの被引用一覧を表示">
               <div class="card-left">
                 <div class="card-icon-container">
@@ -154,7 +215,7 @@
                     <path d="M12 7v5M12 15h.01" stroke-width="2.5" stroke-linecap="round" />
                   </svg>
                 </div>
-                <span class="label">被引用条文の表示</span>
+                <span class="label">被引用（引用元）</span>
               </div>
               <label class="switch">
                 <input type="checkbox" id="feature-citation" checked>
@@ -177,74 +238,12 @@
                 <span class="slider"></span>
               </label>
             </div>
+          </div>
+        </section>
 
-            <div class="setting-card" title="条文の語句を選ぶと出る帯から、マーカーを引いたりメモを書いたりする（オフにしても保存したものは消えない）">
-              <div class="card-left">
-                <div class="card-icon-container">
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                    <path d="M15 4l5 5L9 20H4v-5z" />
-                    <path d="M13 6l5 5" />
-                  </svg>
-                </div>
-                <span class="label">マーカー・メモ</span>
-              </div>
-              <label class="switch">
-                <input type="checkbox" id="feature-marker" checked>
-                <span class="slider"></span>
-              </label>
-            </div>
-
-            <div class="setting-card" title="法令内で定義された用語に下線を引き、ホバー時に定義条文を表示">
-              <div class="card-left">
-                <div class="card-icon-container">
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                    <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" />
-                    <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" />
-                    <path d="M9 6h6M9 10h5" opacity="0.6" />
-                  </svg>
-                </div>
-                <span class="label">定義語ホバー辞書</span>
-              </div>
-              <label class="switch">
-                <input type="checkbox" id="feature-definition" checked>
-                <span class="slider"></span>
-              </label>
-            </div>
-
-            <div class="setting-card" title="政令・省令で、親の法律（「以下「法」という」の法律）が定義した語にも下線を引く">
-              <div class="card-left">
-                <div class="card-icon-container">
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                    <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" />
-                    <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" />
-                    <path d="M12 7v6M9 10l3-3 3 3" opacity="0.7" />
-                  </svg>
-                </div>
-                <span class="label">親の法律の定義語</span>
-              </div>
-              <label class="switch">
-                <input type="checkbox" id="feature-parentDefinition" checked>
-                <span class="slider"></span>
-              </label>
-            </div>
-
-            <div class="setting-card" title="定義語に薄い背景色（マーカー）を付ける。オフにすると色と点線の下線だけになる">
-              <div class="card-left">
-                <div class="card-icon-container">
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                    <path d="M4 20h16" />
-                    <rect x="5" y="9" width="14" height="7" rx="1.5" fill="currentColor" opacity="0.18" stroke="none" />
-                    <path d="M8 6h8M9 13h6" />
-                  </svg>
-                </div>
-                <span class="label">定義語の背景色</span>
-              </div>
-              <label class="switch">
-                <input type="checkbox" id="feature-definitionMarker">
-                <span class="slider"></span>
-              </label>
-            </div>
-
+        <section class="section-group">
+          <h2 class="section-title">条文ページの操作</h2>
+          <div class="settings-grid">
             <div class="setting-card" title="画面右上の入力窓から指定条文へ一瞬で滑らかにスクロール移動">
               <div class="card-left">
                 <div class="card-icon-container">
@@ -254,42 +253,10 @@
                     <path d="M8 11h6M11 8l3 3-3 3" />
                   </svg>
                 </div>
-                <span class="label">条文ジャンプ検索</span>
+                <span class="label">条文ジャンプ</span>
               </div>
               <label class="switch">
                 <input type="checkbox" id="feature-jump" checked>
-                <span class="slider"></span>
-              </label>
-            </div>
-
-            <div class="setting-card" title="他法令へのリンクをクリックした際、現在の画面を維持して新しいタブで開く">
-              <div class="card-left">
-                <div class="card-icon-container">
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                    <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
-                    <polyline points="15 3 21 3 21 9" />
-                    <line x1="10" y1="14" x2="21" y2="3" />
-                  </svg>
-                </div>
-                <span class="label">他法令を別タブで</span>
-              </div>
-              <label class="switch">
-                <input type="checkbox" id="feature-newtab" checked>
-                <span class="slider"></span>
-              </label>
-            </div>
-
-            <div class="setting-card" title="画面外の未表示要素の描画負荷を軽減し初期表示とスクロールを高速化">
-              <div class="card-left">
-                <div class="card-icon-container">
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                    <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" />
-                  </svg>
-                </div>
-                <span class="label">高速レンダリング</span>
-              </div>
-              <label class="switch">
-                <input type="checkbox" id="feature-fastrender" checked>
                 <span class="slider"></span>
               </label>
             </div>
@@ -326,6 +293,38 @@
               </label>
             </div>
 
+            <div class="setting-card" title="他法令へのリンクをクリックした際、現在の画面を維持して新しいタブで開く">
+              <div class="card-left">
+                <div class="card-icon-container">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
+                    <polyline points="15 3 21 3 21 9" />
+                    <line x1="10" y1="14" x2="21" y2="3" />
+                  </svg>
+                </div>
+                <span class="label">他法令を別タブで</span>
+              </div>
+              <label class="switch">
+                <input type="checkbox" id="feature-newtab" checked>
+                <span class="slider"></span>
+              </label>
+            </div>
+
+            <div class="setting-card" title="条文の語句を選ぶと出る帯から、マーカーを引いたりメモを書いたりする（オフにしても保存したものは消えない）">
+              <div class="card-left">
+                <div class="card-icon-container">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M15 4l5 5L9 20H4v-5z" />
+                    <path d="M13 6l5 5" />
+                  </svg>
+                </div>
+                <span class="label">マーカー・メモ</span>
+              </div>
+              <label class="switch">
+                <input type="checkbox" id="feature-marker" checked>
+                <span class="slider"></span>
+              </label>
+            </div>
           </div>
         </section>
 

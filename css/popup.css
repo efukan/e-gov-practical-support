@@ -825,3 +825,9 @@ body.global-off .setting-card {
   background-color: var(--md-comp-disabled-bg);
   border-color: var(--md-comp-disabled-border);
 }
+
+/* 定義語ホバー辞書の中の設定（親の法律の定義語・背景色）。親がオフのあいだは薄くして触れないようにする */
+.setting-card.is-inactive {
+  opacity: 0.45;
+  pointer-events: none;
+}

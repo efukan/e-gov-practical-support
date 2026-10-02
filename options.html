@@ -29,8 +29,8 @@
           </svg>
         </div>
         <div class="card-text">
-          <span class="label">すべての実務支援機能を有効化する</span>
-          <span class="desc">拡張機能全体のオン・オフを一括で切り替えます。一時的にすべての機能を停止したい場合に便利です。</span>
+          <span class="label">すべての機能を有効にする</span>
+          <span class="desc">オフにすると、この拡張は e-Gov のページで何もしません。下の設定は残ります。</span>
         </div>
       </div>
       <label class="switch">
@@ -39,139 +39,96 @@
       </label>
     </div>
 
-    <!-- レイアウト調整セクション -->
     <section class="section-group">
-      <h2 class="section-title">レイアウト調整</h2>
+      <h2 class="section-title">条文の見た目</h2>
       <div class="settings-list">
-        
-        <div class="setting-card">
-          <div class="card-left">
-            <div class="card-icon-container">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M4 6h16M4 12h16M4 18h10" />
-                <path d="M16 14h2a2 2 0 0 1 2 2v2" />
-                <path d="M16 18h4" />
-                <path d="M16 14v4" />
-              </svg>
-            </div>
-            <div class="card-text">
-              <span class="label">横書き表記変換</span>
-              <span class="desc">条文内の漢数字（例: 「第一条」）を全角算用数字（「第１条」）に自動変換し、号番号（例: 「一」）を半角カッコ「(1)」に整形します。</span>
-            </div>
-          </div>
+        <div class="setting-row">
+          <span class="row-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"> <path d="M4 6h16M4 12h16M4 18h10" /> <path d="M16 14h2a2 2 0 0 1 2 2v2" /> <path d="M16 18h4" /> <path d="M16 14v4" /> </svg></span>
+          <label class="row-text" for="feature-horizontal">
+            <span class="label">算用数字（横書き表記）</span>
+            <span class="desc">「第一条」を「第１条」に、号の「一」を「(1)」にします。</span>
+          </label>
           <label class="switch">
             <input type="checkbox" id="feature-horizontal" checked>
             <span class="slider"></span>
           </label>
         </div>
-
-        <div class="setting-card">
-          <div class="card-left">
-            <div class="card-icon-container">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M8 5a9 9 0 0 0 0 14" stroke-width="2.5" stroke-dasharray="1 1.5" opacity="0.6" />
-                <path d="M11 9h3M11 12h4M11 15h3" stroke-width="2" />
-                <path d="M16 5a9 9 0 0 1 0 14" stroke-width="2.5" stroke-dasharray="1 1.5" opacity="0.6" />
-              </svg>
-            </div>
-            <div class="card-text">
-              <span class="label">括弧書き薄字化</span>
-              <span class="desc">長大な括弧書き（例: 「（以下…という。）」など）を薄字（グレー）化し、さらに括弧自体に色をつけることで強調を抑え、主文の速読と正確な把握を助けます。</span>
-            </div>
-          </div>
+        <div class="setting-row">
+          <span class="row-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"> <path d="M8 5a9 9 0 0 0 0 14" stroke-width="2.5" stroke-dasharray="1 1.5" opacity="0.6" /> <path d="M11 9h3M11 12h4M11 15h3" stroke-width="2" /> <path d="M16 5a9 9 0 0 1 0 14" stroke-width="2.5" stroke-dasharray="1 1.5" opacity="0.6" /> </svg></span>
+          <label class="row-text" for="feature-dim">
+            <span class="label">括弧書きの薄字化</span>
+            <span class="desc">長い括弧書きを薄い灰色にして、本文の骨組みを追いやすくします。</span>
+          </label>
           <label class="switch">
             <input type="checkbox" id="feature-dim" checked>
             <span class="slider"></span>
           </label>
         </div>
-
-        <div class="setting-card">
-          <div class="card-left">
-            <div class="card-icon-container">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M3 12h4" stroke-width="3" />
-                <path d="M3 6h2M3 18h2" opacity="0.5" />
-                <path d="M10 6h11" opacity="0.5" />
-                <path d="M10 12h11" stroke-width="2.5" />
-                <path d="M10 18h11" opacity="0.5" />
-              </svg>
-            </div>
-            <div class="card-text">
-              <span class="label">目次連動ハイライト</span>
-              <span class="desc">スクロール位置に合わせて目次の該当箇所をリアルタイムに自動強調表示し、長大な法令内での現在地を把握しやすくします。</span>
-            </div>
-          </div>
-          <label class="switch">
-            <input type="checkbox" id="feature-scrollspy" checked>
-            <span class="slider"></span>
+        <div class="setting-row">
+          <span class="row-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"> <circle cx="18" cy="6" r="3" /> <circle cx="6" cy="12" r="3" /> <circle cx="18" cy="18" r="3" /> <line x1="8.7" y1="10.7" x2="15.3" y2="7.3" /> <line x1="8.7" y1="13.3" x2="15.3" y2="16.7" /> </svg></span>
+          <label class="row-text" for="feature-conjunction">
+            <span class="label">接続詞の色分け</span>
+            <span class="desc">「並びに・及び」「又は・若しくは」を、大小の段階に合わせて色分けします。</span>
           </label>
-        </div>
-
-        <div class="setting-card">
-          <div class="card-left">
-            <div class="card-icon-container">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <circle cx="18" cy="6" r="3" />
-                <circle cx="6" cy="12" r="3" />
-                <circle cx="18" cy="18" r="3" />
-                <line x1="8.7" y1="10.7" x2="15.3" y2="7.3" />
-                <line x1="8.7" y1="13.3" x2="15.3" y2="16.7" />
-              </svg>
-            </div>
-            <div class="card-text">
-              <span class="label">接続詞の色分け</span>
-              <span class="desc">「並びに・及び」（並列）や「又は・若しくは」（選択）などの接続詞を検知し、大・小の階層関係に合わせて色・太字・下線で視覚化します。</span>
-            </div>
-          </div>
           <label class="switch">
             <input type="checkbox" id="feature-conjunction" checked>
             <span class="slider"></span>
           </label>
         </div>
-        
+        <div class="setting-row">
+          <span class="row-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"> <path d="M3 12h4" stroke-width="3" /> <path d="M3 6h2M3 18h2" opacity="0.5" /> <path d="M10 6h11" opacity="0.5" /> <path d="M10 12h11" stroke-width="2.5" /> <path d="M10 18h11" opacity="0.5" /> </svg></span>
+          <label class="row-text" for="feature-scrollspy">
+            <span class="label">目次の追従</span>
+            <span class="desc">いま読んでいる条文を、左の目次で強調します。</span>
+          </label>
+          <label class="switch">
+            <input type="checkbox" id="feature-scrollspy" checked>
+            <span class="slider"></span>
+          </label>
+        </div>
+        <div class="setting-row">
+          <span class="row-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"> <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" /> </svg></span>
+          <label class="row-text" for="feature-fastrender">
+            <span class="label">高速レンダリング</span>
+            <span class="desc">画面の外にある条文の描画を後回しにして、長い法令でも表示を軽くします。</span>
+          </label>
+          <label class="switch">
+            <input type="checkbox" id="feature-fastrender" checked>
+            <span class="slider"></span>
+          </label>
+        </div>
       </div>
     </section>
 
-    <!-- 実務支援ツールセクション -->
     <section class="section-group">
-      <h2 class="section-title">実務支援ツール</h2>
+      <h2 class="section-title">その場で引く</h2>
       <div class="settings-list">
-        
-        <div class="setting-card">
-          <div class="card-left">
-            <div class="card-icon-container">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <rect x="3" y="3" width="18" height="12" rx="2" />
-                <path d="M7 15v4l4-4" />
-                <path d="M7 7h10M7 11h6" opacity="0.6" />
-              </svg>
-            </div>
-            <div class="card-text">
-              <span class="label">参照条文ポップアップ</span>
-              <span class="desc">条文内の「第◯条」や他法令へのリンクにカーソルを重ねるだけで、参照先条文の本文をポップアップでプレビュー表示します。</span>
-            </div>
-          </div>
+        <div class="setting-row">
+          <span class="row-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"> <rect x="3" y="3" width="18" height="12" rx="2" /> <path d="M7 15v4l4-4" /> <path d="M7 7h10M7 11h6" opacity="0.6" /> </svg></span>
+          <label class="row-text" for="feature-popup">
+            <span class="label">参照条文ポップアップ</span>
+            <span class="desc">「第〇条」や他の法令へのリンクにマウスを乗せると、参照先の条文を出します。</span>
+          </label>
           <label class="switch">
             <input type="checkbox" id="feature-popup" checked>
             <span class="slider"></span>
           </label>
         </div>
-
-        <div class="setting-card">
-          <div class="card-left">
-            <div class="card-icon-container">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" />
-                <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" />
-                <path d="M9 6h6M9 10h5" opacity="0.6" />
-              </svg>
-            </div>
-            <div class="card-text">
-              <span class="label">定義語ホバー辞書</span>
-              <span class="desc">法令内で定義されている定義語を検知して下線を付与し、ホバー時にその定義された条文をポップアップで表示します。</span>
-              <div class="color-setting-area">
-                <div class="color-setting-header">
-                  <span class="color-setting-title">着色カラー:</span>
+        <div class="setting-row">
+          <span class="row-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"> <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" /> <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" /> <path d="M9 6h6M9 10h5" opacity="0.6" /> </svg></span>
+          <label class="row-text" for="feature-definition">
+            <span class="label">定義語ホバー辞書</span>
+            <span class="desc">定義語に下線を引き、マウスを乗せると定義している条文を出します。</span>
+          </label>
+          <label class="switch">
+            <input type="checkbox" id="feature-definition" checked>
+            <span class="slider"></span>
+          </label>
+        </div>
+        <div class="setting-row is-sub is-color" data-depends-on="definition">
+          <div class="row-text">
+            <span class="label">着色カラー</span>
+            <div class="color-setting-header">
                   <div class="color-swatches-group">
                     <button type="button" class="def-color-swatch active" data-color="#00695c" title="緑 / ティール深緑（標準）" style="background-color: #00695c;"></button>
                     <button type="button" class="def-color-swatch" data-color="#6a1b9a" title="紫 / パープル（法令ひもとき風）" style="background-color: #6a1b9a;"></button>
@@ -183,240 +140,142 @@
                       <span class="custom-color-icon">🎨</span>
                     </label>
                   </div>
-                </div>
-                <div class="color-preview-box">
-                  プレビュー: この法律において「<span id="def-color-preview-sample" class="def-preview-word">開発行為</span>」とは、建築物の建築をいう。
-                </div>
-              </div>
+            </div>
+            <div class="color-preview-box">
+              見本: この法律において「<span id="def-color-preview-sample" class="def-preview-word">開発行為</span>」とは、建築物の建築をいう。
             </div>
           </div>
-          <label class="switch">
-            <input type="checkbox" id="feature-definition" checked>
-            <span class="slider"></span>
-          </label>
         </div>
-
-        <div class="setting-card">
-          <div class="card-left">
-            <div class="card-icon-container">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" />
-                <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" />
-                <path d="M12 7v6M9 10l3-3 3 3" opacity="0.7" />
-              </svg>
-            </div>
-            <div class="card-text">
-              <span class="label">親の法律の定義語も表示</span>
-              <span class="desc">施行令・施行規則などの政令・省令を開いたとき、親の法律（「以下「法」という」の法律。施行規則では施行令も）が定義した語にも下線を引きます。親の法律の条文は e-Gov法令検索から取得し、取得した定義はブラウザ内に保存して次回から再利用します。定義語ホバー辞書がオンのときだけ働きます。</span>
-            </div>
-          </div>
-          <label class="switch">
-            <input type="checkbox" id="feature-parentDefinition" checked>
-            <span class="slider"></span>
+        <div class="setting-row is-sub" data-depends-on="definition">
+          <label class="row-text" for="feature-definitionMarker">
+            <span class="label">定義語の背景色（マーカー）</span>
+            <span class="desc">定義語に着色カラーの薄い背景色を付けます。初期値はオフです（3.0.0 より前から使っている方はオン）。</span>
           </label>
-        </div>
-
-        <div class="setting-card">
-          <div class="card-left">
-            <div class="card-icon-container">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M4 20h16" />
-                <rect x="5" y="9" width="14" height="7" rx="1.5" fill="currentColor" opacity="0.18" stroke="none" />
-                <path d="M8 6h8M9 13h6" />
-              </svg>
-            </div>
-            <div class="card-text">
-              <span class="label">定義語の背景色（マーカー）</span>
-              <span class="desc">定義語に、着色カラーの薄い背景色を付けます。オフのときは、色と点線の下線だけで示します（マウスを乗せたときは背景色を付けます）。初期値はオフです（3.0.0 より前から使っている方はオンのままです）。定義語ホバー辞書がオンのときだけ働きます。</span>
-            </div>
-          </div>
           <label class="switch">
             <input type="checkbox" id="feature-definitionMarker">
             <span class="slider"></span>
           </label>
         </div>
-
-        <div class="setting-card">
-          <div class="card-left">
-            <div class="card-icon-container">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <circle cx="11" cy="11" r="8" />
-                <path d="M21 21l-4.3-4.3" />
-                <path d="M8 11h6M11 8l3 3-3 3" />
-              </svg>
-            </div>
-            <div class="card-text">
-              <span class="label">条文ジャンプ検索</span>
-              <span class="desc">画面右上に常時表示される入力欄に条文番号（例: 「5」「12の2」）を入力して Enter を押すだけで、該当条文の位置へ瞬時に移動します。</span>
-            </div>
-          </div>
+        <div class="setting-row is-sub" data-depends-on="definition">
+          <label class="row-text" for="feature-parentDefinition">
+            <span class="label">親の法律の定義語</span>
+            <span class="desc">施行令・施行規則で、親の法律が定義した語にも下線を引きます。親の法律の条文は e-Gov法令検索から取得し、この端末に7日間保存します。</span>
+          </label>
           <label class="switch">
-            <input type="checkbox" id="feature-jump" checked>
+            <input type="checkbox" id="feature-parentDefinition" checked>
             <span class="slider"></span>
           </label>
         </div>
-
-        <div class="setting-card">
-          <div class="card-left">
-            <div class="card-icon-container">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
-                <polyline points="15 3 21 3 21 9" />
-                <line x1="10" y1="14" x2="21" y2="3" />
-              </svg>
-            </div>
-            <div class="card-text">
-              <span class="label">別タブで開く</span>
-              <span class="desc">本文内にある他法令へのリンクをクリックした際、現在の表示を切り替えずに新しいタブで開き、並行した調査や比較を容易にします。</span>
-            </div>
-          </div>
-          <label class="switch">
-            <input type="checkbox" id="feature-newtab" checked>
-            <span class="slider"></span>
+        <div class="setting-row">
+          <span class="row-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"> <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" /> <path d="M12 7v5M12 15h.01" stroke-width="2.5" stroke-linecap="round" /> </svg></span>
+          <label class="row-text" for="feature-citation">
+            <span class="label">被引用（引用元）</span>
+            <span class="desc">条の見出しの横の「引用」から、この条文を引用している他の法令を一覧します。</span>
           </label>
-        </div>
-
-        <div class="setting-card">
-          <div class="card-left">
-            <div class="card-icon-container">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" />
-              </svg>
-            </div>
-            <div class="card-text">
-              <span class="label">高速レンダリング</span>
-              <span class="desc">画面外にあって見えていない条文ブロックの描画計算を省略し、ページの表示速度と操作の滑らかさを向上させます。</span>
-            </div>
-          </div>
-          <label class="switch">
-            <input type="checkbox" id="feature-fastrender" checked>
-            <span class="slider"></span>
-          </label>
-        </div>
-
-        <div class="setting-card">
-          <div class="card-left">
-            <div class="card-icon-container">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
-                <path d="M12 7v5M12 15h.01" stroke-width="2.5" stroke-linecap="round" />
-              </svg>
-            </div>
-            <div class="card-text">
-              <span class="label">被引用（引用元）表示</span>
-              <span class="desc">条文の見出し横に「引用」ボタンを追加し、その条文を引用している他の法令の該当箇所をポップアップ表示します。一覧の条文にマウスを乗せると、その条文本文をプレビューできます。</span>
-            </div>
-          </div>
           <label class="switch">
             <input type="checkbox" id="feature-citation" checked>
             <span class="slider"></span>
           </label>
         </div>
-
-        <div class="setting-card">
-          <div class="card-left">
-            <div class="card-icon-container">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                  <path d="M9 14L4 9l5-5" />
-                  <path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11" />
-                </svg>
-            </div>
-            <div class="card-text">
-              <span class="label">同じ法令の中の参照元</span>
-              <span class="desc">条・項・号の番号の横に、同じ法令の中でそこを参照している箇所の数（「↩3」など）を出します。マウスを乗せると参照元の一覧（参照元の条項と、参照している文の前後）が出て、押すとそこへ移動します。「前項」「同項第一号」など e-Gov が本文に付けているリンクから数えるので、通信はしません。他の法令からの引用は「被引用（引用元）表示」で確かめられます。</span>
-            </div>
-          </div>
+        <div class="setting-row">
+          <span class="row-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"> <path d="M9 14L4 9l5-5" /> <path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11" /> </svg></span>
+          <label class="row-text" for="feature-backref">
+            <span class="label">同じ法令の中の参照元</span>
+            <span class="desc">条・項・号の番号の横に、同じ法令の中で参照している箇所の数（↩3 など）を出します。通信はしません。</span>
+          </label>
           <label class="switch">
             <input type="checkbox" id="feature-backref" checked>
             <span class="slider"></span>
           </label>
         </div>
+      </div>
+    </section>
 
-        <div class="setting-card">
-          <div class="card-left">
-            <div class="card-icon-container">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <polygon points="12 2.8 14.9 8.7 21.4 9.6 16.7 14.2 17.8 20.6 12 17.6 6.2 20.6 7.3 14.2 2.6 9.6 9.1 8.7" />
-              </svg>
-            </div>
-            <div class="card-text">
-              <span class="label">お気に入りボタン</span>
-              <span class="desc">条文ページの右上に「☆ お気に入り追加」ボタンを置きます。押した法令は、拡張機能のアイコンを押すと出る画面の「お気に入り」に並び、そこから開けます。お気に入りはブラウザの同期に載せるので、同じアカウントでログインした別の端末でも同じ一覧が出ます（300件まで）。オフにしてもお気に入りの一覧は消えません。</span>
-            </div>
-          </div>
+    <section class="section-group">
+      <h2 class="section-title">条文ページの操作</h2>
+      <div class="settings-list">
+        <div class="setting-row">
+          <span class="row-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"> <circle cx="11" cy="11" r="8" /> <path d="M21 21l-4.3-4.3" /> <path d="M8 11h6M11 8l3 3-3 3" /> </svg></span>
+          <label class="row-text" for="feature-jump">
+            <span class="label">条文ジャンプ</span>
+            <span class="desc">右上の入力欄に条番号（例: 5、12-2）を入れると、その条へ移動します。</span>
+          </label>
+          <label class="switch">
+            <input type="checkbox" id="feature-jump" checked>
+            <span class="slider"></span>
+          </label>
+        </div>
+        <div class="setting-row">
+          <span class="row-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"> <polygon points="12 2.8 14.9 8.7 21.4 9.6 16.7 14.2 17.8 20.6 12 17.6 6.2 20.6 7.3 14.2 2.6 9.6 9.1 8.7" /> </svg></span>
+          <label class="row-text" for="feature-favorite">
+            <span class="label">お気に入りボタン</span>
+            <span class="desc">右上に「☆ お気に入り追加」を置きます。一覧はアイコンを押して出る画面にあり、同期で他の端末にも出ます。</span>
+          </label>
           <label class="switch">
             <input type="checkbox" id="feature-favorite" checked>
             <span class="slider"></span>
           </label>
         </div>
-
-        <div class="setting-card">
-          <div class="card-left">
-            <div class="card-icon-container">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <rect x="2" y="7" width="20" height="10" rx="5" />
-                <circle cx="8" cy="12" r="2" fill="currentColor" />
-                <line x1="13" y1="12" x2="18" y2="12" />
-              </svg>
-            </div>
-            <div class="card-text">
-              <span class="label">条文ページの切り替えボタン</span>
-              <span class="desc">条文ページの右上（お気に入りボタンの左隣）に「算用数字」「括弧」「接続詞」「定義語」「被引用」「参照元」「マーカー」のボタンを置き、設定画面を開かずにその場でオン・オフできるようにします。押した結果はこの設定画面やポップアップにも反映されます。左のロゴに重ならないよう、幅1320px未満の画面では「被引用」「参照元」を、1190px未満では「マーカー」も、1110px未満では切り替えボタンの組ごと表示しません。</span>
-            </div>
-          </div>
+        <div class="setting-row">
+          <span class="row-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"> <rect x="2" y="7" width="20" height="10" rx="5" /> <circle cx="8" cy="12" r="2" fill="currentColor" /> <line x1="13" y1="12" x2="18" y2="12" /> </svg></span>
+          <label class="row-text" for="feature-quickToggle">
+            <span class="label">切り替えボタン</span>
+            <span class="desc">右上に、算用数字・括弧・接続詞などをその場でオン・オフするボタンを置きます。画面の幅が狭いときは一部を隠します。</span>
+          </label>
           <label class="switch">
             <input type="checkbox" id="feature-quickToggle" checked>
             <span class="slider"></span>
           </label>
         </div>
-
+        <div class="setting-row">
+          <span class="row-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"> <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" /> <polyline points="15 3 21 3 21 9" /> <line x1="10" y1="14" x2="21" y2="3" /> </svg></span>
+          <label class="row-text" for="feature-newtab">
+            <span class="label">他の法令を別タブで開く</span>
+            <span class="desc">本文の中の他の法令へのリンクを、新しいタブで開きます。</span>
+          </label>
+          <label class="switch">
+            <input type="checkbox" id="feature-newtab" checked>
+            <span class="slider"></span>
+          </label>
+        </div>
       </div>
     </section>
 
-    <!-- マーカー・メモ -->
     <section class="section-group" id="annotation-section">
       <h2 class="section-title">マーカー・メモ</h2>
       <div class="settings-list">
-        <div class="setting-card">
-          <div class="card-left">
-            <div class="card-icon-container">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M15 4l5 5L9 20H4v-5z" />
-                <path d="M13 6l5 5" />
-              </svg>
-            </div>
-            <div class="card-text">
-              <span class="label">マーカー・メモ</span>
-              <span class="desc">条文の語句を選ぶと出る帯から、黄・緑・桃のマーカーを引いたり、メモを書いたりできます。「この項にメモ」で項・号そのものにもメモを残せ、番号の横に付箋の印が付きます。色の付いた所や付箋を押すと、メモの書き直し・色の変更・削除ができます。オフにすると表示しなくなりますが、保存したものは消えません。</span>
-            </div>
-          </div>
+        <div class="setting-row">
+          <span class="row-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"> <path d="M15 4l5 5L9 20H4v-5z" /> <path d="M13 6l5 5" /> </svg></span>
+          <label class="row-text" for="feature-marker">
+            <span class="label">マーカー・メモ</span>
+            <span class="desc">語句を選ぶと出る帯から、3色のマーカーを引いたりメモを書いたりできます。オフにしても保存したものは消えません。</span>
+          </label>
           <label class="switch">
             <input type="checkbox" id="feature-marker" checked>
             <span class="slider"></span>
           </label>
         </div>
-      </div>
-
-      <div class="annotation-panel">
-        <div class="annotation-mode" role="radiogroup" aria-labelledby="annotation-mode-title">
-          <span class="annotation-panel-title" id="annotation-mode-title">保存先</span>
-          <label class="annotation-radio">
-            <input type="radio" name="annotation-mode" value="local">
-            <span><strong>この端末の中だけ</strong>（初期値）<br><span class="annotation-radio-desc">量の上限はほぼありません。外へは一切送りません。別の端末へは「書き出す」「読み込む」で移せます。</span></span>
-          </label>
-          <label class="annotation-radio">
-            <input type="radio" name="annotation-mode" value="sync">
-            <span><strong>ブラウザの同期で、他の端末とそろえる</strong><br><span class="annotation-radio-desc">同じアカウントでログインした他の端末にも出ます。ブラウザの同期の容量が小さいため、マーカー・メモ全体で約60KB・180件まで、メモは1件500字までです。メモの中身はブラウザの会社（Google など）の同期のサーバーを通ります。</span></span>
-          </label>
+        <div class="annotation-panel">
+          <div class="annotation-mode" role="radiogroup" aria-labelledby="annotation-mode-title">
+            <span class="annotation-panel-title" id="annotation-mode-title">保存先</span>
+            <label class="annotation-radio">
+              <input type="radio" name="annotation-mode" value="local">
+              <span><strong>この端末の中だけ</strong>（初期値）<br><span class="annotation-radio-desc">量の上限はほぼありません。外へは送りません。別の端末へは書き出し・読み込みで移せます。</span></span>
+            </label>
+            <label class="annotation-radio">
+              <input type="radio" name="annotation-mode" value="sync">
+              <span><strong>ブラウザの同期で、他の端末とそろえる</strong><br><span class="annotation-radio-desc">同じアカウントの他の端末にも出ます。全体で約60KB・180件、メモは1件500字までです。メモの中身はブラウザの会社（Google など）の同期のサーバーを通ります。</span></span>
+            </label>
+          </div>
+          <p class="annotation-usage" id="annotation-usage"></p>
+          <div class="annotation-actions">
+            <button type="button" class="annotation-btn" id="annotation-open-list">一覧を開く（検索・書き直し）</button>
+            <button type="button" class="annotation-btn" id="annotation-export">書き出す（JSON ファイル）</button>
+            <label class="annotation-btn" for="annotation-import">読み込む</label>
+            <input type="file" id="annotation-import" accept="application/json,.json" hidden>
+          </div>
+          <p class="annotation-status" id="annotation-status" role="status" aria-live="polite"></p>
         </div>
-        <p class="annotation-usage" id="annotation-usage"></p>
-        <div class="annotation-actions">
-          <button type="button" class="annotation-btn" id="annotation-open-list">一覧を開く（検索・書き直し）</button>
-          <button type="button" class="annotation-btn" id="annotation-export">書き出す（JSON ファイル）</button>
-          <label class="annotation-btn" for="annotation-import">読み込む</label>
-          <input type="file" id="annotation-import" accept="application/json,.json" hidden>
-        </div>
-        <p class="annotation-status" id="annotation-status" role="status" aria-live="polite"></p>
       </div>
     </section>
   </div>

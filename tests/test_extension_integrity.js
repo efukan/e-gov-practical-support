@@ -257,6 +257,35 @@ async function main() {
     assert.strictEqual(sentMessages[0].msg.settings.horizontal, false, '送信された設定の horizontal が false');
   });
 
+  await runAsyncTest('設定画面: 定義語ホバー辞書がオフのあいだ、中の設定（色・背景色・親の法律）を薄くして操作できなくする', async () => {
+    for (const [name, html] of [['options.html', optionsHtml], ['popup.html', popupHtml]]) {
+      const dom = new JSDOM(html, { runScripts: 'dangerously' });
+      const window = dom.window;
+      const document = window.document;
+      window.chrome = {
+        storage: { sync: { get: async (key) => ({ [key]: { global: true, definition: false } }), set: async () => {} }, onChanged: { addListener: () => {} } },
+        tabs: { query: async () => [], sendMessage: async () => {} }
+      };
+      window.eval(settingsJs);
+      await window.egovExt.initSettingsUI({ allTabs: false });
+      const dependents = Array.from(document.querySelectorAll('[data-depends-on="definition"]'));
+      assert(dependents.length >= 2, `${name}: 定義語ホバー辞書の中の設定がある`);
+      ['feature-parentDefinition', 'feature-definitionMarker'].forEach(id => {
+        assert(document.getElementById(id).closest('[data-depends-on="definition"]'), `${name}: #${id} は定義語ホバー辞書の中にある`);
+      });
+      dependents.forEach(el => assert(el.classList.contains('is-inactive'), `${name}: オフのあいだは薄くする`));
+      assert.strictEqual(document.getElementById('feature-parentDefinition').disabled, true, `${name}: オフのあいだは操作できない`);
+      const definition = document.getElementById('feature-definition');
+      definition.checked = true;
+      definition.dispatchEvent(new window.Event('change'));
+      await new Promise(r => setTimeout(r, 10));
+      dependents.forEach(el => assert(!el.classList.contains('is-inactive'), `${name}: オンにすると戻す`));
+      assert.strictEqual(document.getElementById('feature-parentDefinition').disabled, false);
+      const swatch = document.querySelector('.def-color-swatch');
+      if (swatch) assert.strictEqual(swatch.disabled, false, `${name}: 色も選べるようになる`);
+    }
+  });
+
   const favoritesJs = fs.readFileSync(path.join(ROOT_DIR, 'js', 'favorites.js'), 'utf8');
   const utilsJsForFavorites = fs.readFileSync(path.join(ROOT_DIR, 'js', 'utils.js'), 'utf8');
   const jumpJsForFavorites = fs.readFileSync(path.join(ROOT_DIR, 'js', 'jump.js'), 'utf8');

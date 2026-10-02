@@ -195,9 +195,21 @@ body * {
 }
 
 .global-card .card-icon-container {
+  width: 32px;
+  height: 32px;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
   background-color: var(--md-comp-badge-bg);
   color: var(--md-sys-color-primary);
   border: none;
+}
+
+.global-card .card-icon-container svg {
+  width: 16px;
+  height: 16px;
 }
 
 .global-card .card-text {
@@ -234,81 +246,92 @@ body * {
   text-transform: uppercase;
 }
 
-/* グリッド 2カラム化 */
+/* 設定の一覧。まとまりごとに 1 つの枠に入れ、1 行に 1 つの設定を並べる */
 .settings-list {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
-  gap: 12px;
-}
-
-/* 設定カード */
-.setting-card {
   background-color: var(--md-sys-color-surface);
   border: 1px solid var(--md-sys-color-outline);
   border-radius: 12px;
-  padding: 12px 14px;
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 10px;
-  transition: background-color 0.2s, border-color 0.2s, box-shadow 0.2s;
+  overflow: hidden;
 }
 
-.setting-card:hover {
+.setting-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 16px;
+  border-top: 1px solid var(--md-sys-color-outline);
+  transition: background-color 0.15s, opacity 0.15s;
+}
+
+.setting-row:first-child {
+  border-top: none;
+}
+
+.setting-row:hover {
   background-color: var(--md-sys-color-surface-hover);
-  border-color: var(--md-sys-color-outline-hover);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.03);
 }
 
-.card-left {
-  display: flex;
-  align-items: flex-start;
-  gap: 10px;
-  flex-grow: 1;
-}
-
-.card-icon-container {
-  width: 32px;
-  height: 32px;
-  border-radius: 6px;
-  background-color: var(--md-comp-icon-bg);
+.row-icon {
   display: flex;
   align-items: center;
   justify-content: center;
-  color: var(--md-sys-color-text-muted);
+  width: 20px;
   flex-shrink: 0;
-  margin-top: 2px;
-  transition: color 0.2s, background-color 0.2s;
+  color: var(--md-sys-color-text-muted);
 }
 
-.setting-card:hover .card-icon-container {
+.row-icon svg {
+  width: 18px;
+  height: 18px;
+}
+
+.setting-row:hover .row-icon {
   color: var(--md-sys-color-primary);
-  background-color: var(--md-comp-icon-hover-bg);
 }
 
-.card-icon-container svg {
-  width: 16px;
-  height: 16px;
-}
-
-.card-text {
+.row-text {
+  flex: 1;
+  min-width: 0;
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 2px;
+  cursor: pointer;
 }
 
-.setting-card .label {
+.setting-row .label {
   font-size: 13.5px;
   font-weight: 700;
   color: var(--md-sys-color-text-main);
-  line-height: 1.3;
+  line-height: 1.4;
 }
 
-.setting-card .desc {
-  font-size: 11px;
+.setting-row .desc {
+  font-size: 11.5px;
   color: var(--md-sys-color-text-muted);
-  font-weight: 500;
-  line-height: 1.4;
+  line-height: 1.5;
+}
+
+/* 親の設定の中の設定（定義語ホバー辞書の中の色・背景色・親の法律）。アイコンの分だけ字下げし、線を薄くする */
+.setting-row.is-sub {
+  padding-left: 48px;
+  padding-top: 8px;
+  padding-bottom: 8px;
+  border-top-style: dashed;
+}
+
+.setting-row.is-sub .label {
+  font-size: 12.5px;
+}
+
+.setting-row.is-color .row-text {
+  gap: 6px;
+  cursor: default;
+}
+
+/* 親の設定がオフのあいだは、中の設定を薄くして触れないようにする */
+.setting-row.is-inactive {
+  opacity: 0.45;
+  pointer-events: none;
 }
 
 /* カスタム・スイッチ (標準 44px x 26px - Material 3 準拠) */
@@ -403,21 +426,13 @@ body * {
   box-shadow: 0 0 0 6px rgba(255, 255, 255, 0.24);
 }
 
-/* グローバル無効化時の設定カードの遮断 */
-body.global-off .setting-card {
+/* 拡張全体がオフのあいだは、各機能の一覧を薄くして触れないようにする */
+body.global-off .settings-list {
   opacity: 0.45;
   pointer-events: none;
-  background-color: var(--md-comp-disabled-bg);
-  border-color: var(--md-comp-disabled-border);
 }
 
-/* 定義語カラー設定エリア */
-.color-setting-area {
-  margin-top: 10px;
-  padding-top: 8px;
-  border-top: 1px dashed var(--md-comp-color-area-border);
-}
-
+/* 定義語カラー設定 */
 .color-setting-header {
   display: flex;
   align-items: center;
@@ -491,7 +506,6 @@ body.global-off .setting-card {
 }
 
 .color-preview-box {
-  margin-top: 8px;
   font-size: 12px;
   color: var(--md-sys-color-text-sub);
   background: var(--md-comp-color-preview-bg);
@@ -511,12 +525,10 @@ body.global-off .setting-card {
   border-radius: 2px;
 }
 
-/* マーカー・メモの保存先・書き出し・読み込み */
+/* マーカー・メモの保存先・書き出し・読み込み（マーカー・メモの行の下、同じ枠の中） */
 .annotation-panel {
-  background-color: var(--md-sys-color-surface);
-  border: 1px solid var(--md-sys-color-outline);
-  border-radius: 12px;
-  padding: 14px 16px;
+  border-top: 1px dashed var(--md-sys-color-outline);
+  padding: 12px 16px 14px 48px;
   display: flex;
   flex-direction: column;
   gap: 10px;

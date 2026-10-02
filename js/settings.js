@@ -167,6 +167,18 @@ window.egovExt = window.egovExt || {};
     const colorPicker = document.getElementById('def-color-picker');
     const colorPreview = document.getElementById('def-color-preview-sample');
 
+    /**
+     * 親の設定（data-depends-on に書いたキー）がオフのあいだ、中の設定を薄くし、操作できないようにする
+     */
+    function syncDependents() {
+      document.querySelectorAll('[data-depends-on]').forEach(el => {
+        const parent = toggles[el.dataset.dependsOn];
+        const inactive = !!parent && !parent.checked;
+        el.classList.toggle('is-inactive', inactive);
+        el.querySelectorAll('input, button').forEach(control => { control.disabled = inactive; });
+      });
+    }
+
     /** 現在の settings をチェックボックスおよびカラーUIへ反映する */
     function syncUI() {
       for (const key in toggles) {
@@ -176,6 +188,7 @@ window.egovExt = window.egovExt || {};
       }
       // グローバルスイッチが OFF のときは画面全体をグレーアウトする
       document.body.classList.toggle('global-off', !(toggles.global && toggles.global.checked));
+      syncDependents();
 
       // 定義語カラーの反映
       const currentColor = settings.definitionColor || ext.DEFAULT_SETTINGS.definitionColor;
@@ -221,6 +234,7 @@ window.egovExt = window.egovExt || {};
           document.body.classList.toggle('global-off', !e.target.checked);
         }
         if (key === 'definitionMarker') syncUI(); // 見本の背景色を合わせる
+        syncDependents();
         await ext.saveSettings(settings);
         await broadcast(settings);
       });

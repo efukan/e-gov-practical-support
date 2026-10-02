@@ -27,54 +27,7 @@
       </label>
     </header>
 
-    <!-- 法令名検索（e-Gov法令API の法令名・略称検索）。入力欄を押すと下に検索の履歴を出す -->
-    <div class="search-wrap" id="search-wrap">
-      <div class="search-box" role="search">
-        <svg class="search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-          <circle cx="11" cy="11" r="7" />
-          <path d="M20 20l-3.5-3.5" />
-        </svg>
-        <input type="search" id="law-search" class="search-input" placeholder="法令名・略称で検索（例: 地方自治法、地自法）" autocomplete="off" spellcheck="false" aria-label="法令名・略称で検索" aria-controls="search-history" aria-expanded="false">
-      </div>
-      <div class="search-history" id="search-history" hidden>
-        <div class="search-history-heading">最近の検索</div>
-        <ul class="search-history-list" id="search-history-list"></ul>
-      </div>
-    </div>
-
-    <!-- お気に入りを保存できなかったとき等のお知らせ（数秒で消える） -->
-    <p class="popup-notice" id="popup-notice" role="status" hidden></p>
-
-    <!-- 検索結果（入力があるときだけ、お気に入りの代わりに出す） -->
-    <section class="section-group" id="search-section" hidden>
-      <h2 class="section-title" id="search-status" aria-live="polite"></h2>
-      <ul class="law-list" id="search-results"></ul>
-    </section>
-
-    <!-- お気に入り -->
-    <section class="section-group" id="favorites-section">
-      <h2 class="section-title">お気に入り<span class="section-count" id="favorite-count"></span></h2>
-      <ul class="law-list" id="favorite-list"></ul>
-      <p class="empty-note" id="favorite-empty" hidden>条文のページ右上の「☆ お気に入り追加」か、検索結果の ☆ で登録すると、ここから開けます。</p>
-    </section>
-
-    <!-- この法令のマーカー・メモ（e-Gov の条文ページを開いているときだけ） -->
-    <section class="section-group" id="annotations-section" hidden>
-      <h2 class="section-title">この法令のマーカー・メモ<span class="section-count" id="annotation-count"></span></h2>
-      <ul class="law-list" id="annotation-list"></ul>
-      <p class="empty-note" id="annotation-empty" hidden>条文の語句を選ぶと出る帯から、マーカーを引いたりメモを書いたりできます。</p>
-    </section>
-
-    <!-- すべての法令のマーカー・メモの一覧（notes.html）を開く。1件以上あるときだけ -->
-    <button type="button" class="notes-link-btn" id="open-notes" hidden>
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-        <path d="M8 6h13M8 12h13M8 18h13" />
-        <path d="M3 6h.01M3 12h.01M3 18h.01" />
-      </svg>
-      <span id="open-notes-label">すべてのマーカー・メモ</span>
-    </button>
-
-    <!-- 機能の設定（折りたたみ。開閉はこの端末に記憶する） -->
+    <!-- 機能の設定（折りたたみ。気づきやすいよう検索欄の上に置く。ポップアップを開くたびに閉じた状態から始める） -->
     <details class="settings-panel" id="settings-panel">
       <summary class="settings-summary">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
@@ -387,6 +340,53 @@
 
       </div>
     </details>
+
+    <!-- 法令名検索（e-Gov法令API の法令名・略称検索）。入力欄を押すと下に検索の履歴を出す -->
+    <div class="search-wrap" id="search-wrap">
+      <div class="search-box" role="search">
+        <svg class="search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <circle cx="11" cy="11" r="7" />
+          <path d="M20 20l-3.5-3.5" />
+        </svg>
+        <input type="search" id="law-search" class="search-input" placeholder="法令名・略称で検索（例: 地方自治法、地自法）" autocomplete="off" spellcheck="false" aria-label="法令名・略称で検索" aria-controls="search-history" aria-expanded="false">
+      </div>
+      <div class="search-history" id="search-history" hidden>
+        <div class="search-history-heading">最近の検索</div>
+        <ul class="search-history-list" id="search-history-list"></ul>
+      </div>
+    </div>
+
+    <!-- お気に入りを保存できなかったとき等のお知らせ（数秒で消える） -->
+    <p class="popup-notice" id="popup-notice" role="status" hidden></p>
+
+    <!-- 検索結果（入力があるときだけ、お気に入りの代わりに出す） -->
+    <section class="section-group" id="search-section" hidden>
+      <h2 class="section-title" id="search-status" aria-live="polite"></h2>
+      <ul class="law-list" id="search-results"></ul>
+    </section>
+
+    <!-- お気に入り -->
+    <section class="section-group" id="favorites-section">
+      <h2 class="section-title">お気に入り<span class="section-count" id="favorite-count"></span></h2>
+      <ul class="law-list" id="favorite-list"></ul>
+      <p class="empty-note" id="favorite-empty" hidden>条文のページ右上の「☆ お気に入り追加」か、検索結果の ☆ で登録すると、ここから開けます。</p>
+    </section>
+
+    <!-- この法令のマーカー・メモ（e-Gov の条文ページを開いているときだけ） -->
+    <section class="section-group" id="annotations-section" hidden>
+      <h2 class="section-title">この法令のマーカー・メモ<span class="section-count" id="annotation-count"></span></h2>
+      <ul class="law-list" id="annotation-list"></ul>
+      <p class="empty-note" id="annotation-empty" hidden>条文の語句を選ぶと出る帯から、マーカーを引いたりメモを書いたりできます。</p>
+    </section>
+
+    <!-- すべての法令のマーカー・メモの一覧（notes.html）を開く。1件以上あるときだけ -->
+    <button type="button" class="notes-link-btn" id="open-notes" hidden>
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <path d="M8 6h13M8 12h13M8 18h13" />
+        <path d="M3 6h.01M3 12h.01M3 18h.01" />
+      </svg>
+      <span id="open-notes-label">すべてのマーカー・メモ</span>
+    </button>
   </div>
   <script src="js/settings.js"></script>
   <script src="js/favorites.js"></script>

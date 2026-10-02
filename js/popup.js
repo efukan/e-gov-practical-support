@@ -58,9 +58,6 @@ window.egovExt = window.egovExt || {};
     }
   }
 
-  /** 「機能の設定」の開閉を覚えておく localStorage のキー */
-  const SETTINGS_OPEN_KEY = 'egovPopupSettingsOpen';
-
   /** 法令の種別の表示名と、検索結果での並び順（憲法・法律を先に） */
   const LAW_TYPES = {
     Constitution: { label: '憲法', rank: 0 },
@@ -748,41 +745,7 @@ window.egovExt = window.egovExt || {};
     });
 
     // ---- 機能の設定（折りたたみ） ----
-
-    try {
-      settingsPanel.open = localStorage.getItem(SETTINGS_OPEN_KEY) === '1';
-    } catch (e) {}
-    // 押して開いたときは「機能の設定」を上端（固定した見出しのすぐ下）まで送る。
-    // 前回開いたままにしていて、ポップアップを開いた時点で開いている場合は送らない
-    let openedByUser = false;
-    settingsPanel.querySelector('summary').addEventListener('click', () => {
-      openedByUser = !settingsPanel.open;
-    });
-    settingsPanel.addEventListener('toggle', () => {
-      try {
-        localStorage.setItem(SETTINGS_OPEN_KEY, settingsPanel.open ? '1' : '0');
-      } catch (e) {}
-      if (!settingsPanel.open) {
-        settingsPanel.style.minHeight = '';
-      } else if (openedByUser) {
-        // ポップアップは中身に合わせて背が伸びるので、伸びきってから送る
-        requestAnimationFrame(() => requestAnimationFrame(bringSettingsToTop));
-      }
-      openedByUser = false;
-    });
-
-    /**
-     * 「機能の設定」を上端（固定した見出しのすぐ下）まで送る。
-     * 下に残りの中身が少ないと上端まで送れないので、開いている間だけ「機能の設定」の高さを
-     * 画面の高さまで確保する。全部が画面に収まっているときは動かさない
-     */
-    function bringSettingsToTop() {
-      settingsPanel.style.minHeight = '';
-      if (document.documentElement.scrollHeight <= window.innerHeight) return;
-      const headerSpace = parseFloat(getComputedStyle(document.documentElement).scrollPaddingTop) || 0;
-      settingsPanel.style.minHeight = `${Math.max(0, window.innerHeight - headerSpace)}px`;
-      settingsPanel.scrollIntoView({ block: 'start', behavior: 'smooth' });
-    }
+    // 検索欄の上にあるので、開いたままだと検索とお気に入りが下へ押し出される。開閉は覚えず、毎回閉じた状態から始める
 
     await Promise.all([
       ext.initSettingsUI({ allTabs: false, syncFromStorage: false }),

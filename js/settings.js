@@ -31,6 +31,8 @@ window.egovExt = window.egovExt || {};
     definition: true,
     // 政令・省令で、親の法律（「以下「法」という」の法律）の定義語も引く。定義語ホバー辞書がオンのときだけ働く
     parentDefinition: true,
+    // 定義語の薄い背景色（マーカー）。オフにすると、色と点線の下線だけで示す
+    definitionMarker: true,
     newtab: true,
     dim: true,
     jump: true,
@@ -103,13 +105,14 @@ window.egovExt = window.egovExt || {};
   /**
    * 定義語ハイライト用のCSS変数をルート要素に適用する
    * @param {string} [color]
+   * @param {boolean} [marker=true] - false なら背景色（マーカー）を付けない。マウスを乗せたときの背景は残す
    */
-  ext.applyDefinitionColor = function(color) {
+  ext.applyDefinitionColor = function(color, marker) {
     const safeColor = color || (ext.DEFAULT_SETTINGS && ext.DEFAULT_SETTINGS.definitionColor) || '#00695c';
     const root = document.documentElement;
     if (root && root.style) {
       root.style.setProperty('--egov-def-color', safeColor);
-      root.style.setProperty('--egov-def-bg', ext.hexToRgba(safeColor, 0.05));
+      root.style.setProperty('--egov-def-bg', marker === false ? 'transparent' : ext.hexToRgba(safeColor, 0.05));
       root.style.setProperty('--egov-def-bg-hover', ext.hexToRgba(safeColor, 0.12));
     }
   };
@@ -153,7 +156,7 @@ window.egovExt = window.egovExt || {};
 
       // 定義語カラーの反映
       const currentColor = settings.definitionColor || ext.DEFAULT_SETTINGS.definitionColor;
-      ext.applyDefinitionColor(currentColor);
+      ext.applyDefinitionColor(currentColor, settings.definitionMarker);
 
       if (colorPicker) {
         colorPicker.value = currentColor.startsWith('#') ? currentColor : '#6a1b9a';
@@ -194,6 +197,7 @@ window.egovExt = window.egovExt || {};
         if (key === 'global') {
           document.body.classList.toggle('global-off', !e.target.checked);
         }
+        if (key === 'definitionMarker') syncUI(); // 見本の背景色を合わせる
         await ext.saveSettings(settings);
         await broadcast(settings);
       });

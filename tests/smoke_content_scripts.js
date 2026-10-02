@@ -100,7 +100,18 @@ function check(name, fn) {
 }
 
 console.log('\n--- ユーティリティ ---');
-check('DEFAULT_SETTINGS に17キー（16機能＋定義語カラー）', () => Object.keys(ext.DEFAULT_SETTINGS).length === 17);
+check('DEFAULT_SETTINGS に18キー（17機能＋定義語カラー）', () => Object.keys(ext.DEFAULT_SETTINGS).length === 18);
+check('定義語の背景色（マーカー）: オフで背景を透明にし、オンで着色カラーの薄い色に戻す', () => {
+  const st = document.documentElement.style;
+  ext.applyDefinitionColor('#1a5fb4', false);
+  const off = st.getPropertyValue('--egov-def-bg');
+  const hoverOff = st.getPropertyValue('--egov-def-bg-hover');
+  ext.applyDefinitionColor('#1a5fb4', true);
+  const on = st.getPropertyValue('--egov-def-bg');
+  ext.applyDefinitionColor('#1a5fb4');
+  const dflt = st.getPropertyValue('--egov-def-bg');
+  return off === 'transparent' && /^rgba\(26, 95, 180/.test(hoverOff) && /^rgba\(26, 95, 180, 0\.05\)$/.test(on) && dflt === on;
+});
 check('getLawIdFromUrl (パス形式)', () => ext.getLawIdFromUrl('https://laws.e-gov.go.jp/law/415AC0000000057') === '415AC0000000057');
 check('getLawIdFromUrl (小文字クエリ)', () => ext.getLawIdFromUrl('https://laws.e-gov.go.jp/document?lawid=321constitution') === '321CONSTITUTION');
 check('getLawIdFromUrl (大文字クエリ)', () => ext.getLawIdFromUrl('https://laws.e-gov.go.jp/document?lawId=321CONSTITUTION') === '321CONSTITUTION');

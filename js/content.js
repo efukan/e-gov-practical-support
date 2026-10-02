@@ -96,7 +96,7 @@ window.egovExt = window.egovExt || {};
    */
   function applySettings() {
     if (ext.applyDefinitionColor) {
-      ext.applyDefinitionColor(ext.settings.definitionColor);
+      ext.applyDefinitionColor(ext.settings.definitionColor, ext.settings.definitionMarker);
     }
 
     if (!ext.settings.global) {

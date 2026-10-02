@@ -258,7 +258,7 @@ body * {
   display: flex;
   align-items: center;
   gap: 12px;
-  padding: 12px 16px;
+  padding: 10px 16px;
   border-top: 1px solid var(--md-sys-color-outline);
   transition: background-color 0.15s, opacity 0.15s;
 }
@@ -314,8 +314,8 @@ body * {
 /* 親の設定の中の設定（定義語ホバー辞書の中の色・背景色・親の法律）。アイコンの分だけ字下げし、線を薄くする */
 .setting-row.is-sub {
   padding-left: 48px;
-  padding-top: 8px;
-  padding-bottom: 8px;
+  padding-top: 7px;
+  padding-bottom: 7px;
   border-top-style: dashed;
 }
 
@@ -323,9 +323,15 @@ body * {
   font-size: 12.5px;
 }
 
-.setting-row.is-color .row-text {
-  gap: 6px;
-  cursor: default;
+/* 着色カラーは、名前・色の丸・見本を 1 行に並べる（狭い画面では折り返す） */
+.setting-row.is-color {
+  flex-wrap: wrap;
+  gap: 8px 14px;
+}
+
+.setting-row.is-color .color-preview-box {
+  flex: 1;
+  min-width: 260px;
 }
 
 /* 親の設定がオフのあいだは、中の設定を薄くして触れないようにする */
@@ -433,19 +439,6 @@ body.global-off .settings-list {
 }
 
 /* 定義語カラー設定 */
-.color-setting-header {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  flex-wrap: wrap;
-}
-
-.color-setting-title {
-  font-size: 11.5px;
-  font-weight: 700;
-  color: var(--md-sys-color-text-sub);
-}
-
 .color-swatches-group {
   display: inline-flex;
   align-items: center;
@@ -528,10 +521,10 @@ body.global-off .settings-list {
 /* マーカー・メモの保存先・書き出し・読み込み（マーカー・メモの行の下、同じ枠の中） */
 .annotation-panel {
   border-top: 1px dashed var(--md-sys-color-outline);
-  padding: 12px 16px 14px 48px;
+  padding: 10px 16px 12px 48px;
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 8px;
 }
 
 .annotation-panel-title {

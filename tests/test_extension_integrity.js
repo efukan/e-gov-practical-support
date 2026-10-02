@@ -188,6 +188,11 @@ async function main() {
     });
     const colorPicker = doc.getElementById('def-color-picker');
     assert(colorPicker, 'options.html に #def-color-picker が存在する');
+    // まとまりはどれも .container の直下にある（閉じタグの過不足で入れ子がずれていない）
+    const sections = Array.from(doc.querySelectorAll('.section-group'));
+    assert.strictEqual(sections.length, 4, '詳細設定のまとまりは 4 つ');
+    sections.forEach(sec => assert(sec.parentElement.classList.contains('container'), `「${sec.querySelector('.section-title').textContent}」は .container の直下にある`));
+    doc.querySelectorAll('.setting-row').forEach(row => assert(row.parentElement.classList.contains('settings-list'), '設定の行は一覧の枠の直下にある'));
     const swatches = doc.querySelectorAll('.def-color-swatch');
     assert(swatches.length >= 5, 'options.html に 5個以上のカラースウォッチが存在する');
   });

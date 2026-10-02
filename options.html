@@ -90,7 +90,7 @@
           <span class="row-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"> <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" /> </svg></span>
           <label class="row-text" for="feature-fastrender">
             <span class="label">高速レンダリング</span>
-            <span class="desc">画面の外にある条文の描画を後回しにして、長い法令でも表示を軽くします。</span>
+            <span class="desc">画面の外にある条文の描画を後回しにして、表示を軽くします。</span>
           </label>
           <label class="switch">
             <input type="checkbox" id="feature-fastrender" checked>
@@ -126,30 +126,26 @@
           </label>
         </div>
         <div class="setting-row is-sub is-color" data-depends-on="definition">
-          <div class="row-text">
-            <span class="label">着色カラー</span>
-            <div class="color-setting-header">
-                  <div class="color-swatches-group">
-                    <button type="button" class="def-color-swatch active" data-color="#00695c" title="緑 / ティール深緑（標準）" style="background-color: #00695c;"></button>
-                    <button type="button" class="def-color-swatch" data-color="#6a1b9a" title="紫 / パープル（法令ひもとき風）" style="background-color: #6a1b9a;"></button>
-                    <button type="button" class="def-color-swatch" data-color="#1a5fb4" title="藍 / ブルー" style="background-color: #1a5fb4;"></button>
-                    <button type="button" class="def-color-swatch" data-color="#c05621" title="琥珀 / アンバー" style="background-color: #c05621;"></button>
-                    <button type="button" class="def-color-swatch" data-color="#b83280" title="ローズ / ピンク" style="background-color: #b83280;"></button>
-                    <label class="custom-color-label" title="カスタムカラー選択">
-                      <input type="color" id="def-color-picker" value="#00695c" class="custom-color-input">
-                      <span class="custom-color-icon">🎨</span>
-                    </label>
-                  </div>
-            </div>
-            <div class="color-preview-box">
-              見本: この法律において「<span id="def-color-preview-sample" class="def-preview-word">開発行為</span>」とは、建築物の建築をいう。
-            </div>
+          <span class="label">着色カラー</span>
+          <div class="color-swatches-group">
+            <button type="button" class="def-color-swatch active" data-color="#00695c" title="緑 / ティール深緑（標準）" style="background-color: #00695c;"></button>
+            <button type="button" class="def-color-swatch" data-color="#6a1b9a" title="紫 / パープル（法令ひもとき風）" style="background-color: #6a1b9a;"></button>
+            <button type="button" class="def-color-swatch" data-color="#1a5fb4" title="藍 / ブルー" style="background-color: #1a5fb4;"></button>
+            <button type="button" class="def-color-swatch" data-color="#c05621" title="琥珀 / アンバー" style="background-color: #c05621;"></button>
+            <button type="button" class="def-color-swatch" data-color="#b83280" title="ローズ / ピンク" style="background-color: #b83280;"></button>
+            <label class="custom-color-label" title="カスタムカラー選択">
+              <input type="color" id="def-color-picker" value="#00695c" class="custom-color-input">
+              <span class="custom-color-icon">🎨</span>
+            </label>
+          </div>
+          <div class="color-preview-box">
+            見本: この法律において「<span id="def-color-preview-sample" class="def-preview-word">開発行為</span>」とは、建築物の建築をいう。
           </div>
         </div>
         <div class="setting-row is-sub" data-depends-on="definition">
           <label class="row-text" for="feature-definitionMarker">
-            <span class="label">定義語の背景色（マーカー）</span>
-            <span class="desc">定義語に着色カラーの薄い背景色を付けます。初期値はオフです（3.0.0 より前から使っている方はオン）。</span>
+            <span class="label">定義語の背景色</span>
+            <span class="desc">定義語に薄い背景色を付けます。</span>
           </label>
           <label class="switch">
             <input type="checkbox" id="feature-definitionMarker">
@@ -159,7 +155,7 @@
         <div class="setting-row is-sub" data-depends-on="definition">
           <label class="row-text" for="feature-parentDefinition">
             <span class="label">親の法律の定義語</span>
-            <span class="desc">施行令・施行規則で、親の法律が定義した語にも下線を引きます。親の法律の条文は e-Gov法令検索から取得し、この端末に7日間保存します。</span>
+            <span class="desc">施行令・施行規則で、親の法律の定義語にも下線を引きます（e-Gov から取得）。</span>
           </label>
           <label class="switch">
             <input type="checkbox" id="feature-parentDefinition" checked>
@@ -181,7 +177,7 @@
           <span class="row-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"> <path d="M9 14L4 9l5-5" /> <path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11" /> </svg></span>
           <label class="row-text" for="feature-backref">
             <span class="label">同じ法令の中の参照元</span>
-            <span class="desc">条・項・号の番号の横に、同じ法令の中で参照している箇所の数（↩3 など）を出します。通信はしません。</span>
+            <span class="desc">番号の横に、同じ法令の中から参照している数（↩3 など）を出します。通信はしません。</span>
           </label>
           <label class="switch">
             <input type="checkbox" id="feature-backref" checked>
@@ -198,7 +194,7 @@
           <span class="row-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"> <circle cx="11" cy="11" r="8" /> <path d="M21 21l-4.3-4.3" /> <path d="M8 11h6M11 8l3 3-3 3" /> </svg></span>
           <label class="row-text" for="feature-jump">
             <span class="label">条文ジャンプ</span>
-            <span class="desc">右上の入力欄に条番号（例: 5、12-2）を入れると、その条へ移動します。</span>
+            <span class="desc">右上の入力欄に条番号（例: 5、12-2）を入れて、その条へ移動します。</span>
           </label>
           <label class="switch">
             <input type="checkbox" id="feature-jump" checked>
@@ -209,7 +205,7 @@
           <span class="row-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"> <polygon points="12 2.8 14.9 8.7 21.4 9.6 16.7 14.2 17.8 20.6 12 17.6 6.2 20.6 7.3 14.2 2.6 9.6 9.1 8.7" /> </svg></span>
           <label class="row-text" for="feature-favorite">
             <span class="label">お気に入りボタン</span>
-            <span class="desc">右上に「☆ お気に入り追加」を置きます。一覧はアイコンを押して出る画面にあり、同期で他の端末にも出ます。</span>
+            <span class="desc">右上に「☆ お気に入り追加」を置きます。一覧はアイコンを押して出る画面にあります。</span>
           </label>
           <label class="switch">
             <input type="checkbox" id="feature-favorite" checked>
@@ -220,7 +216,7 @@
           <span class="row-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"> <rect x="2" y="7" width="20" height="10" rx="5" /> <circle cx="8" cy="12" r="2" fill="currentColor" /> <line x1="13" y1="12" x2="18" y2="12" /> </svg></span>
           <label class="row-text" for="feature-quickToggle">
             <span class="label">切り替えボタン</span>
-            <span class="desc">右上に、算用数字・括弧・接続詞などをその場でオン・オフするボタンを置きます。画面の幅が狭いときは一部を隠します。</span>
+            <span class="desc">右上に、算用数字・括弧などをその場でオン・オフするボタンを置きます。</span>
           </label>
           <label class="switch">
             <input type="checkbox" id="feature-quickToggle" checked>
@@ -248,7 +244,7 @@
           <span class="row-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"> <path d="M15 4l5 5L9 20H4v-5z" /> <path d="M13 6l5 5" /> </svg></span>
           <label class="row-text" for="feature-marker">
             <span class="label">マーカー・メモ</span>
-            <span class="desc">語句を選ぶと出る帯から、3色のマーカーを引いたりメモを書いたりできます。オフにしても保存したものは消えません。</span>
+            <span class="desc">語句を選ぶと出る帯から、マーカーを引いたりメモを書いたりできます。オフでも保存は消えません。</span>
           </label>
           <label class="switch">
             <input type="checkbox" id="feature-marker" checked>
@@ -260,11 +256,11 @@
             <span class="annotation-panel-title" id="annotation-mode-title">保存先</span>
             <label class="annotation-radio">
               <input type="radio" name="annotation-mode" value="local">
-              <span><strong>この端末の中だけ</strong>（初期値）<br><span class="annotation-radio-desc">量の上限はほぼありません。外へは送りません。別の端末へは書き出し・読み込みで移せます。</span></span>
+              <span><strong>この端末の中だけ</strong>（初期値）<br><span class="annotation-radio-desc">外へは送りません。別の端末へは、書き出し・読み込みで移せます。</span></span>
             </label>
             <label class="annotation-radio">
               <input type="radio" name="annotation-mode" value="sync">
-              <span><strong>ブラウザの同期で、他の端末とそろえる</strong><br><span class="annotation-radio-desc">同じアカウントの他の端末にも出ます。全体で約60KB・180件、メモは1件500字までです。メモの中身はブラウザの会社（Google など）の同期のサーバーを通ります。</span></span>
+              <span><strong>ブラウザの同期で、他の端末とそろえる</strong><br><span class="annotation-radio-desc">他の端末にも出ます。約60KB・180件、メモは500字まで。中身はブラウザの同期のサーバーを通ります。</span></span>
             </label>
           </div>
           <p class="annotation-usage" id="annotation-usage"></p>

@@ -31,8 +31,9 @@ window.egovExt = window.egovExt || {};
     definition: true,
     // 政令・省令で、親の法律（「以下「法」という」の法律）の定義語も引く。定義語ホバー辞書がオンのときだけ働く
     parentDefinition: true,
-    // 定義語の薄い背景色（マーカー）。オフにすると、色と点線の下線だけで示す
-    definitionMarker: true,
+    // 定義語の薄い背景色（マーカー）。オフのときは色と点線の下線だけで示す。
+    // 初期値はオフ（3.0.0 から）。それより前から使っている人はオンのまま（LEGACY_DEFAULTS と background.js）
+    definitionMarker: false,
     newtab: true,
     dim: true,
     jump: true,
@@ -52,6 +53,28 @@ window.egovExt = window.egovExt || {};
   });
 
   /**
+   * 後から足した設定のうち、初期値をオフにしたもの。それより前に保存した設定（このキーが無い）では、
+   * これまでの見た目を変えないよう、ここの値を使う
+   */
+  ext.LEGACY_DEFAULTS = Object.freeze({
+    definitionMarker: true
+  });
+
+  /**
+   * 保存してある設定を、初期値に重ねる。保存した設定に無いキーのうち LEGACY_DEFAULTS にあるものは、その値にする
+   * @param {Object} [stored]
+   * @returns {Object<string, boolean|string>}
+   */
+  ext.mergeStoredSettings = function(stored) {
+    const merged = Object.assign({}, ext.DEFAULT_SETTINGS);
+    if (!stored) return merged;
+    for (const key in ext.LEGACY_DEFAULTS) {
+      if (!(key in stored)) merged[key] = ext.LEGACY_DEFAULTS[key];
+    }
+    return Object.assign(merged, stored);
+  };
+
+  /**
    * 保存済みの設定を読み込み、デフォルト値にマージした新しいオブジェクトを返す。
    * 読み込みに失敗した場合はデフォルト値のコピーを返す。
    * @returns {Promise<Object<string, boolean>>}
@@ -63,7 +86,7 @@ window.egovExt = window.egovExt || {};
       const stored = result && result[ext.SETTINGS_STORAGE_KEY];
       if (stored) {
         // デフォルトをベースにマージし、新機能追加時の undefined を防ぐ
-        return Object.assign(defaults, stored);
+        return ext.mergeStoredSettings(stored);
       }
     } catch (e) {
       console.error('egov-ext: 設定の読み込みに失敗しました。デフォルト値を使用します:', e);
@@ -234,7 +257,7 @@ window.egovExt = window.egovExt || {};
         if (areaName !== 'sync' || !changes[ext.SETTINGS_STORAGE_KEY]) return;
         const newSettings = changes[ext.SETTINGS_STORAGE_KEY].newValue;
         if (!newSettings) return;
-        settings = Object.assign({}, ext.DEFAULT_SETTINGS, newSettings);
+        settings = ext.mergeStoredSettings(newSettings);
         syncUI();
       });
     }

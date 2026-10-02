@@ -147,41 +147,44 @@ async function main() {
 
   const settingKeys = Object.keys(defaultSettings);
   const toggleKeys = settingKeys.filter(k => k !== 'definitionColor');
+  // 初期値をオフにした設定（定義語の背景色。3.0.0 より前から使っている人はオンのまま）
+  const defaultOffKeys = ['definitionMarker'];
+  const expectedDefault = k => !defaultOffKeys.includes(k);
 
-  runTest('DEFAULT_SETTINGS に全18設定キー（17機能トグル＋定義語カラー）が定義され、全機能が初期状態で全て ON (true) であること', () => {
+  runTest('DEFAULT_SETTINGS に全18設定キー（17機能トグル＋定義語カラー）が定義され、定義語の背景色のほかは初期状態で ON (true) であること', () => {
     const expectedKeys = ['global', 'scrollspy', 'popup', 'definition', 'parentDefinition', 'definitionMarker', 'newtab', 'dim', 'jump', 'horizontal', 'conjunction', 'fastrender', 'citation', 'favorite', 'quickToggle', 'backref', 'marker', 'definitionColor'];
     assert.strictEqual(settingKeys.length, expectedKeys.length);
     expectedKeys.forEach(k => assert(settingKeys.includes(k), `キー '${k}' が DEFAULT_SETTINGS に存在する`));
     
-    // 初回インストール時にすべての機能トグルが ON (true) であることを厳密に検証
+    // 初回インストール時の機能トグルの値を厳密に検証
     toggleKeys.forEach(k => {
-      assert.strictEqual(defaultSettings[k], true, `機能トグル '${k}' のデフォルト値は true (ON) であること`);
+      assert.strictEqual(defaultSettings[k], expectedDefault(k), `機能トグル '${k}' のデフォルト値は ${expectedDefault(k)} であること`);
     });
 
     assert.strictEqual(defaultSettings.definitionColor, '#00695c', 'デフォルトの定義語カラーは緑系ティール深緑(#00695c)である');
   });
 
-  runTest('popup.html に 全機能トグルに対応するチェックボックスが存在し、全て初期状態で checked であること', () => {
+  runTest('popup.html に 全機能トグルに対応するチェックボックスが存在し、初期値に合わせて checked であること', () => {
     const dom = new JSDOM(popupHtml);
     const doc = dom.window.document;
     toggleKeys.forEach(key => {
       const el = doc.getElementById(`feature-${key}`);
       assert(el, `popup.html に #feature-${key} が存在する`);
       assert.strictEqual(el.type, 'checkbox', `#feature-${key} は checkbox である`);
-      assert(el.hasAttribute('checked'), `popup.html の #feature-${key} には checked 属性が付与されていること`);
+      assert.strictEqual(el.hasAttribute('checked'), expectedDefault(key), `popup.html の #feature-${key} の checked 属性が初期値に合うこと`);
     });
     const openOptions = doc.getElementById('open-options');
     assert(openOptions, 'popup.html に #open-options ボタンが存在する');
   });
 
-  runTest('options.html に 全機能トグルおよび定義語カラー設定UIが存在し、全て初期状態で checked であること', () => {
+  runTest('options.html に 全機能トグルおよび定義語カラー設定UIが存在し、初期値に合わせて checked であること', () => {
     const dom = new JSDOM(optionsHtml);
     const doc = dom.window.document;
     toggleKeys.forEach(key => {
       const el = doc.getElementById(`feature-${key}`);
       assert(el, `options.html に #feature-${key} が存在する`);
       assert.strictEqual(el.type, 'checkbox', `#feature-${key} は checkbox である`);
-      assert(el.hasAttribute('checked'), `options.html の #feature-${key} には checked 属性が付与されていること`);
+      assert.strictEqual(el.hasAttribute('checked'), expectedDefault(key), `options.html の #feature-${key} の checked 属性が初期値に合うこと`);
     });
     const colorPicker = doc.getElementById('def-color-picker');
     assert(colorPicker, 'options.html に #def-color-picker が存在する');
@@ -189,7 +192,7 @@ async function main() {
     assert(swatches.length >= 5, 'options.html に 5個以上のカラースウォッチが存在する');
   });
 
-  await runAsyncTest('初回インストール時（storage未設定時）に loadSettings() が全機能 ON (true) を返すこと', async () => {
+  await runAsyncTest('初回インストール時（storage未設定時）に loadSettings() が初期値（定義語の背景色のほかは ON）を返すこと', async () => {
     const dom = new JSDOM('<!DOCTYPE html><html><body></body></html>', { runScripts: 'dangerously' });
     const window = dom.window;
     window.chrome = {
@@ -202,7 +205,7 @@ async function main() {
     window.eval(settingsJs);
     const loaded = await window.egovExt.loadSettings();
     toggleKeys.forEach(k => {
-      assert.strictEqual(loaded[k], true, `初回読み込み時に機能 '${k}' が true (ON) であること`);
+      assert.strictEqual(loaded[k], expectedDefault(k), `初回読み込み時に機能 '${k}' が ${expectedDefault(k)} であること`);
     });
     assert.strictEqual(loaded.definitionColor, '#00695c', '初回読み込み時の定義語カラーが #00695c であること');
   });
@@ -506,6 +509,58 @@ async function main() {
     assert.strictEqual(createdTabs[0].url, 'chrome-extension://self-id/popup.html?view=tab');
     assert.strictEqual(createdTabs[0].index, 4, '条文ページの右隣に開く');
     assert(!session.egovPopupFocusSearch, 'タブで開いたときは印を残さない');
+  });
+
+  await runAsyncTest('定義語の背景色: 初めての人はオフ、3.0.0 より前に保存した設定（キーが無い）ではオン', async () => {
+    const { window } = new JSDOM('<!DOCTYPE html><html><body></body></html>', { runScripts: 'outside-only' });
+    let stored;
+    window.chrome = { storage: { sync: { get: async () => (stored === undefined ? {} : { egovSettings: stored }) } } };
+    window.eval(settingsJs);
+    const ext = window.egovExt;
+    stored = undefined;
+    assert.strictEqual((await ext.loadSettings()).definitionMarker, false, '保存した設定が無ければオフ');
+    stored = { global: true, dim: false };
+    let loaded = await ext.loadSettings();
+    assert.strictEqual(loaded.definitionMarker, true, '前の版で保存した設定（キーが無い）ならオン');
+    assert.strictEqual(loaded.dim, false, '保存した値はそのまま');
+    stored = { global: true, definitionMarker: false };
+    assert.strictEqual((await ext.loadSettings()).definitionMarker, false, '保存したオフはオフ');
+    assert.strictEqual(ext.mergeStoredSettings({ definitionMarker: true }).definitionMarker, true);
+  });
+
+  await runAsyncTest('background.js: 3.0.0 より前から更新したときだけ、定義語の背景色をオンで書いておく', async () => {
+    const bgJs = fs.readFileSync(path.join(ROOT_DIR, 'js', 'background.js'), 'utf8');
+    async function run(details, stored) {
+      let installed = null;
+      let written = null;
+      const chromeMock = {
+        action: { setIcon: () => Promise.resolve() },
+        runtime: {
+          id: 'self-id', lastError: null,
+          onStartup: { addListener() {} },
+          onInstalled: { addListener: (l) => { installed = l; } },
+          onMessage: { addListener() {} }
+        },
+        storage: {
+          sync: {
+            get: (k, cb) => cb(stored === undefined ? {} : { egovSettings: stored }),
+            set: async (o) => { written = o.egovSettings; }
+          },
+          onChanged: { addListener() {} }
+        }
+      };
+      new Function('chrome', bgJs)(chromeMock);
+      installed(details);
+      await new Promise(r => setTimeout(r, 5));
+      return written;
+    }
+    let w = await run({ reason: 'update', previousVersion: '2.2.0' }, undefined);
+    assert(w && w.definitionMarker === true && w.global === true, '設定を変えたことの無い人もオンにし、有効のまま');
+    w = await run({ reason: 'update', previousVersion: '2.3.0' }, { global: false, dim: false });
+    assert(w && w.definitionMarker === true && w.global === false && w.dim === false, '保存した設定は残してオンを足す');
+    assert.strictEqual(await run({ reason: 'install' }, undefined), null, '初めて入れた人には書かない（オフ）');
+    assert.strictEqual(await run({ reason: 'update', previousVersion: '3.0.0' }, undefined), null, '3.0.0 以降からの更新では書かない');
+    assert.strictEqual(await run({ reason: 'update', previousVersion: '2.2.0' }, { definitionMarker: false }), null, 'すでに選んである人には書かない');
   });
 
   runTest('同じ法令の中の参照元: 参照されている条・項・号の番号の横に件数の印を付け、自分の中への参照は数えない', () => {

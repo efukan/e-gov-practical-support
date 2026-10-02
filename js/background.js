@@ -27,15 +27,32 @@ chrome.runtime.onStartup.addListener(() => {
   });
 });
 
+/**
+ * 3.0.0 より前の版から更新したか
+ * @param {string} [previousVersion]
+ * @returns {boolean}
+ */
+function isUpdateFromBefore3(previousVersion) {
+  const major = parseInt(String(previousVersion || '').split('.')[0], 10);
+  return Number.isFinite(major) && major < 3;
+}
+
 // Initial set on install/reload
 // 拡張機能がインストール・更新された時の初期化処理
-chrome.runtime.onInstalled.addListener(() => {
+chrome.runtime.onInstalled.addListener((details) => {
   chrome.storage.sync.get('egovSettings', (result) => {
     if (chrome.runtime.lastError) return;
-    const settings = (result && result.egovSettings) || { global: true };
+    const stored = result && result.egovSettings;
+    const settings = stored || { global: true };
     updateIcon(settings.global);
+    // 定義語の背景色（3.0.0 で足した設定）は、初めて入れた人はオフ、それより前の版から使っている人はオンにする。
+    // 設定を一度も変えていない人は保存した設定が無いので、ここでオンを書いておく
+    if (details && details.reason === 'update' && isUpdateFromBefore3(details.previousVersion)
+        && !(stored && 'definitionMarker' in stored)) {
+      chrome.storage.sync.set({ egovSettings: Object.assign({ global: true }, stored, { definitionMarker: true }) })
+        .catch(e => console.error('egov-ext: 設定の保存に失敗しました:', e));
+    }
   });
-  // インストール/更新時の初期処理はアイコン状態の同期のみ（下の updateIcon が担当）
 });
 
 // Service Worker 起動時（スリープ復帰時含む）のアイコン状態同調

@@ -59,6 +59,7 @@ window.egovExt = window.egovExt || {};
     horizontal_item: null,
     horizontal_para: null,
     dim: null,
+    conjunction: null,
     definitionExtract: null,
     definitionHighlight: null
   };

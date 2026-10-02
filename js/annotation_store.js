@@ -331,13 +331,24 @@ window.egovExt = window.egovExt || {};
   // ---------------------------------------------------------------------------
 
   /**
+   * 法令名として使えるか（空や、サイトの名前「e-Gov 法令検索」でない）
+   * @param {string} title
+   * @returns {boolean}
+   */
+  function isUsableLawTitle(title) {
+    const t = String(title || '').replace(/\s+/g, '');
+    return !!t && !/^e-?Gov法令検索$/i.test(t);
+  }
+  ext.isUsableLawTitle = isUsableLawTitle;
+
+  /**
    * 法令名を覚えておく（マーカー・メモを付けた法令を開いたとき・読み込んだときに呼ぶ）
    * @param {string} lawId
    * @param {string} title
    * @param {string} [lawNum]
    */
   ext.rememberLawTitle = async function(lawId, title, lawNum) {
-    if (!lawId || !title) return;
+    if (!lawId || !isUsableLawTitle(title)) return;
     try {
       const result = await chrome.storage.local.get(LAW_TITLES_KEY);
       const titles = (result && result[LAW_TITLES_KEY]) || {};
@@ -361,7 +372,12 @@ window.egovExt = window.egovExt || {};
   ext.getLawTitles = async function() {
     try {
       const result = await chrome.storage.local.get(LAW_TITLES_KEY);
-      return (result && result[LAW_TITLES_KEY]) || {};
+      const titles = (result && result[LAW_TITLES_KEY]) || {};
+      // 3.0.0 の開発中に、開いた直後のタブの題名「e-Gov 法令検索」を法令名として覚えてしまったものは使わない
+      Object.keys(titles).forEach(id => {
+        if (!titles[id] || !isUsableLawTitle(titles[id].t)) delete titles[id];
+      });
+      return titles;
     } catch (e) {
       return {};
     }

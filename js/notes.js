@@ -120,10 +120,11 @@ window.egovExt = window.egovExt || {};
       byLaw.forEach((list, lawId) => {
         const known = titles[lawId];
         const fav = favById.get(lawId);
+        const favTitle = fav && ext.isUsableLawTitle(fav.title) ? fav.title : '';
         laws[lawId] = {
-          title: (known && known.t) || (fav && fav.title) || ext.describeLawId(lawId),
+          title: (known && known.t) || favTitle || ext.describeLawId(lawId),
           lawNum: (known && known.n) || (fav && fav.lawNum) || '',
-          named: !!((known && known.t) || (fav && fav.title))
+          named: !!((known && known.t) || favTitle)
         };
       });
     }

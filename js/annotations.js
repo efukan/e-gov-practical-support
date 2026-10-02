@@ -283,10 +283,20 @@ window.egovExt = window.egovExt || {};
     const token = ++renderToken;
     render();
     if (!ext.waitForTasks || !ext.activeTasks) return;
-    const names = Object.keys(ext.activeTasks).filter(n => n !== 'definitionExtract');
-    ext.waitForTasks(names, 60000).then(() => {
-      if (token === renderToken && enabled) render();
-    });
+    // 書き換えは本文の差し替えなので、その前に付けた色の範囲は消える。終わるのを待って描き直す。
+    // 大きな法令では 60 秒で待ちきれないことがあるので、まだ動いていれば待ち直す（5 回まで）
+    const textTasksRunning = () => Object.keys(ext.activeTasks)
+      .some(n => n !== 'definitionExtract' && ext.activeTasks[n] && ext.activeTasks[n].done);
+    const waitAndRender = (round) => {
+      const names = Object.keys(ext.activeTasks).filter(n => n !== 'definitionExtract');
+      ext.waitForTasks(names, 60000).then(() => {
+        if (token !== renderToken || !enabled) return;
+        render();
+        rememberCurrentLaw();
+        if (round < 5 && textTasksRunning()) waitAndRender(round + 1);
+      });
+    };
+    waitAndRender(1);
   }
 
   // ---------------------------------------------------------------------------
@@ -463,7 +473,7 @@ window.egovExt = window.egovExt || {};
    * 見出しがまだ描かれていなければ、タブの題名から取る
    */
   function rememberCurrentLaw() {
-    if (!currentLawId || !ext.rememberLawTitle || !ext.readCurrentLawInfo) return;
+    if (!currentLawId || !annotations.length || !ext.rememberLawTitle || !ext.readCurrentLawInfo) return;
     const info = ext.readCurrentLawInfo();
     if (info && info.title) ext.rememberLawTitle(currentLawId, info.title, info.lawNum);
   }
@@ -472,8 +482,8 @@ window.egovExt = window.egovExt || {};
   async function addAnnotation(ann) {
     const result = await ext.saveAnnotation(currentLawId, ann);
     if (result.ok) {
-      rememberCurrentLaw();
       annotations = annotations.filter(a => a.id !== ann.id).concat([ann]);
+      rememberCurrentLaw();
       render();
     }
     return result;
@@ -758,10 +768,10 @@ window.egovExt = window.egovExt || {};
   }
 
   /**
-   * マーカー・メモを描く。法令が変わったら読み直す
-   * @param {boolean} [force=false]
+   * マーカー・メモを描く。法令が変わったら読み直す。
+   * 本文の書き換え（算用数字化など）が動いていれば、終わるのを待ってもう一度描く
    */
-  ext.enableAnnotations = function(force = false) {
+  ext.enableAnnotations = function() {
     if (!ext.settings || !ext.settings.global || !ext.settings.marker || !(ext.checkIfLawPage && ext.checkIfLawPage())) {
       ext.disableAnnotations();
       return;
@@ -775,8 +785,8 @@ window.egovExt = window.egovExt || {};
       reloadAnnotations();
       return;
     }
-    if (force) renderAfterTextTasks();
-    else render();
+    // e-Gov が本文を描き足したときも、算用数字化などの書き換えが続くので、終わってから描き直す
+    renderAfterTextTasks();
   };
 
   /**
@@ -793,6 +803,6 @@ window.egovExt = window.egovExt || {};
   };
 
   // テスト用
-  ext._testAnnotations = { normalizeWithMap, collectSegments, render: () => render(), getOrphans: () => orphans, setState: (lawId, list) => { currentLawId = lawId; annotations = list; enabled = true; } };
+  ext._testAnnotations = { normalizeWithMap, collectSegments, render: () => render(), getOrphans: () => orphans, getRange: (id) => rangesById.get(id), setState: (lawId, list) => { currentLawId = lawId; annotations = list; enabled = true; } };
 
 })(window.egovExt);

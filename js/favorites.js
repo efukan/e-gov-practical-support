@@ -209,7 +209,9 @@ window.egovExt = window.egovExt || {};
       title = clone.textContent.replace(/\s+/g, ' ').trim();
     }
     if (!title) {
-      title = (document.title || '').replace(/\s*[|｜]\s*e-Gov.*$/, '').trim();
+      // タブの題名は「地方自治法 | e-Gov 法令検索」。開いた直後は「e-Gov 法令検索」だけなので、そのときは使わない
+      const m = (document.title || '').match(/^(.+?)\s*[|｜]\s*e-Gov/);
+      title = m ? m[1].trim() : '';
     }
     return { title, lawNum };
   };

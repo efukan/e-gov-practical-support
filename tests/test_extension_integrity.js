@@ -846,6 +846,68 @@ async function main() {
     assert(!document.querySelector('.egov-ext-note-flag'), 'オフにすると付箋が消える');
   });
 
+  await runAsyncTest('マーカー・メモの描き直し: e-Gov が本文を描き足して書き換えが続くときも、書き換えが終わってから色を付け直す', async () => {
+    const html = `<!DOCTYPE html><html><body><div id="provisionview">
+      <div id="Mp-Ch_1-At_6-Pr_2" class="paragraph"><div class="istitle"><span class="paragraphtitle">２　</span>
+        <p class="sentence">前項の規定は、適用しない。</p></div></div>
+    </div></body></html>`;
+    const dom = new JSDOM(html, { runScripts: 'dangerously', url: 'https://laws.e-gov.go.jp/law/325AC0000000201' });
+    const window = dom.window;
+    const document = window.document;
+    window.chrome = { storage: createStorageMock(), runtime: { onMessage: { addListener() {} } } };
+    window.eval(settingsJs);
+    window.eval(utilsJsForFavorites);
+    window.eval(annotationStoreJs);
+    window.eval(fs.readFileSync(path.join(ROOT_DIR, 'js', 'annotations.js'), 'utf8'));
+    const ext = window.egovExt;
+    ext.settings = Object.assign({}, ext.DEFAULT_SETTINGS);
+    ext.checkIfLawPage = () => true;
+    const t = ext._testAnnotations;
+    t.setState('325AC0000000201', [{ id: 'a1', k: 'text', p: 'Mp-Ch_1-At_6-Pr_2', q: '前項', b: '', f: 'の規定', c: 1, m: '' }]);
+
+    // 算用数字化などの書き換えが動いている途中で、e-Gov の描き足しから呼ばれる（法令は変わっていない）
+    let finish;
+    const task = { cancelled: false, done: new Promise(r => { finish = r; }) };
+    ext.activeTasks.horizontal_leaf = task;
+    ext.enableAnnotations();
+    assert.strictEqual(t.getRange('a1').toString(), '前項', 'まず今の本文で色を付ける');
+    // 書き換えは本文の文字を差し替える。前に付けた範囲は消える
+    const p = document.querySelector('#Mp-Ch_1-At_6-Pr_2 .sentence');
+    p.replaceChild(document.createTextNode('前項の規定は、適用しない。'), p.firstChild);
+    assert.strictEqual(t.getRange('a1').toString(), '', '差し替えで前の範囲は消える');
+    ext.activeTasks.horizontal_leaf = null;
+    finish();
+    await new Promise(r => setTimeout(r, 20));
+    assert.strictEqual(t.getRange('a1').toString(), '前項', '書き換えが終わったら色を付け直す');
+    ext.disableAnnotations();
+  });
+
+  await runAsyncTest('法令名を覚える: 開いた直後のタブの題名「e-Gov 法令検索」は法令名にしない（覚えてしまったものも使わない）', async () => {
+    const dom = new JSDOM('<!DOCTYPE html><html><head><title>e-Gov 法令検索</title></head><body></body></html>', { runScripts: 'dangerously', url: 'https://laws.e-gov.go.jp/law/325AC0000000201' });
+    const window = dom.window;
+    const document = window.document;
+    const storage = createStorageMock();
+    window.chrome = { storage };
+    window.eval(settingsJs);
+    window.eval(utilsJsForFavorites);
+    window.eval(favoritesJs);
+    window.eval(annotationStoreJs);
+    const ext = window.egovExt;
+    assert.strictEqual(ext.readCurrentLawInfo().title, '', '見出しが無く、題名が「e-Gov 法令検索」だけなら法令名は空');
+    document.title = '建築基準法 | e-Gov 法令検索';
+    assert.strictEqual(ext.readCurrentLawInfo().title, '建築基準法', '題名に法令名が入ったら使う');
+
+    await ext.rememberLawTitle('325AC0000000201', 'e-Gov 法令検索', '');
+    assert.deepStrictEqual(Object.keys(await ext.getLawTitles()), [], 'サイトの名前は覚えない');
+    // 前の版で覚えてしまったもの
+    await storage.local.set({ egovLawTitles: { '325AC0000000201': { t: 'e-Gov 法令検索', n: '', s: 1 }, '322AC0000000067': { t: '地方自治法', n: '', s: 2 } } });
+    const titles = await ext.getLawTitles();
+    assert(!titles['325AC0000000201'], '覚えてしまった「e-Gov 法令検索」は使わない（法令番号の表示に戻る）');
+    assert.strictEqual(titles['322AC0000000067'].t, '地方自治法');
+    await ext.rememberLawTitle('325AC0000000201', '建築基準法', '昭和二十五年法律第二百一号');
+    assert.strictEqual((await ext.getLawTitles())['325AC0000000201'].t, '建築基準法', '正しい法令名で上書きする');
+  });
+
   runTest('ポップアップの法令名検索: 名前がそのもの・前方一致・法律を上に、廃止を下に並べる', () => {
     const dom = new JSDOM('<!DOCTYPE html><html><body></body></html>', { runScripts: 'dangerously' });
     const window = dom.window;

@@ -532,29 +532,91 @@ body.egov-ext-dim-active a.egov-ext-dimmed-text {
    （隠したものはポップアップの「機能の設定」から切り替えられる。虫眼鏡と歯車は小さいので、狭い画面でも出したまま）。
    右上の並びは右から110pxの所から始まり、2026-10-01 に測った幅は、切り替えボタンが7つのとき約859px、
    「被引用」「参照元」を除く5つのとき約726px、表示を整える4つだけのとき約644px。ロゴとの間を約80px取れる幅で区切る */
-/* 1段目: 幅1320px未満（約1316pxで足りなくなる）では、「被引用」「参照元」と前の仕切りを隠す（「マーカー」の前の仕切りは残る） */
-@media (max-width: 1319px) {
+/* 1段目: 幅1355px未満では、「被引用」「参照元」と前の仕切りを隠す（「マーカー」の前の仕切りは残る） */
+@media (max-width: 1354px) {
   .egov-ext-quick-tertiary {
     display: none !important;
   }
 }
 
-/* 2段目: 幅1190px未満（約1183pxで足りなくなる）では、「マーカー」と仕切りも隠し、表示を整える4つを残す */
-@media (max-width: 1189px) {
+/* 2段目: 幅1225px未満では、「マーカー」と仕切りも隠し、表示を整える4つを残す */
+@media (max-width: 1224px) {
   .egov-ext-quick-secondary {
     display: none !important;
   }
 }
 
-/* 3段目: 幅1110px未満（約1101pxで足りなくなる）では、切り替えボタンの組ごと隠す */
-@media (max-width: 1109px) {
+/* 3段目: 幅1145px未満では、切り替えボタンの組ごと隠す */
+@media (max-width: 1144px) {
   .egov-ext-quick-toggles {
     display: none !important;
   }
 }
 
-/* ----- 5a-1. 法令名検索の虫眼鏡・設定画面を開く歯車 (Search / Settings Buttons) ----- */
-/* 右上の並びの右端（e-Gov のヘルプの左隣）に、虫眼鏡 → 歯車の順。DOM の中の位置に関わらず order で右端に回す */
+/* ----- 5a-1. 法令ひもときボタン・法令名検索の虫眼鏡・設定画面を開く歯車 (Himotoki / Search / Settings Buttons) ----- */
+/* 右上の並びの右端（e-Gov のヘルプの左隣）に、ひもとき → 虫眼鏡 → 歯車の順。DOM の中の位置に関わらず order で右端に回す */
+.egov-ext-himotoki-btn {
+  order: 97 !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 5px !important;
+  height: 28px !important;
+  margin: 0 !important;
+  padding: 0 10px 0 6px !important;
+  border: 1px solid #b0402c !important;
+  border-radius: 14px !important;
+  background: rgba(253, 249, 242, 0.94) !important;
+  backdrop-filter: blur(10px) !important;
+  -webkit-backdrop-filter: blur(10px) !important;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1) !important;
+  color: #b0402c !important;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Hiragino Sans", "Noto Sans JP", sans-serif !important;
+  font-size: 12px !important;
+  font-weight: 700 !important;
+  line-height: 1 !important;
+  text-decoration: none !important;
+  white-space: nowrap !important;
+  cursor: pointer !important;
+  pointer-events: auto !important;
+  box-sizing: border-box !important;
+  transition: background-color 0.15s, border-color 0.15s, transform 0.2s !important;
+}
+
+.egov-ext-himotoki-btn:hover {
+  background: #f6ebe0 !important;
+  border-color: #8c2f1f !important;
+  color: #8c2f1f !important;
+  text-decoration: none !important;
+}
+
+.egov-ext-himotoki-seal {
+  flex-shrink: 0 !important;
+  display: block !important;
+  transition: transform 0.25s ease !important;
+}
+
+.egov-ext-himotoki-btn:hover .egov-ext-himotoki-seal {
+  transform: scale(1.08) rotate(-3deg) !important;
+}
+
+.egov-ext-himotoki-label {
+  display: inline-block !important;
+  letter-spacing: 0.02em !important;
+}
+
+/* 幅1400px未満では左のロゴや切り替えボタンと重ならないよう、文字を畳んで丸い朱印ボタンにする */
+@media (max-width: 1399px) {
+  .egov-ext-himotoki-btn {
+    width: 28px !important;
+    padding: 0 !important;
+    border-radius: 50% !important;
+  }
+  .egov-ext-himotoki-label {
+    display: none !important;
+  }
+}
+
 .egov-ext-search-btn {
   order: 98 !important;
 }
@@ -1512,6 +1574,7 @@ div.egov-ext-preview-title {
 .egov-ext-jump-clear:focus-visible,
 .egov-ext-fav-btn:focus-visible,
 .egov-ext-quick-btn:focus-visible,
+.egov-ext-himotoki-btn:focus-visible,
 .egov-ext-round-btn:focus-visible,
 .egov-ext-tip-action-btn:focus-visible {
   outline: 2px solid #1042a4 !important;
@@ -1525,6 +1588,7 @@ div.egov-ext-preview-title {
   .egov-ext-jump-container,
   .egov-ext-fav-btn,
   .egov-ext-quick-toggles,
+  .egov-ext-himotoki-btn,
   .egov-ext-round-btn,
   .egov-ext-jump-modal,
   .egov-ext-jump-backdrop,

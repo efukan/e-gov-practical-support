@@ -470,22 +470,47 @@ async function main() {
     ext.setupQuickToggles();
     assert(!document.getElementById('egov-ext-quick-toggles'), '設定をオフにすると消える');
 
-    // 法令名検索を開く虫眼鏡と、設定画面を開く歯車: 押すと background.js へ依頼を送る
+    // 「法令ひもとき」で開くボタン・法令名検索を開く虫眼鏡・設定画面を開く歯車
     const sent = [];
+    const openedUrls = [];
     window.chrome.runtime = { sendMessage: async (msg) => { sent.push(msg); } };
+    window.open = (url, target, features) => { openedUrls.push({ url, target, features }); };
     ext.setupSettingsButton();
+    const himotoki = document.getElementById('egov-ext-himotoki-btn');
     const search = document.getElementById('egov-ext-search-btn');
     const gear = document.getElementById('egov-ext-settings-btn');
-    assert(search && gear, '虫眼鏡と歯車のボタンが置かれた');
-    assert(search.getAttribute('aria-label') && gear.getAttribute('aria-label'), 'どちらにも読み上げ用の名前がある');
+    assert(himotoki && search && gear, 'ひもとき・虫眼鏡・歯車のボタンが置かれた');
+    assert(himotoki.getAttribute('aria-label') && search.getAttribute('aria-label') && gear.getAttribute('aria-label'), 'すべてのボタンに読み上げ用の名前がある');
+    assert.strictEqual(himotoki.href, 'https://himotoki.efukan.jp/law/322AC0000000067', 'ページ先頭では法令トップのURLになる');
+    himotoki.click();
+    assert.strictEqual(openedUrls.length, 1, 'ひもときボタンを押すと新しいタブで開く');
+    assert.strictEqual(openedUrls[0].url, 'https://himotoki.efukan.jp/law/322AC0000000067');
+    assert.strictEqual(openedUrls[0].target, '_blank');
+
+    // 条・枝番号・項・号・附則のURL組み立て検証
+    window.location.hash = '#Mp-Ch_1-At_15';
+    himotoki.dispatchEvent(new window.Event('mouseenter'));
+    assert.strictEqual(himotoki.href, 'https://himotoki.efukan.jp/law/322AC0000000067/15', '本則の第15条へ直接リンクする');
+    assert(himotoki.title.includes('第15条'), 'ツールチップに表示中の条文名が入る');
+
+    window.location.hash = '#Mp-Ch_1-At_6_2-Pr_2';
+    assert.strictEqual(ext.buildHimotokiUrl(), 'https://himotoki.efukan.jp/law/322AC0000000067/6_2?p=2', '枝番号条文＋第2項のURL');
+    window.location.hash = '#Mp-Ch_1-At_6_2-Pr_1-It_3';
+    assert.strictEqual(ext.buildHimotokiUrl(), 'https://himotoki.efukan.jp/law/322AC0000000067/6_2?p=1&i=3', '枝番号条文＋第1項第3号のURL');
+    window.location.hash = '#Mp-Ch_1-At_6_2-Pr_2-It_4-Si1_2';
+    assert.strictEqual(ext.buildHimotokiUrl(), 'https://himotoki.efukan.jp/law/322AC0000000067/6_2?p=2&i=4&s=2', '号の細分まで含むURL');
+    window.location.hash = '#322AC0000000067-Sp-At_1';
+    assert.strictEqual(ext.buildHimotokiUrl(), 'https://himotoki.efukan.jp/law/322AC0000000067', '附則では法令トップへフォールバックする');
+    window.location.hash = '';
+
     search.click();
     gear.click();
     assert.strictEqual(sent.map(m => m.type).join(','), 'OPEN_LAW_SEARCH,OPEN_OPTIONS_PAGE', '虫眼鏡は検索、歯車は設定画面を開く依頼を送る');
     ext.setupSettingsButton();
-    assert.strictEqual(document.querySelectorAll('#egov-ext-search-btn, #egov-ext-settings-btn').length, 2, '2回呼んでも増えない');
+    assert.strictEqual(document.querySelectorAll('#egov-ext-himotoki-btn, #egov-ext-search-btn, #egov-ext-settings-btn').length, 3, '2回呼んでも増えない');
     ext.settings.global = false;
     ext.setupSettingsButton();
-    assert(!document.getElementById('egov-ext-settings-btn') && !document.getElementById('egov-ext-search-btn'), '拡張全体をオフにすると虫眼鏡も歯車も消える');
+    assert(!document.getElementById('egov-ext-himotoki-btn') && !document.getElementById('egov-ext-settings-btn') && !document.getElementById('egov-ext-search-btn'), '拡張全体をオフにするとひもとき・虫眼鏡・歯車がすべて消える');
   });
 
   await runAsyncTest('background.js: 設定画面・法令名検索を開く依頼は、この拡張自身からのものだけ受ける', async () => {

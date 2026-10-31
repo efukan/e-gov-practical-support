@@ -41,6 +41,21 @@ window.egovExt = window.egovExt || {};
   const SYNC_PROCESS_LIMIT = 250;
 
   /**
+   * 1回の MutationObserver バッチ内で同期的に処理する子孫要素数の累計上限。
+   * e-Gov（Vue）が初期描画やスクロール時に小規模な条文ノードを数百個同時に追加した場合、
+   * 個々のノードが SYNC_PROCESS_LIMIT 未満でも合計で数千要素に達しメインスレッドを凍結させるため、
+   * 累計上限またはフレーム予算を超えた分は非同期チャンク処理へ引き継ぐ。
+   * @type {number}
+   */
+  const SYNC_BATCH_DESCENDANT_LIMIT = 400;
+
+  /**
+   * 1回の MutationObserver バッチ内で同期処理に許容する最大経過時間（ミリ秒）
+   * @type {number}
+   */
+  const SYNC_BATCH_TIME_BUDGET_MS = 12;
+
+  /**
    * 重複監視およびメモリリークを防ぐための、MutationObserver監視対象Shadow Root/要素のセット
    * @type {Set<Node>}
    */
@@ -57,6 +72,14 @@ window.egovExt = window.egovExt || {};
    * @type {string}
    */
   let lastObservedLawId = '';
+
+  /**
+   * 前回適用した本文テキスト加工設定のスナップショット。
+   * 非テキスト系機能（マーカー・逆引き・被引用・お気に入り等）のトグル時に
+   * 全文HTMLの巻き戻し（restoreAllOriginalHTML）と再変換を回避して即時反映させるために用いる。
+   * @type {{lawId: string, horizontal: boolean, dim: boolean, conjunction: boolean, definition: boolean}|null}
+   */
+  let lastAppliedTextSettings = null;
 
   /**
    * 別タブで開く機能のクリックリスナーが登録されたかどうかのフラグ
@@ -135,6 +158,7 @@ window.egovExt = window.egovExt || {};
       if (ext.referenceTooltip) ext.referenceTooltip.hide(true);
       if (ext.definitionTooltip) ext.definitionTooltip.hide(true);
       if (ext.citationTooltip) ext.citationTooltip.hide(true);
+      lastAppliedTextSettings = null;
       return;
     }
     
@@ -142,48 +166,51 @@ window.egovExt = window.egovExt || {};
     const shouldFastRender = !!ext.settings.fastrender;
 
     if (wasFastRenderEnabled !== shouldFastRender) {
-      // 1. 現在ビューポートの上部に見えている最適な要素を探し、その位置を記録
+      const scroller = ext.getLawScrollContainer ? ext.getLawScrollContainer() : null;
+      const isDocScroll = !scroller || (ext.isDocumentScroller && ext.isDocumentScroller(scroller));
+      const currentScrollTop = Math.max(
+        window.pageYOffset || window.scrollY || 0,
+        !isDocScroll && scroller ? scroller.scrollTop : 0
+      );
+
+      // 1. すでにスクロールされている場合のみ、現在ビューポート上部に見えている要素の位置を記録して保護する
       let anchorEl = null;
       let originalTop = 0;
-      
-      // 法令本文コンテナを取得
-      const container = ext.getLawContainer();
 
-      // 憲法の前文や章タイトルなど、あらゆる法令構造のアンカーに対応するためスキャン対象のセレクタを拡充
-      const selectors = [
-        '.Article', '._div_Article',
-        '.Paragraph', '._div_Paragraph',
-        '.ParagraphSentence', '._div_ParagraphSentence',
-        '.ChapterTitle', '._div_ChapterTitle',
-        '.SectionTitle', '._div_SectionTitle',
-        '.Preamble', '._div_Preamble',
-        '.PreambleSentence',
-        '.Item', '._div_Item',
-        '.ItemSentence', '._div_ItemSentence',
-        'div.sentence', 'p.sentence',
-        '.AppdxTable', '._div_AppdxTable'
-      ].join(', ');
+      if (currentScrollTop > 10) {
+        const container = ext.getLawContainer();
+        const selectors = [
+          '.Article', '._div_Article',
+          '.Paragraph', '._div_Paragraph',
+          '.ParagraphSentence', '._div_ParagraphSentence',
+          '.ChapterTitle', '._div_ChapterTitle',
+          '.SectionTitle', '._div_SectionTitle',
+          '.Preamble', '._div_Preamble',
+          '.PreambleSentence',
+          '.Item', '._div_Item',
+          '.ItemSentence', '._div_ItemSentence',
+          'div.sentence', 'p.sentence',
+          '.AppdxTable', '._div_AppdxTable'
+        ].join(', ');
 
-      let candidateBlocks = Array.from(container.querySelectorAll(selectors));
-      
-      // 特殊なマークアップ等で1件も取得できなかった場合のフォールバックとして、コンテナ直下の子要素を取得
-      if (candidateBlocks.length === 0) {
-        candidateBlocks = Array.from(container.children);
-      }
+        let candidateBlocks = Array.from(container.querySelectorAll(selectors));
+        if (candidateBlocks.length === 0) {
+          candidateBlocks = Array.from(container.children);
+        }
 
-      let minDiff = Infinity;
-      const headerOffset = 100; // e-Govヘッダー等の上部要素を避けるためのオフセット
+        let minDiff = Infinity;
+        const headerOffset = 100;
 
-      for (let i = 0; i < candidateBlocks.length; i++) {
-        const el = candidateBlocks[i];
-        const rect = el.getBoundingClientRect();
-        // 画面上部を越えていない（または上部付近にある）要素
-        if (rect.bottom > headerOffset) {
-          const diff = Math.abs(rect.top - headerOffset);
-          if (diff < minDiff) {
-            minDiff = diff;
-            anchorEl = el;
-            originalTop = rect.top;
+        for (let i = 0; i < candidateBlocks.length; i++) {
+          const el = candidateBlocks[i];
+          const rect = el.getBoundingClientRect();
+          if (rect.bottom > headerOffset) {
+            const diff = Math.abs(rect.top - headerOffset);
+            if (diff < minDiff) {
+              minDiff = diff;
+              anchorEl = el;
+              originalTop = rect.top;
+            }
           }
         }
       }
@@ -202,7 +229,12 @@ window.egovExt = window.egovExt || {};
       if (anchorEl) {
         anchorEl.scrollIntoView({ behavior: 'auto', block: 'start' });
         const newTop = anchorEl.getBoundingClientRect().top;
-        window.scrollBy(0, newTop - originalTop);
+        const delta = newTop - originalTop;
+        if (!isDocScroll && scroller) {
+          scroller.scrollTop += delta;
+        } else {
+          window.scrollBy(0, delta);
+        }
       }
     }
 
@@ -213,8 +245,8 @@ window.egovExt = window.egovExt || {};
       observeDOMChanges();
     }
     
-    // 画面の構造に依存する処理（薄字化など）を呼び出す
-    handleDynamicContent(true);
+    // 画面の構造に依存する処理（薄字化など）を呼び出す（設定差分モードで適用）
+    handleDynamicContent('settings');
   }
 
   // 条文ページ上の切り替えボタン（quick_toggle.js）から、設定を変えたあとに呼ぶ
@@ -361,7 +393,8 @@ window.egovExt = window.egovExt || {};
       }
 
       // チラつき防止：新しく追加された要素や変更されたテキストノードに対して、同期的（即座）に変換を適用する
-      let addedElementsToProcess = [];
+      // 重複ノードや親子関係の重複を除外しつつ、1バッチ内の同期処理予算（要素数・経過時間）を超えた分は非同期へ委ねる
+      const candidateSet = new Set();
       for (let i = 0; i < mutations.length; i++) {
         const mutation = mutations[i];
         if (mutation.type === 'childList') {
@@ -370,26 +403,56 @@ window.egovExt = window.egovExt || {};
             const node = addedNodes[j];
             if (node.nodeType === Node.ELEMENT_NODE && !isSelfGeneratedElement(node) && node.closest &&
                 node.closest(ext.LAW_CONTAINER_SELECTOR)) {
-              addedElementsToProcess.push(node);
+              candidateSet.add(node);
             }
           }
         } else if (mutation.type === 'characterData') {
           const parent = mutation.target.parentNode; // テキストノードの親要素
           if (parent && !isSelfGeneratedElement(parent) && parent.closest && parent.closest(ext.LAW_CONTAINER_SELECTOR)) {
-            addedElementsToProcess.push(parent);
+            candidateSet.add(parent);
           }
         }
       }
 
+      // 祖先ノードが同じバッチに含まれている場合は子孫側を除外して二重変換を防ぐ
+      let addedElementsToProcess = [];
+      if (candidateSet.size > 0) {
+        candidateSet.forEach(node => {
+          let ancestorInSet = false;
+          for (let p = node.parentElement; p; p = p.parentElement) {
+            if (candidateSet.has(p)) {
+              ancestorInSet = true;
+              break;
+            }
+          }
+          if (!ancestorInSet) {
+            addedElementsToProcess.push(node);
+          }
+        });
+      }
+
+      let hasDeferredSyncNode = false;
       if (addedElementsToProcess.length > 0) {
         // 一時的に監視を解除して、自らのDOM変更による無限ループを防ぐ
         if (ext.globalDOMObserver) {
           ext.globalDOMObserver.disconnect();
         }
 
+        let totalSyncDescendants = 0;
+        const getTime = (typeof performance !== 'undefined' && typeof performance.now === 'function')
+          ? () => performance.now()
+          : () => Date.now();
+        const syncStartTime = getTime();
+
         addedElementsToProcess.forEach(node => {
-          // ノード配下の要素数が多すぎないかチェック（大がかりなDOM入れ替えの場合は非同期に任せる）
-          if (countDescendants(node) < SYNC_PROCESS_LIMIT) {
+          const descCount = countDescendants(node);
+          const elapsed = getTime() - syncStartTime;
+          const withinBatchBudget = totalSyncDescendants === 0 ||
+            (totalSyncDescendants + descCount <= SYNC_BATCH_DESCENDANT_LIMIT && elapsed < SYNC_BATCH_TIME_BUDGET_MS);
+
+          // ノード配下の要素数が上限未満、かつバッチ全体の累計予算内であれば即時同期変換を適用
+          if (descCount < SYNC_PROCESS_LIMIT && withinBatchBudget) {
+            totalSyncDescendants += Math.max(1, descCount);
             // 横書き表記変換 (同期的)
             if (ext.settings.global && ext.settings.horizontal && ext.applyHorizontalConversion) {
               try {
@@ -422,6 +485,8 @@ window.egovExt = window.egovExt || {};
                 console.error("egov-ext: Error enabling sync definition highlighting:", e);
               }
             }
+          } else {
+            hasDeferredSyncNode = true;
           }
         });
 
@@ -430,8 +495,8 @@ window.egovExt = window.egovExt || {};
       }
       
       // 法令本文コンテナに関連する変更のみを適用対象にする (サイドバーやツールチップ等の変更による再レンダリングやチラつきを防止)
-      let shouldUpdate = false;
-      for (let i = 0; i < mutations.length; i++) {
+      let shouldUpdate = hasDeferredSyncNode;
+      for (let i = 0; !shouldUpdate && i < mutations.length; i++) {
         const mutation = mutations[i];
 
         // サイドバーや目次の開閉などの変更、および拡張機能の自作UI変更は無視する (チラつき・負荷防止)
@@ -480,14 +545,19 @@ window.egovExt = window.egovExt || {};
       if (domUpdateTimer) clearTimeout(domUpdateTimer);
       
       // 前回の実行からすでにMAX_DELAY以上経過している場合は即時実行（スターベーション回避）
-      if (now - lastExecutionTime >= MAX_DELAY) {
+      // ただし、同ターン内で既に同期バッチ変換を実行し残りを繰り越した場合は、まず描画フレームを譲るため次マクロタスク（0ms）へ送る
+      const delay = (now - lastExecutionTime >= MAX_DELAY)
+        ? (hasDeferredSyncNode ? 0 : -1)
+        : DEBOUNCE_DELAY;
+
+      if (delay < 0) {
         lastExecutionTime = now;
         handleDynamicContent(false); // 動的DOM更新時は forceReset = false
       } else {
         domUpdateTimer = setTimeout(() => {
           lastExecutionTime = Date.now();
           handleDynamicContent(false); // 動的DOM更新時は forceReset = false
-        }, DEBOUNCE_DELAY);
+        }, delay);
       }
     });
 
@@ -529,23 +599,17 @@ window.egovExt = window.egovExt || {};
       ext.scrollSpyRafId = null;
     }
     ext.restoreAllOriginalHTML();
+    lastAppliedTextSettings = null;
   }
 
   /**
    * 画面が書き換わった後に、各機能を再度適用し直すためのオーケストレーション関数
-   * @param {boolean} [forceReset=false] - 既存の適用を一度クリアしてリセット適用するかどうか
+   * @param {boolean|'settings'} [resetMode=false] - true: 完全リセット, 'settings': 設定変更差分リセット, false: 動的追加のみ
    * @returns {Promise<void>}
    */
-  async function handleDynamicContent(forceReset = false) {
+  async function handleDynamicContent(resetMode = false) {
     if (!ext.settings.global) return;
-
-    // 進行中のDOM書き換えチャンク処理タスクをキャンセル（読み取り専用の定義語抽出は継続）
-    ext.cancelAllTasks(['definitionExtract']);
-
-    // 自分がDOMを書き換える間、一時的にObserverを止めて無限ループを防ぐ
-    if (ext.globalDOMObserver) {
-      ext.globalDOMObserver.disconnect();
-    }
+    lastExecutionTime = Date.now();
 
     const isLawPage = ext.checkIfLawPage();
     const currentUrl = window.location.href;
@@ -567,9 +631,31 @@ window.egovExt = window.egovExt || {};
       if (ext.cancelTask) ext.cancelTask('definitionExtract');
       ext.definitionExtractionCompleted = false;
       ext.definitionExtractionPromise = null;
+      lastAppliedTextSettings = null;
     }
 
-    ext.log("handleDynamicContent called. forceReset:", forceReset, "urlChanged:", urlChanged, "isLawPage:", isLawPage);
+    const isSettingsUpdate = resetMode === 'settings';
+    const textSettingsChanged = !lastAppliedTextSettings ||
+      lastAppliedTextSettings.lawId !== currentLawId ||
+      lastAppliedTextSettings.horizontal !== !!ext.settings.horizontal ||
+      lastAppliedTextSettings.dim !== !!ext.settings.dim ||
+      lastAppliedTextSettings.conjunction !== !!ext.settings.conjunction ||
+      lastAppliedTextSettings.definition !== !!ext.settings.definition;
+
+    const forceReset = resetMode === true || (isSettingsUpdate && textSettingsChanged);
+    const skipTextTransforms = isSettingsUpdate && !textSettingsChanged && !lawIdChanged;
+
+    // テキスト加工の再走査が必要な場合のみ、進行中のDOM書き換えチャンク処理タスクをキャンセル
+    if (!skipTextTransforms) {
+      ext.cancelAllTasks(['definitionExtract']);
+    }
+
+    // 自分がDOMを書き換える間、一時的にObserverを止めて無限ループを防ぐ
+    if (ext.globalDOMObserver) {
+      ext.globalDOMObserver.disconnect();
+    }
+
+    ext.log("handleDynamicContent called. resetMode:", resetMode, "forceReset:", forceReset, "urlChanged:", urlChanged, "isLawPage:", isLawPage);
 
     // 条文ページ以外（検索結果 /result やトップページ等）の場合は各種機能を完全停止・クリーンアップして終了
     if (!isLawPage) {
@@ -605,10 +691,13 @@ window.egovExt = window.egovExt || {};
         console.error("egov-ext: Error removing horizontal conversion:", e);
       }
 
-      try {
-        if (ext.disableCitations) ext.disableCitations();
-      } catch (e) {
-        console.error("egov-ext: Error disabling citations:", e);
+      // 法令自体が変わった場合、または被引用機能がオフになった場合のみ被引用キャッシュを破棄する
+      if (lawIdChanged || !ext.settings.citation) {
+        try {
+          if (ext.disableCitations) ext.disableCitations();
+        } catch (e) {
+          console.error("egov-ext: Error disabling citations:", e);
+        }
       }
 
       // 各 disable は状態リセットのみを行う。DOM の巻き戻しはここで一度だけ実施する
@@ -629,44 +718,61 @@ window.egovExt = window.egovExt || {};
       }
     }
 
-    // 横書き表記変換 (全角算用数字＆半角かっこ号見出し)
-    if (ext.settings.horizontal && isLawPage && ext.applyHorizontalConversion) {
-      try {
-        ext.applyHorizontalConversion();
-      } catch (e) {
-        console.error("egov-ext: Error applying horizontal conversion:", e);
-      }
-    }
-
-    // 括弧書きの薄字化・虹色カッコ
-    if (ext.settings.dim && isLawPage && ext.enableDimParentheses) {
-      try {
-        ext.enableDimParentheses();
-      } catch (e) {
-        console.error("egov-ext: Error enabling dim parentheses:", e);
-      }
-    }
-
-    // 接続詞の色分け（又は・若しくは・並びに・及び）
-    if (ext.settings.conjunction && isLawPage && ext.enableConjunctionHighlight) {
-      try {
-        ext.enableConjunctionHighlight();
-      } catch (e) {
-        console.error("egov-ext: Error enabling conjunction highlight:", e);
-      }
-    }
-    
-    // 定義語ホバー辞書＆ハイライト
-    if (ext.settings.definition && isLawPage && ext.extractDefinitionsAsync && ext.enableDefinitionHighlighting) {
-      try {
-        const shouldExtract = forceReset || lawIdChanged || !ext.definitionExtractionCompleted || ext.definitionMap.size === 0;
-        if (shouldExtract) {
-          await ext.extractDefinitionsAsync();
+    if (!skipTextTransforms) {
+      // 横書き表記変換 (全角算用数字＆半角かっこ号見出し)
+      if (ext.settings.horizontal && isLawPage && ext.applyHorizontalConversion) {
+        try {
+          ext.applyHorizontalConversion();
+        } catch (e) {
+          console.error("egov-ext: Error applying horizontal conversion:", e);
         }
-        ext.enableDefinitionHighlighting();
-      } catch (e) {
-        console.error("egov-ext: Error enabling definition highlighting:", e);
       }
+
+      // 括弧書きの薄字化・虹色カッコ
+      if (ext.settings.dim && isLawPage && ext.enableDimParentheses) {
+        try {
+          ext.enableDimParentheses();
+        } catch (e) {
+          console.error("egov-ext: Error enabling dim parentheses:", e);
+        }
+      }
+
+      // 接続詞の色分け（又は・若しくは・並びに・及び）
+      if (ext.settings.conjunction && isLawPage && ext.enableConjunctionHighlight) {
+        try {
+          ext.enableConjunctionHighlight();
+        } catch (e) {
+          console.error("egov-ext: Error enabling conjunction highlight:", e);
+        }
+      }
+      
+      // 定義語ホバー辞書＆ハイライト
+      if (ext.settings.definition && isLawPage && ext.extractDefinitionsAsync && ext.enableDefinitionHighlighting) {
+        try {
+          const shouldExtract = forceReset || lawIdChanged || !ext.definitionExtractionCompleted || ext.definitionMap.size === 0;
+          if (shouldExtract) {
+            // 非同期の定義語抽出（読み取り専用）を待つ間は Observer を再接続し、e-Gov 側の条文描画を取りこぼさない
+            if (ext.globalDOMObserver) {
+              ext.reconnectDOMObserver();
+            }
+            await ext.extractDefinitionsAsync();
+            if (ext.globalDOMObserver) {
+              ext.globalDOMObserver.disconnect();
+            }
+          }
+          ext.enableDefinitionHighlighting();
+        } catch (e) {
+          console.error("egov-ext: Error enabling definition highlighting:", e);
+        }
+      }
+
+      lastAppliedTextSettings = {
+        lawId: currentLawId,
+        horizontal: !!ext.settings.horizontal,
+        dim: !!ext.settings.dim,
+        conjunction: !!ext.settings.conjunction,
+        definition: !!ext.settings.definition
+      };
     }
     
     // 別タブで開く機能
@@ -849,7 +955,8 @@ window.egovExt = window.egovExt || {};
         if (originalPushState && !history._egovPatched) {
           history.pushState = function(...args) {
             const result = originalPushState.apply(this, args);
-            handleDynamicContent(true);
+            const lawChanged = ext.getLawIdFromUrl(window.location.href) !== lastObservedLawId;
+            handleDynamicContent(lawChanged);
             return result;
           };
           history._egovPatched = true;
@@ -858,7 +965,8 @@ window.egovExt = window.egovExt || {};
         if (originalReplaceState && !history._egovPatchedReplace) {
           history.replaceState = function(...args) {
             const result = originalReplaceState.apply(this, args);
-            handleDynamicContent(true);
+            const lawChanged = ext.getLawIdFromUrl(window.location.href) !== lastObservedLawId;
+            handleDynamicContent(lawChanged);
             return result;
           };
           history._egovPatchedReplace = true;

@@ -186,18 +186,22 @@ window.egovExt = window.egovExt || {};
     });
 
     // 1. 本文内テキストノードの変換
+    // 拡張機能自身が生成した装飾用 span（.egov-*）は親ブロックの TreeWalker で走査されるためクエリ段階から除外する
+    const LEAF_CANDIDATE_SELECTOR = 'div, p, h1, h2, h3, h4, h5, h6, li, td, th, span:not([class*="egov-"]), a:not([class*="egov-"])';
     let allBlocks = [];
     containers.forEach(c => {
       if (targetContainer && targetContainer.matches && targetContainer.matches('div, p, h1, h2, h3, h4, h5, h6, li, td, th, span, a')) {
         allBlocks.push(targetContainer);
       }
-      const blocks = ext.deepQuerySelectorAll(c, 'div, p, h1, h2, h3, h4, h5, h6, li, td, th, span, a');
-      allBlocks = allBlocks.concat(Array.from(blocks));
+      const blocks = ext.deepQuerySelectorAll(c, LEAF_CANDIDATE_SELECTOR);
+      for (let i = 0; i < blocks.length; i++) {
+        allBlocks.push(blocks[i]);
+      }
     });
 
     const titlebar = document.getElementById('titlebar');
     
-    const leafBlocks = Array.from(allBlocks).filter(el => {
+    const candidateLeaves = allBlocks.filter(el => {
       if (titlebar && (titlebar === el || titlebar.contains(el))) return false;
       if (el.closest && el.closest(ext.SELF_UI_SELECTOR)) return false;
       
@@ -214,9 +218,29 @@ window.egovExt = window.egovExt || {};
       return !el.querySelector(ext.BLOCK_SELECTOR);
     });
 
+    // 親ブロックがすでに candidateLeaves に含まれている場合、その内部の span や a を重複して走査しない
+    const leafSet = new Set(candidateLeaves);
+    const leafBlocks = candidateLeaves.filter(el => {
+      const tag = el.tagName;
+      if (tag === 'SPAN' || tag === 'A') {
+        let p = el.parentElement;
+        while (p && p !== targetContainer && p !== document.body) {
+          if (leafSet.has(p)) return false;
+          p = p.parentElement;
+        }
+      }
+      return true;
+    });
+
     const processLeaf = (block) => {
+      const currentText = block.textContent;
+      // 前回変換完了時とテキストが全く同じなら再走査をスキップ（動的更新時の高速化）
+      if (block._egov_horizDone === currentText) {
+        return;
+      }
       // 数字を含まないブロックは変換対象が無いのでテキストノード走査ごとスキップする
-      if (!HAS_NUM_REGEX.test(block.textContent)) {
+      if (!HAS_NUM_REGEX.test(currentText)) {
+        block._egov_horizDone = currentText;
         return;
       }
 
@@ -263,6 +287,8 @@ window.egovExt = window.egovExt || {};
           node.textContent = newVal;
         }
       });
+
+      block._egov_horizDone = block.textContent;
     };
 
     if (targetContainer) {

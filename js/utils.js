@@ -135,6 +135,7 @@ window.egovExt = window.egovExt || {};
    * 保存されたすべての要素のHTMLを元に戻す関数
    */
   ext.restoreAllOriginalHTML = function() {
+    if (ext.invalidateLeafBlocksCache) ext.invalidateLeafBlocksCache();
     if (ext.modifiedElements) {
       ext.modifiedElements.forEach(element => {
         if (element.isConnected && element._egov_originalHTML !== undefined) {
@@ -143,6 +144,7 @@ window.egovExt = window.egovExt || {};
           }
         }
         delete element._egov_originalHTML;
+        delete element._egov_horizDone;
       });
       ext.modifiedElements.clear();
     }
@@ -305,8 +307,35 @@ window.egovExt = window.egovExt || {};
    */
   const SKIP_SELECTOR = ext.SIDEBAR_SELECTOR + ', ' + ext.EXCLUDED_SELECTORS + ', ' + ext.SELF_UI_SELECTOR;
 
+  /**
+   * 同一ターン（handleDynamicContent の1パス）内で collectLeafBlocks の結果を共有する短期キャッシュ。
+   * horizontal / dim / conjunction / definition が連続して同じコンテナを走査する際の5重クエリを防ぐ。
+   */
+  let leafBlocksCacheContainer = null;
+  let leafBlocksCacheResult = null;
+  let leafBlocksCacheClearScheduled = false;
+
+  ext.invalidateLeafBlocksCache = function() {
+    leafBlocksCacheContainer = null;
+    leafBlocksCacheResult = null;
+  };
+
   ext.collectLeafBlocks = function(container, selfCandidate = null) {
     if (!container) return [];
+
+    // 全体走査（selfCandidate なし）かつ同一ターン内のキャッシュが有効なら再利用
+    if (!selfCandidate && leafBlocksCacheContainer === container && leafBlocksCacheResult) {
+      let allConnected = true;
+      for (let i = 0; i < leafBlocksCacheResult.length; i++) {
+        if (!leafBlocksCacheResult[i].isConnected) {
+          allConnected = false;
+          break;
+        }
+      }
+      if (allConnected) {
+        return leafBlocksCacheResult.slice();
+      }
+    }
 
     const candidates = [];
     if (selfCandidate && selfCandidate.matches && selfCandidate.matches(ext.BLOCK_SELECTOR)) {
@@ -334,8 +363,33 @@ window.egovExt = window.egovExt || {};
       results.push(el);
     }
 
+    if (!selfCandidate) {
+      leafBlocksCacheContainer = container;
+      leafBlocksCacheResult = results;
+      if (!leafBlocksCacheClearScheduled) {
+        leafBlocksCacheClearScheduled = true;
+        const clear = () => {
+          leafBlocksCacheClearScheduled = false;
+          leafBlocksCacheContainer = null;
+          leafBlocksCacheResult = null;
+        };
+        if (typeof queueMicrotask === 'function') {
+          queueMicrotask(clear);
+        } else {
+          Promise.resolve().then(clear);
+        }
+      }
+    }
+
     return results;
   };
+
+  /**
+   * 非同期チャンク実行時の1フレームあたりの最大実行時間予算（ミリ秒）。
+   * Long Task の境界（50ms）より十分小さい値とし、UIの応答性を保ちつつスループットを高める。
+   * @type {number}
+   */
+  const CHUNK_TIME_BUDGET_MS = 16;
 
   /**
    * 要素配列を指定サイズのチャンクに分割し、非同期かつ非ブロッキングで処理を実行する
@@ -354,8 +408,10 @@ window.egovExt = window.egovExt || {};
     state.done = new Promise(resolve => { state.resolveDone = resolve; });
     ext.activeTasks[taskName] = state;
 
+    const getNow = () => (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now();
+
     let index = 0;
-    function runNextChunk() {
+    function runNextChunk(isFirst = false) {
       if (state.cancelled) {
         state.resolveDone();
         if (onComplete) onComplete(state);
@@ -368,22 +424,33 @@ window.egovExt = window.egovExt || {};
         ext.globalDOMObserver.disconnect();
       }
 
-      const end = Math.min(index + chunkSize, items.length);
-      for (let i = index; i < end; i++) {
-        processFunc(items[i]);
-      }
-      index = end;
-
-      // チャンク処理終了後に監視を再開
-      if (wasObserving && ext.reconnectDOMObserver) {
-        ext.reconnectDOMObserver();
+      try {
+        // 初回は呼び出し元の同期処理をブロックしすぎないよう1チャンクのみ実行し、
+        // 2回目以降の非同期ターンでは時間予算（CHUNK_TIME_BUDGET_MS）内で複数チャンクを連続処理する
+        const deadline = getNow() + CHUNK_TIME_BUDGET_MS;
+        do {
+          const end = Math.min(index + chunkSize, items.length);
+          for (let i = index; i < end; i++) {
+            processFunc(items[i]);
+          }
+          index = end;
+        } while (!isFirst && index < items.length && !state.cancelled && getNow() < deadline);
+      } finally {
+        // チャンク処理終了後に監視を再開
+        if (wasObserving && ext.reconnectDOMObserver) {
+          ext.reconnectDOMObserver();
+        }
       }
 
       if (index < items.length) {
+        const scheduleNext = () => runNextChunk(false);
         if (window.requestIdleCallback) {
-          window.requestIdleCallback(runNextChunk);
+          // timeout を指定し、ページ描画中やスクロール中でも最大50ms以内に必ず進行させる
+          window.requestIdleCallback(scheduleNext, { timeout: 50 });
+        } else if ('scheduler' in window && window.scheduler && typeof window.scheduler.yield === 'function') {
+          window.scheduler.yield().then(scheduleNext);
         } else {
-          setTimeout(runNextChunk, 0);
+          setTimeout(scheduleNext, 0);
         }
       } else {
         if (ext.activeTasks[taskName] === state) {
@@ -394,7 +461,7 @@ window.egovExt = window.egovExt || {};
       }
     }
 
-    runNextChunk();
+    runNextChunk(true);
     return state;
   };
 
@@ -916,6 +983,52 @@ window.egovExt = window.egovExt || {};
   }
 
   /**
+   * 章・節を省いた短い ID などを高速に解決するためのプレフィックス別キャッシュ。
+   * backref.js などで数千本のリンクを連続解決する際の O(N^2) DOM 走査を O(1) に短縮する。
+   * @type {Map<string, {byNorm: Map<string, HTMLElement>, candidates: HTMLElement[]}>}
+   */
+  const targetLookupCache = new Map();
+  let targetLookupClearScheduled = false;
+
+  function getPrefixLookup(prefix, escapeAttr) {
+    let entry = targetLookupCache.get(prefix);
+    if (entry) {
+      // 先頭と末尾が DOM に接続されていればキャッシュ有効とみなす
+      const len = entry.candidates.length;
+      if (len === 0 || (entry.candidates[0].isConnected && entry.candidates[len - 1].isConnected)) {
+        return entry;
+      }
+    }
+
+    const candidates = (ext.deepQuerySelectorAll ? ext.deepQuerySelectorAll(document.body, `[id^="${escapeAttr(prefix)}-"], [id^="${escapeAttr(prefix)}_"]`)
+                                                 : Array.from(document.querySelectorAll(`[id^="${escapeAttr(prefix)}-"], [id^="${escapeAttr(prefix)}_"]`)));
+    const byNorm = new Map();
+    for (let i = 0; i < candidates.length; i++) {
+      const el = candidates[i];
+      const norm = normalizeIdForMatch(el.id);
+      if (!byNorm.has(norm)) {
+        byNorm.set(norm, el);
+      }
+    }
+    entry = { byNorm, candidates };
+    targetLookupCache.set(prefix, entry);
+
+    if (!targetLookupClearScheduled) {
+      targetLookupClearScheduled = true;
+      const clear = () => {
+        targetLookupClearScheduled = false;
+        targetLookupCache.clear();
+      };
+      if (typeof queueMicrotask === 'function') {
+        queueMicrotask(clear);
+      } else {
+        Promise.resolve().then(clear);
+      }
+    }
+    return entry;
+  }
+
+  /**
    * リンクの参照先 ID から、実際の対象要素を解決する共通関数。
    * 章・節を省いた短い形（Mp-At_2-Pr_1-It_14）、ハイフン／アンダースコアの表記揺れ
    * （Mp-At_ ⇄ Mp_At_）、改正附則の前方一致・後方一致に対応。
@@ -952,19 +1065,25 @@ window.egovExt = window.egovExt || {};
     const match = targetId.match(/^(Mp|Sp|[0-9A-Za-z]+-Sp)[-_](.+)$/);
     if (!match) return null;
     const prefix = match[1];
-    const candidates = (ext.deepQuerySelectorAll ? ext.deepQuerySelectorAll(document.body, `[id^="${escapeAttr(prefix)}-"], [id^="${escapeAttr(prefix)}_"]`)
-                                                 : Array.from(document.querySelectorAll(`[id^="${escapeAttr(prefix)}-"], [id^="${escapeAttr(prefix)}_"]`)));
+    let lookup = getPrefixLookup(prefix, escapeAttr);
 
     // 2. 章・節を省いた短い形。段を取り除いた id が完全に一致するものだけを採る
     //    （後方一致だけで探すと「At_2」が別の段の「At_2」に当たりうる）
     const wanted = normalizeIdForMatch(targetId);
     // 段だけを指す id（Mp-Ch_3）は段を取ると何も残らず、どの要素とも一致してしまう
-    for (let i = 0; wanted.length > prefix.length && i < candidates.length; i++) {
-      if (normalizeIdForMatch(candidates[i].id) === wanted) return candidates[i];
+    if (wanted.length > prefix.length) {
+      let hit = lookup.byNorm.get(wanted);
+      if (hit && hit.isConnected) return hit;
+      // 同一ターン内に後からDOMへ追加された要素がある場合に備え、1度だけ再走査を試みる
+      targetLookupCache.delete(prefix);
+      lookup = getPrefixLookup(prefix, escapeAttr);
+      hit = lookup.byNorm.get(wanted);
+      if (hit && hit.isConnected) return hit;
     }
 
     // 3. 改正附則などの後方一致（区切りの直後から一致するものに限る）
     const tail = match[2];
+    const candidates = lookup.candidates;
     for (let i = 0; i < candidates.length; i++) {
       const id = candidates[i].id;
       if (id.length > tail.length && id.endsWith(tail) && /[-_]/.test(id[id.length - tail.length - 1])) {

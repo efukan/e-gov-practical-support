@@ -2798,6 +2798,153 @@ async function check(name, fn) {
     return '法令番号括弧の薄字化除外、通常注記・体言止め注記の薄字化維持、枝番号・ネスト・aタグ共存の完全動作を確認';
   });
 
+  console.log('\n--- 12. 動作速度・安定性改善（キャッシュ・差分設定反映・段階的被引用取得）の検証 ---');
+
+  await check('collectLeafBlocks 同一ターンキャッシュと restoreAllOriginalHTML による無効化', async () => {
+    const { window, ext } = await createTestEnv(SAMPLE_LAW_HTML);
+    const container = ext.getLawContainer();
+    ext.invalidateLeafBlocksCache();
+
+    let queryCount = 0;
+    const origDeepQuery = ext.deepQuerySelectorAll;
+    ext.deepQuerySelectorAll = function(...args) {
+      queryCount++;
+      return origDeepQuery.apply(this, args);
+    };
+
+    const blocks1 = ext.collectLeafBlocks(container, null);
+    const blocks2 = ext.collectLeafBlocks(container, null);
+    if (queryCount !== 1 || blocks1.length !== blocks2.length) {
+      ext.deepQuerySelectorAll = origDeepQuery;
+      throw new Error(`同一ターン内で deepQuerySelectorAll が ${queryCount} 回呼ばれました（期待値: 1）`);
+    }
+
+    // restoreAllOriginalHTML 呼び出し後はキャッシュが破棄され、再走査されること
+    ext.restoreAllOriginalHTML();
+    const blocks3 = ext.collectLeafBlocks(container, null);
+    ext.deepQuerySelectorAll = origDeepQuery;
+    if (queryCount !== 2 || blocks3.length !== blocks1.length) {
+      throw new Error(`restoreAllOriginalHTML 後の collectLeafBlocks 再走査が機能していません: queryCount=${queryCount}`);
+    }
+    return `同一ターン再利用（走査1回）および復元時キャッシュ無効化を確認 (${blocks3.length} blocks)`;
+  });
+
+  await check('設定の差分更新 (handleDynamicContent("settings")): 非テキスト設定トグル時に全文HTML巻き戻しを行わない', async () => {
+    const { window, ext } = await createTestEnv(SAMPLE_LAW_HTML);
+    ext.settings = Object.assign({}, ext.DEFAULT_SETTINGS, {
+      global: true,
+      horizontal: true,
+      dim: true,
+      conjunction: true,
+      definition: true,
+      backref: false,
+      marker: false
+    });
+
+    // 初回設定反映
+    await ext._testContent.handleDynamicContent('settings');
+
+    let restoreCount = 0;
+    const origRestore = ext.restoreAllOriginalHTML;
+    ext.restoreAllOriginalHTML = function(...args) {
+      restoreCount++;
+      return origRestore.apply(this, args);
+    };
+
+    // 非テキスト系設定（逆引き backref・マーカー marker）を ON に切り替え
+    ext.settings.backref = true;
+    ext.settings.marker = true;
+    await ext._testContent.handleDynamicContent('settings');
+
+    if (restoreCount !== 0) {
+      throw new Error(`非テキスト設定のトグルで restoreAllOriginalHTML が ${restoreCount} 回呼ばれました（期待値: 0）`);
+    }
+
+    // テキスト系設定（薄字化 dim）を OFF に切り替えた場合は restoreAllOriginalHTML が1回呼ばれること
+    ext.settings.dim = false;
+    await ext._testContent.handleDynamicContent('settings');
+    ext.restoreAllOriginalHTML = origRestore;
+
+    if (restoreCount !== 1) {
+      throw new Error(`テキスト設定のトグルで restoreAllOriginalHTML が ${restoreCount} 回呼ばれました（期待値: 1）`);
+    }
+    if (window.document.querySelector('.egov-ext-dimmed-text')) {
+      throw new Error('dim OFF 後に薄字化要素が残存しています');
+    }
+    if (!window.document.querySelector('#Mp-At_2-Pr_1 ._div_ParagraphSentence').textContent.includes('第３条第２項')) {
+      throw new Error('dim OFF 後に横書き変換まで消えてしまっています');
+    }
+    return '非テキスト設定トグル時の巻き戻しスキップ（0回）とテキスト設定変更時の正常巻き戻し（1回）を確認';
+  });
+
+  await check('被引用データの段階的差分取得とリビジョンキャッシュ再利用', async () => {
+    const { window, ext } = await createTestEnv(SAMPLE_LAW_HTML);
+    ext.settings = Object.assign({}, ext.DEFAULT_SETTINGS, { global: true, citation: true });
+    ext.disableCitations();
+    ext.citationRevisionCache.clear();
+
+    let revFetchCount = 0;
+    let inyoBatches = [];
+    window.fetch = async (url, opts) => {
+      if (url.includes('SelectLawRevisionData')) {
+        revFetchCount++;
+        return {
+          ok: true,
+          json: async () => ({
+            result: {
+              revision_list: [{ law_data_id: '415AC0000000057_01', subRevision: '0', IsCurrentEnforcement: true }]
+            }
+          })
+        };
+      }
+      if (url.includes('SelectInyoLawData')) {
+        const body = JSON.parse(opts.body);
+        inyoBatches.push(body.selTextList);
+        return {
+          ok: true,
+          json: async () => ({
+            result: {
+              success: true,
+              inyo_data: body.selTextList.map(id => ({
+                selText: id,
+                inyo_list: [{ law_id: '140AC0000000045', law_name: '刑法', path: '第十条', url: '/law/140AC0000000045#Mp-At_10' }]
+              }))
+            }
+          })
+        };
+      }
+      return { ok: false };
+    };
+    global.fetch = window.fetch;
+
+    // 1回目: Mp-At_1, Mp-At_2 の2条文が存在する状態で取得
+    await ext.enableCitations();
+    if (revFetchCount !== 1 || inyoBatches.length !== 1 || inyoBatches[0].length !== 2) {
+      throw new Error(`初回取得の通信回数が想定外です: rev=${revFetchCount}, batches=${JSON.stringify(inyoBatches)}`);
+    }
+
+    // 2回目: 新たに Mp-At_3 が遅延描画されたケースをシミュレート
+    const lawBody = window.document.querySelector('.LawBody');
+    const newArt = window.document.createElement('div');
+    newArt.className = '_div_Article';
+    newArt.id = 'Mp-At_3';
+    newArt.innerHTML = '<div class="_div_ArticleTitle"><span>第三条</span></div>';
+    lawBody.appendChild(newArt);
+
+    await ext.enableCitations();
+    // リビジョンAPIはキャッシュから再利用（1回のまま）、被引用APIは未取得の Mp-At_3 のみ（1件）が追加取得されること
+    if (revFetchCount !== 1) {
+      throw new Error(`リビジョンAPIがキャッシュされず再通信されました: revFetchCount=${revFetchCount}`);
+    }
+    if (inyoBatches.length !== 2 || inyoBatches[1].join(',') !== 'Mp-At_3') {
+      throw new Error(`遅延追加条文の差分取得が機能していません: batches=${JSON.stringify(inyoBatches)}`);
+    }
+    if (!window.document.querySelector('#Mp-At_3 .egov-ext-citation-btn')) {
+      throw new Error('遅延追加された第三条に被引用ボタンが挿入されていません');
+    }
+    return '遅延描画条文の差分API取得（Mp-At_3のみ）とリビジョンキャッシュ再利用を確認';
+  });
+
   console.log('\n==========================================');
   if (failures === 0) {
     console.log('🎉 全ての相互作用・順序・重複検証テストに成功しました！');

@@ -58,6 +58,13 @@ window.egovExt = window.egovExt || {};
   let currentLawId = null;
 
   /**
+   * 現在の法令IDに対してすでに被引用API取得を実行済みの条文 ObjectId セット。
+   * e-Gov が段階的に条文DOMを描画した場合でも、後から追加された条文のみ差分取得できるようにする。
+   * @type {Set<string>}
+   */
+  const fetchedObjectIds = new Set();
+
+  /**
    * 現在ホバー中の引用リンク要素
    * @type {HTMLElement|null}
    */
@@ -88,34 +95,42 @@ window.egovExt = window.egovExt || {};
 
     setupCitationTooltip();
 
-    // すでに同じLawIDでロード済みの場合は、DOMへのボタン挿入のみ行う
-    if (currentLawId === lawId && ext.citationMap.size > 0) {
-      insertCitationButtons();
-      return;
+    if (currentLawId !== lawId) {
+      currentLawId = lawId;
+      ext.citationMap.clear();
+      fetchedObjectIds.clear();
     }
 
-    currentLawId = lawId;
-    ext.citationMap.clear();
-
     try {
-      // 1. DOMから全条文のObjectIdを収集する
+      // 1. DOMから全条文のObjectIdを収集し、未取得の条文IDのみを抽出する
       const objectIds = collectArticleObjectIds();
       if (objectIds.length === 0) return;
 
-      // 2. 内部APIを叩いてデータを一括取得する
-      const inyoDataList = await fetchInyoData(lawId, objectIds);
-      if (!inyoDataList || inyoDataList.length === 0) return;
+      const unfetchedIds = objectIds.filter(id => !fetchedObjectIds.has(id));
+      if (unfetchedIds.length === 0) {
+        if (ext.citationMap.size > 0) {
+          insertCitationButtons();
+        }
+        return;
+      }
 
-      // 3. キャッシュに登録する
-      for (let i = 0; i < inyoDataList.length; i++) {
-        const item = inyoDataList[i];
-        if (item.selText && item.inyo_list && item.inyo_list.length > 0) {
-          ext.citationMap.set(item.selText, item.inyo_list);
+      // 2. 内部APIを叩いて未取得条文のデータを一括取得する
+      const inyoDataList = await fetchInyoData(lawId, unfetchedIds);
+      if (inyoDataList) {
+        unfetchedIds.forEach(id => fetchedObjectIds.add(id));
+        // 3. キャッシュに登録する
+        for (let i = 0; i < inyoDataList.length; i++) {
+          const item = inyoDataList[i];
+          if (item.selText && item.inyo_list && item.inyo_list.length > 0) {
+            ext.citationMap.set(item.selText, item.inyo_list);
+          }
         }
       }
 
       // 4. データが存在する条文にのみ「被引用」ボタンを挿入する
-      insertCitationButtons();
+      if (ext.citationMap.size > 0) {
+        insertCitationButtons();
+      }
     } catch (e) {
       console.error("egov-ext: Error enabling citations:", e);
     }
@@ -152,6 +167,7 @@ window.egovExt = window.egovExt || {};
     ext.citationMap.clear();
     ext.citationPreviewCache.clear();
     ext.citationXmlCache.clear();
+    fetchedObjectIds.clear();
     inFlightFetches.clear();
     activePreviewLink = null;
     currentLawId = null;
@@ -184,27 +200,35 @@ window.egovExt = window.egovExt || {};
    */
   async function fetchInyoData(lawId, objectIds) {
     try {
-      // API 1: revision情報の取得
-      const revRes = await fetch('https://laws.e-gov.go.jp/internal-api/SelectLawRevisionData.json', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json, text/plain, */*'
-        },
-        body: JSON.stringify({ law_id: lawId })
-      });
-      if (!revRes.ok) throw new Error(`SelectLawRevisionData failed with status ${revRes.status}`);
-      const revData = await revRes.json();
-      
-      const revisionList = revData.result.revision_list || revData.result.Amendment_History;
-      if (!revData || !revData.result || !revisionList || revisionList.length === 0) {
-        return null;
+      let revInfo = ext.citationRevisionCache.get(lawId);
+      if (!revInfo) {
+        // API 1: revision情報の取得（同一法令IDではキャッシュして2回目以降の通信を省略）
+        const revRes = await fetch('https://laws.e-gov.go.jp/internal-api/SelectLawRevisionData.json', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Accept': 'application/json, text/plain, */*'
+          },
+          body: JSON.stringify({ law_id: lawId })
+        });
+        if (!revRes.ok) throw new Error(`SelectLawRevisionData failed with status ${revRes.status}`);
+        const revData = await revRes.json();
+        
+        const revisionList = revData && revData.result && (revData.result.revision_list || revData.result.Amendment_History);
+        if (!revisionList || revisionList.length === 0) {
+          return null;
+        }
+
+        // 現在施行されているリビジョンを取得 (無ければ最初の要素を使用)
+        const currentRevision = revisionList.find(r => r.IsCurrentEnforcement || r.isCurrentEnforcement) || revisionList[0];
+        revInfo = {
+          lawDataId: currentRevision.law_data_id || currentRevision.LawDataId,
+          subRevision: currentRevision.subRevision || currentRevision.SubRevision
+        };
+        ext.citationRevisionCache.set(lawId, revInfo);
       }
 
-      // 現在施行されているリビジョンを取得 (無ければ最初の要素を使用)
-      const currentRevision = revisionList.find(r => r.IsCurrentEnforcement || r.isCurrentEnforcement) || revisionList[0];
-      const lawDataId = currentRevision.law_data_id || currentRevision.LawDataId;
-      const subRevision = currentRevision.subRevision || currentRevision.SubRevision;
+      const { lawDataId, subRevision } = revInfo;
 
       // 日付の取得 (YYYY/MM/DD形式)
       const date = new Date();
@@ -237,10 +261,41 @@ window.egovExt = window.egovExt || {};
   }
 
   /**
+   * 単一の条文要素に対して「被引用」ボタンを挿入する内部ヘルパー
+   * @param {Element} articleEl
+   */
+  function attachCitationButtonToArticle(articleEl) {
+    if (!articleEl) return;
+    // すでにボタンが挿入されているかチェック
+    if (articleEl.querySelector('.egov-ext-citation-btn')) return;
+
+    // 条文のタイトル要素 (例: 「第１条」など) を探す (大文字・小文字・ハイフン表記等のバリエーションを網羅)
+    const titleEl = articleEl.querySelector('.ArticleTitle, ._div_ArticleTitle, .articletitle, ._div_articletitle, .article-title, .paragraph-title, .paragraphtitle');
+    if (!titleEl) return;
+
+    // ボタン要素の作成 (イベントはグローバルデリゲーションで処理するため貼らない)
+    const btn = document.createElement('button');
+    btn.className = 'egov-ext-citation-btn';
+    btn.type = 'button';
+    btn.title = 'この条文の被引用法令一覧を表示';
+    btn.innerHTML = `<svg viewBox="0 0 24 24" width="12" height="12" fill="currentColor"><path d="M20 2H4c-1.1 0-1.99.9-1.99 2L2 22l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zM6 9h12v2H6V9zm8 5H6v-2h8v2zm4-6H6V6h12v2z"/></svg>引用`;
+
+    // タイトルの直後に挿入 (インライン)
+    // 公職選挙法などのように、_div_ArticleTitle の中に本文が同居しているケースに対応するため、
+    // 内部の最初の span (「第一条」等の条数ラベル) の直後に挿入を試みる。
+    const labelSpan = titleEl.querySelector('span');
+    if (labelSpan && labelSpan.parentNode === titleEl) {
+      labelSpan.parentNode.insertBefore(btn, labelSpan.nextSibling);
+    } else {
+      titleEl.appendChild(btn);
+    }
+  }
+
+  /**
    * 被引用データが存在する条文タイトル（見出し）の直後に「被引用」ボタンを挿入する関数
    */
   function insertCitationButtons() {
-    const container = ext.getLawContainer();
+    if (ext.citationMap.size === 0) return;
 
     // ボタンの一括挿入に伴うMutationObserverのカスケード発火（全ボタンへの不要走査）を完全に防止する
     const wasObserving = ext.globalDOMObserver !== null && ext.globalDOMObserver !== undefined;
@@ -249,35 +304,23 @@ window.egovExt = window.egovExt || {};
     }
 
     try {
-      const articles = ext.deepQuerySelectorAll(container, ARTICLE_SELECTOR);
-      articles.forEach(articleEl => {
-        const objectId = articleEl.id;
-        if (!objectId || !ext.citationMap.has(objectId)) return;
-
-        // すでにボタンが挿入されているかチェック
-        if (articleEl.querySelector('.egov-ext-citation-btn')) return;
-
-        // 条文のタイトル要素 (例: 「第１条」など) を探す (大文字・小文字・ハイフン表記等のバリエーションを網羅)
-        const titleEl = articleEl.querySelector('.ArticleTitle, ._div_ArticleTitle, .articletitle, ._div_articletitle, .article-title, .paragraph-title, .paragraphtitle');
-        if (!titleEl) return;
-
-        // ボタン要素の作成 (イベントはグローバルデリゲーションで処理するため貼らない)
-        const btn = document.createElement('button');
-        btn.className = 'egov-ext-citation-btn';
-        btn.type = 'button';
-        btn.title = 'この条文の被引用法令一覧を表示';
-        btn.innerHTML = `<svg viewBox="0 0 24 24" width="12" height="12" fill="currentColor"><path d="M20 2H4c-1.1 0-1.99.9-1.99 2L2 22l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zM6 9h12v2H6V9zm8 5H6v-2h8v2zm4-6H6V6h12v2z"/></svg>引用`;
-
-        // タイトルの直後に挿入 (インライン)
-        // 公職選挙法などのように、_div_ArticleTitle の中に本文が同居しているケースに対応するため、
-        // 内部の最初の span (「第一条」等の条数ラベル) の直後に挿入を試みる。
-        const labelSpan = titleEl.querySelector('span');
-        if (labelSpan && labelSpan.parentNode === titleEl) {
-          labelSpan.parentNode.insertBefore(btn, labelSpan.nextSibling);
-        } else {
-          titleEl.appendChild(btn);
-        }
-      });
+      if (!ext.hasShadowRoots) {
+        // Shadow DOM が無い通常ケースでは、全条文を querySelectorAll せず citationMap のキーから O(1) で直接引き当てる
+        ext.citationMap.forEach((_, objectId) => {
+          const articleEl = document.getElementById(objectId);
+          if (articleEl) {
+            attachCitationButtonToArticle(articleEl);
+          }
+        });
+      } else {
+        const container = ext.getLawContainer();
+        const articles = ext.deepQuerySelectorAll(container, ARTICLE_SELECTOR);
+        articles.forEach(articleEl => {
+          const objectId = articleEl.id;
+          if (!objectId || !ext.citationMap.has(objectId)) return;
+          attachCitationButtonToArticle(articleEl);
+        });
+      }
     } finally {
       if (wasObserving && ext.reconnectDOMObserver) {
         ext.reconnectDOMObserver();

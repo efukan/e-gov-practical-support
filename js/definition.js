@@ -1501,6 +1501,14 @@ window.egovExt = window.egovExt || {};
   }
 
   /**
+   * 定義語ハイライト用の頭文字別バケットキャッシュ（同期呼び出し連発時の再ソート・配列再生成を防止）
+   * @type {Map<string, string[]>|null}
+   */
+  let cachedBuckets = null;
+  let cachedBucketsSize = -1;
+  let cachedBucketsKeySet = new Set();
+
+  /**
    * 抽出された定義語を安全にハイライト処理する関数（非同期チャンク分割版）
    * @param {HTMLElement|null} [targetContainer=null] - 適用対象のDOMコンテナ
    */
@@ -1513,15 +1521,32 @@ window.egovExt = window.egovExt || {};
       return;
     }
 
-    // 語の頭の 1 字ごとに、長い語から順に並べる（同じ位置では長い語を先に試す）
-    const buckets = new Map();
-    ext.definitionMap.forEach((_, term) => {
-      if (!term) return;
-      const head = term[0];
-      const arr = buckets.get(head);
-      if (arr) arr.push(term); else buckets.set(head, [term]);
-    });
-    buckets.forEach(arr => arr.sort((a, b) => b.length - a.length));
+    // 定義語セットが変化していない場合はキャッシュ済みバケットを再利用する
+    let needsRebuild = !cachedBuckets || cachedBucketsSize !== ext.definitionMap.size;
+    if (!needsRebuild) {
+      for (const term of ext.definitionMap.keys()) {
+        if (!cachedBucketsKeySet.has(term)) {
+          needsRebuild = true;
+          break;
+        }
+      }
+    }
+
+    if (needsRebuild) {
+      // 語の頭の 1 字ごとに、長い語から順に並べる（同じ位置では長い語を先に試す）
+      cachedBuckets = new Map();
+      cachedBucketsKeySet = new Set();
+      ext.definitionMap.forEach((_, term) => {
+        if (!term) return;
+        cachedBucketsKeySet.add(term);
+        const head = term[0];
+        const arr = cachedBuckets.get(head);
+        if (arr) arr.push(term); else cachedBuckets.set(head, [term]);
+      });
+      cachedBuckets.forEach(arr => arr.sort((a, b) => b.length - a.length));
+      cachedBucketsSize = ext.definitionMap.size;
+    }
+    const buckets = cachedBuckets;
 
     const container = targetContainer || ext.getLawContainer();
     const blocks = ext.collectLeafBlocks(container, targetContainer);

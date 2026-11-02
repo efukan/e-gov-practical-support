@@ -905,7 +905,7 @@ window.egovExt = window.egovExt || {};
     const link = ext.getComposedTarget(e, 'a');
     if (!link || !link.hasAttribute('href')) return;
     
-    if (ext.deepClosest(link, '.Article, .provisiontext, .lawdetailcontent, .dialog')) {
+    if (ext.deepClosest(link, '.Article, .provisiontext, .lawdetailcontent, .dialog, .egov-ext-header-container, #egov-ext-himotoki-btn')) {
       return;
     }
     

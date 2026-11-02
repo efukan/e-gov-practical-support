@@ -503,6 +503,15 @@ async function main() {
     assert.strictEqual(ext.buildHimotokiUrl(), 'https://himotoki.efukan.jp/law/322AC0000000067', '附則では法令トップへフォールバックする');
     window.location.hash = '';
 
+    // ひもときボタンにマウスを乗せても、参照条文プレビュー（refer_popup.js）は出さない
+    window.eval(fs.readFileSync(path.join(ROOT_DIR, 'js', 'tooltip.js'), 'utf8'));
+    window.eval(fs.readFileSync(path.join(ROOT_DIR, 'js', 'refer_popup.js'), 'utf8'));
+    ext.enablePopup();
+    himotoki.dispatchEvent(new window.MouseEvent('mouseover', { bubbles: true }));
+    await new Promise(r => setTimeout(r, 380));
+    assert(!ext.referenceTooltip.el.classList.contains('visible'), 'ひもときボタンにマウスを乗せても参照条文プレビューは出ない');
+    ext.disablePopup();
+
     search.click();
     gear.click();
     assert.strictEqual(sent.map(m => m.type).join(','), 'OPEN_LAW_SEARCH,OPEN_OPTIONS_PAGE', '虫眼鏡は検索、歯車は設定画面を開く依頼を送る');

@@ -48,7 +48,7 @@ window.egovExt = window.egovExt || {};
    * 拡張機能自身が挿入した自作UI要素を指すセレクタ
    * @type {string}
    */
-  ext.SELF_UI_SELECTOR = '.egov-ext-tip, .egov-ext-header-container, #egov-ext-jump-container, #egov-ext-fav-btn, #egov-ext-quick-toggles, #egov-ext-search-btn, #egov-ext-settings-btn, .egov-ext-citation-btn, .egov-ext-backref-btn, .egov-ext-note-flag, .egov-ext-mk-toolbar, .egov-ext-mk-card';
+  ext.SELF_UI_SELECTOR = '.egov-ext-tip, .egov-ext-header-container, #egov-ext-jump-container, #egov-ext-fav-btn, #egov-ext-quick-toggles, #egov-ext-himotoki-btn, #egov-ext-search-btn, #egov-ext-settings-btn, .egov-ext-citation-btn, .egov-ext-backref-btn, .egov-ext-note-flag, .egov-ext-mk-toolbar, .egov-ext-mk-card';
 
   /**
    * 非同期実行タスクの追跡管理オブジェクト（多重起動防止およびキャンセル排他制御用）

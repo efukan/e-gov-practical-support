@@ -449,8 +449,17 @@ window.egovExt = window.egovExt || {};
       tooltip: ext.referenceTooltip,
       isEnabled: () => !!(ext.settings.global && ext.settings.popup && ext.checkIfLawPage && ext.checkIfLawPage()),
       resolveContent: (a) => {
-        // 左カラム（サイドバー、目次）や被引用一覧ツールチップ内のリンクはプレビューしない
-        if (ext.deepClosest(a, ext.SIDEBAR_SELECTOR) || ext.deepClosest(a, '.egov-ext-tip--citation')) return null;
+        // 左カラム（サイドバー、目次）、被引用一覧ツールチップ、拡張の右上バー（法令ひもときボタン等）はプレビューしない
+        if (ext.deepClosest(a, ext.SIDEBAR_SELECTOR)
+            || ext.deepClosest(a, '.egov-ext-tip--citation, .egov-ext-header-container, #egov-ext-himotoki-btn')) {
+          return null;
+        }
+        // e-Gov 以外の外部サイト（himotoki.efukan.jp など）へのリンクはプレビューしない
+        try {
+          if (a.origin && window.location.origin && a.origin !== window.location.origin) {
+            return null;
+          }
+        } catch (e) {}
 
         const currentLawId = ext.getLawIdFromUrl(window.location.href);
         const targetLawId = ext.getLawIdFromUrl(a.href);

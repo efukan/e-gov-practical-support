@@ -10,6 +10,52 @@ window.egovExt = window.egovExt || {};
 
 (function(ext) {
 
+  /** ショートカットキー監視リスナーが登録済みかどうか */
+  let shortcutBound = false;
+
+  /**
+   * フォーカス中の要素が文字入力欄（input, textarea, select, contentEditable）かどうかを判定する
+   * @param {Element|null} el
+   * @returns {boolean}
+   */
+  function isEditableElement(el) {
+    if (!el || el.nodeType !== 1) return false;
+    const tag = (el.tagName || '').toUpperCase();
+    if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return true;
+    if (el.isContentEditable || el.getAttribute('contenteditable') === 'true') return true;
+    return false;
+  }
+
+  /**
+   * 条文ジャンプ検索へフォーカスを移すキーボードショートカット（`/` または `Ctrl+K` / `Cmd+K`）
+   * @param {KeyboardEvent} e
+   */
+  function handleJumpShortcutKeydown(e) {
+    if (!ext.settings || !ext.settings.global || !ext.settings.jump) return;
+    if (ext.checkIfLawPage && !ext.checkIfLawPage()) return;
+    if (e.defaultPrevented || e.isComposing) return;
+
+    const isSlash = e.key === '/' && !e.ctrlKey && !e.metaKey && !e.altKey;
+    const isModK = (e.key === 'k' || e.key === 'K') && (e.ctrlKey || e.metaKey) && !e.altKey && !e.shiftKey;
+    if (!isSlash && !isModK) return;
+
+    const container = document.getElementById('egov-ext-jump-container');
+    const input = container ? container.querySelector('.egov-ext-jump-input') : null;
+    if (!input) return;
+
+    const active = document.activeElement;
+    // すでに別の入力欄（メモ欄やe-Gov検索欄など）にフォーカスがある場合は横取りしない
+    if (active && active !== input && isEditableElement(active)) return;
+    // `/` キーはジャンプ欄自身にフォーカスがある場合も通常の文字入力として通す
+    if (isSlash && active === input) return;
+
+    e.preventDefault();
+    input.focus();
+    if (typeof input.select === 'function') {
+      input.select();
+    }
+  }
+
   /**
    * 条文ジャンプ検索ボックスをDOMから削除する関数
    */
@@ -52,7 +98,9 @@ window.egovExt = window.egovExt || {};
     input.type = 'text';
     input.className = 'egov-ext-jump-input';
     input.placeholder = '条文へジャンプ (例: 5, 12-2)';
+    input.title = '条文へジャンプ（ショートカット: / または Ctrl+K / ⌘K）';
     input.setAttribute('aria-label', '条文番号検索');
+    input.setAttribute('aria-keyshortcuts', '/ Control+K Meta+K');
 
     // クリアボタン
     const clearBtn = document.createElement('span');
@@ -216,6 +264,11 @@ window.egovExt = window.egovExt || {};
         }
       }
     });
+
+    if (!shortcutBound) {
+      document.addEventListener('keydown', handleJumpShortcutKeydown);
+      shortcutBound = true;
+    }
   };
 
 

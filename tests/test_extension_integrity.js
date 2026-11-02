@@ -1107,6 +1107,47 @@ async function main() {
     assert.strictEqual(input.value, '', 'Enterキーで入力がクリアされた');
   });
 
+  runTest('条文ジャンプ検索へのキーボードショートカット (/ および Ctrl+K / Cmd+K) と他入力欄での干渉防止', () => {
+    const dom = new JSDOM(`<!DOCTYPE html><html><body><textarea id="other-memo"></textarea></body></html>`, {
+      runScripts: 'dangerously',
+      url: 'https://laws.e-gov.go.jp/law/322AC0000000067'
+    });
+    const window = dom.window;
+    const document = window.document;
+
+    window.eval(utilsJs);
+    window.eval(jumpJs);
+    const ext = window.egovExt;
+    ext.settings = { global: true, jump: true };
+
+    ext.setupJumpSearch();
+
+    const input = document.querySelector('.egov-ext-jump-input');
+    const otherMemo = document.getElementById('other-memo');
+
+    // 1. / キーで条文ジャンプ検索欄にフォーカスが移ること
+    const slashEvent = new window.KeyboardEvent('keydown', { key: '/', bubbles: true, cancelable: true });
+    document.dispatchEvent(slashEvent);
+    assert.strictEqual(document.activeElement, input, '/ キーで条文ジャンプ入力欄にフォーカスが移る');
+    assert.strictEqual(slashEvent.defaultPrevented, true, '/ キーの既定動作が抑止される');
+
+    // 2. 別の入力欄（メモ欄など）にフォーカスがあるときは横取りしないこと
+    otherMemo.focus();
+    assert.strictEqual(document.activeElement, otherMemo);
+    const slashInMemo = new window.KeyboardEvent('keydown', { key: '/', bubbles: true, cancelable: true });
+    otherMemo.dispatchEvent(slashInMemo);
+    assert.strictEqual(document.activeElement, otherMemo, '他入力欄フォーカス時は / キーを横取りしない');
+    assert.strictEqual(slashInMemo.defaultPrevented, false);
+
+    // 3. Ctrl+K / Cmd+K でも条文ジャンプ入力欄にフォーカスが移ること
+    otherMemo.blur();
+    document.body.focus();
+    const cmdKEvent = new window.KeyboardEvent('keydown', { key: 'k', metaKey: true, bubbles: true, cancelable: true });
+    document.dispatchEvent(cmdKEvent);
+    assert.strictEqual(document.activeElement, input, 'Cmd+K で条文ジャンプ入力欄にフォーカスが移る');
+    assert.strictEqual(cmdKEvent.defaultPrevented, true, 'Cmd+K の既定動作が抑止される');
+  });
+
   runTest('css/style.css 内のフォーカス視認性 (:focus-visible) 定義', () => {
     const styleCss = fs.readFileSync(path.join(ROOT_DIR, 'css', 'style.css'), 'utf8');
     assert(styleCss.includes('.egov-ext-jump-input:focus-visible'), 'jump-input の focus-visible が定義されている');
